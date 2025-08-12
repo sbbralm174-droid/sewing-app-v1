@@ -12,8 +12,8 @@ const App = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [expandedOperator, setExpandedOperator] = useState(null); // Track which operator's form is expanded
 
-  // নতুন ফাংশন যা ফ্লোর অনুযায়ী টাইম স্লট লোড করবে
   const fetchTimeSlotsByFloor = async (selectedFloor) => {
     try {
       const response = await fetch(`/api/hours?floor=${selectedFloor}`);
@@ -26,12 +26,10 @@ const App = () => {
     } catch (err) {
       console.error(err.message);
       setError('সময় স্লট লোড করা যায়নি।');
-      // API ব্যর্থ হলে একটি ডিফল্ট তালিকা ব্যবহার করা হচ্ছে
       setTimeSlots(['8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM']);
     }
   };
 
-  // দৈনিক রিপোর্ট খোঁজার জন্য ফাংশন
   const handleSearch = async (e) => {
     e.preventDefault();
     if (!date || !floor || !line) {
@@ -43,7 +41,8 @@ const App = () => {
     setSuccess(null);
     setSearchResults([]);
     setHourlyData({});
-    setTimeSlots([]); // নতুন সার্চের সময় টাইম স্লটগুলো খালি করা হচ্ছে
+    setTimeSlots([]);
+    setExpandedOperator(null); // Reset expanded operator on new search
 
     try {
       const response = await fetch(`/api/daily-production/search?date=${date}&floor=${floor}&line=${line}`);
@@ -58,7 +57,6 @@ const App = () => {
         setSearchResults(results);
         const initialHourlyData = {};
         results.forEach(report => {
-          // ডেটাবেস থেকে productionCount মান ব্যবহার করা হচ্ছে
           const currentData = (report.hourlyProduction || []).reduce((acc, item) => {
             acc[item.hour] = parseInt(item.productionCount, 10) || 0; 
             return acc;
@@ -66,8 +64,6 @@ const App = () => {
           initialHourlyData[report._id] = currentData;
         });
         setHourlyData(initialHourlyData);
-        
-        // দৈনিক রিপোর্ট সফলভাবে লোড হওয়ার পর নির্দিষ্ট ফ্লোরের জন্য টাইম স্লট লোড করা হচ্ছে
         fetchTimeSlotsByFloor(floor);
       }
     } catch (err) {
@@ -78,7 +74,6 @@ const App = () => {
     }
   };
 
-  // Hourly ডেটা পরিবর্তনের জন্য ফাংশন
   const handleHourlyChange = (reportId, hour, value) => {
     setHourlyData(prev => ({
       ...prev,
@@ -89,7 +84,6 @@ const App = () => {
     }));
   };
 
-  // Hourly রিপোর্ট জমা দেওয়ার জন্য ফাংশন
   const handleHourlySubmit = async (reportId) => {
     setLoading(true);
     setError(null);
@@ -98,7 +92,6 @@ const App = () => {
     try {
       const dataToSubmit = timeSlots.map(hour => ({
         hour: hour,
-        // ইনপুট থেকে পাওয়া মানকে productionCount হিসেবে পাঠানো হচ্ছে
         productionCount: parseInt(hourlyData[reportId]?.[hour], 10) || 0,
       }));
 
@@ -127,6 +120,10 @@ const App = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const toggleOperatorForm = (operatorId) => {
+    setExpandedOperator(expandedOperator === operatorId ? null : operatorId);
   };
 
   return (
@@ -182,54 +179,67 @@ const App = () => {
                     <th className="py-3 px-4 text-left">ইউনিক মেশিন</th>
                     <th className="py-3 px-4 text-left">টার্গেট</th>
                     <th className="py-3 px-4 text-left">মোট প্রোডাকশন</th>
+                    <th className="py-3 px-4 text-left">অ্যাকশন</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-600">
                   {searchResults.map((report) => (
-                    <tr key={report._id} className="hover:bg-gray-600 transition-colors">
-                      <td className="py-3 px-4">{report.operator.operatorId}</td>
-                      <td className="py-3 px-4">{report.operator.name}</td>
-                      <td className="py-3 px-4">{report.uniqueMachine}</td>
-                      <td className="py-3 px-4">{report.target}</td>
-                      <td className="py-3 px-4">{
-                        (report.hourlyProduction || []).reduce((sum, h) => sum + (parseInt(h.productionCount, 10) || 0), 0)
-                      }</td>
-                    </tr>
+                    <React.Fragment key={report._id}>
+                      <tr className="hover:bg-gray-600 transition-colors">
+                        <td className="py-3 px-4">{report.operator.operatorId}</td>
+                        <td className="py-3 px-4">{report.operator.name}</td>
+                        <td className="py-3 px-4">{report.uniqueMachine}</td>
+                        <td className="py-3 px-4">{report.target}</td>
+                        <td className="py-3 px-4">{
+                          (report.hourlyProduction || []).reduce((sum, h) => sum + (parseInt(h.productionCount, 10) || 0), 0)
+                        }</td>
+                        <td className="py-3 px-4">
+                          <button
+                            onClick={() => toggleOperatorForm(report._id)}
+                            className="bg-green-600 text-white font-bold py-1 px-3 rounded-lg hover:bg-green-700 transition duration-300 text-sm"
+                          >
+                            {expandedOperator === report._id ? 'ফর্ম লুকান' : 'Hourly প্রোডাকশন যোগ করুন'}
+                          </button>
+                        </td>
+                      </tr>
+                      {expandedOperator === report._id && (
+                        <tr>
+                          <td colSpan="6" className="p-4 bg-gray-700">
+                            <div className="mt-4">
+                              <h3 className="text-xl font-bold text-blue-400 mb-4 text-center">{report.operator.name} এর Hourly প্রোডাকশন রিপোর্ট</h3>
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <div className="bg-gray-600 rounded-lg p-6 shadow-md">
+                                  <div className="space-y-4">
+                                    {timeSlots.map(hour => (
+                                      <div key={hour} className="flex items-center space-x-2">
+                                        <label className="text-gray-300 w-24 flex-shrink-0">{hour}</label>
+                                        <input
+                                          type="number"
+                                          value={hourlyData[report._id]?.[hour] || ''}
+                                          onChange={(e) => handleHourlyChange(report._id, hour, e.target.value)}
+                                          className="bg-gray-800 text-gray-100 border border-gray-600 rounded-md p-2 w-full focus:ring-2 focus:ring-blue-500 outline-none"
+                                          placeholder="0"
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <button
+                                    onClick={() => handleHourlySubmit(report._id)}
+                                    className="mt-6 w-full bg-green-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-700 transition duration-300 disabled:bg-gray-500"
+                                    disabled={loading}
+                                  >
+                                    {loading ? 'সেভ করা হচ্ছে...' : 'Hourly রিপোর্ট সেভ করুন'}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>
-            </div>
-
-            <div className="mt-8">
-              <h2 className="text-3xl font-semibold text-blue-400 mb-6 text-center">Hourly প্রোডাকশন রিপোর্ট</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {searchResults.map((report) => (
-                  <div key={report._id} className="bg-gray-700 rounded-lg p-6 shadow-md">
-                    <h3 className="text-xl font-bold text-gray-200 mb-4">{report.operator.name} ({report.uniqueMachine})</h3>
-                    <div className="space-y-4">
-                      {timeSlots.map(hour => (
-                        <div key={hour} className="flex items-center space-x-2">
-                          <label className="text-gray-300 w-24 flex-shrink-0">{hour}</label>
-                          <input
-                            type="number"
-                            value={hourlyData[report._id]?.[hour] || ''}
-                            onChange={(e) => handleHourlyChange(report._id, hour, e.target.value)}
-                            className="bg-gray-800 text-gray-100 border border-gray-600 rounded-md p-2 w-full focus:ring-2 focus:ring-blue-500 outline-none"
-                            placeholder="0"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                    <button
-                      onClick={() => handleHourlySubmit(report._id)}
-                      className="mt-6 w-full bg-green-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-700 transition duration-300 disabled:bg-gray-500"
-                      disabled={loading}
-                    >
-                      {loading ? 'সেভ করা হচ্ছে...' : 'Hourly রিপোর্ট সেভ করুন'}
-                    </button>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         )}
