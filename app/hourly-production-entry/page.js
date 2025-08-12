@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const App = () => {
   const [date, setDate] = useState('');
@@ -12,7 +12,41 @@ const App = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [expandedOperator, setExpandedOperator] = useState(null); // Track which operator's form is expanded
+  const [expandedOperator, setExpandedOperator] = useState(null);
+  const [floorLines, setFloorLines] = useState([]);
+  const [filteredLines, setFilteredLines] = useState([]);
+
+  // Fetch floor and line data on component mount
+  useEffect(() => {
+    const fetchFloorLines = async () => {
+      try {
+        const response = await fetch('/api/floor-lines');
+        if (!response.ok) {
+          throw new Error('Failed to fetch floor and line data');
+        }
+        const data = await response.json();
+        setFloorLines(data);
+      } catch (err) {
+        console.error('Error fetching floor lines:', err);
+        setError('Failed to load floor and line data');
+      }
+    };
+    fetchFloorLines();
+  }, []);
+
+  // Filter lines when floor changes
+  useEffect(() => {
+    if (floor) {
+      const linesForFloor = floorLines
+        .filter(item => item.floor?.floorName === floor)
+        .map(item => item.lineNumber);
+      setFilteredLines(linesForFloor);
+      setLine(''); // Reset line when floor changes
+    } else {
+      setFilteredLines([]);
+      setLine('');
+    }
+  }, [floor, floorLines]);
 
   const fetchTimeSlotsByFloor = async (selectedFloor) => {
     try {
@@ -42,7 +76,7 @@ const App = () => {
     setSearchResults([]);
     setHourlyData({});
     setTimeSlots([]);
-    setExpandedOperator(null); // Reset expanded operator on new search
+    setExpandedOperator(null);
 
     try {
       const response = await fetch(`/api/daily-production/search?date=${date}&floor=${floor}&line=${line}`);
@@ -126,6 +160,9 @@ const App = () => {
     setExpandedOperator(expandedOperator === operatorId ? null : operatorId);
   };
 
+  // Get unique floor names
+  const uniqueFloors = [...new Set(floorLines.map(item => item.floor?.floorName).filter(Boolean))];
+
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 p-8 font-sans">
       <div className="container mx-auto max-w-7xl">
@@ -140,24 +177,40 @@ const App = () => {
               onChange={(e) => setDate(e.target.value)}
               className="bg-gray-700 text-gray-200 border-none rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none"
             />
-            <input
-              type="text"
-              placeholder="ফ্লোর (যেমন: A)"
+            
+            <select
               value={floor}
               onChange={(e) => setFloor(e.target.value)}
               className="bg-gray-700 text-gray-200 border-none rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none"
-            />
-            <input
-              type="text"
-              placeholder="লাইন (যেমন: Line-1)"
+              required
+            >
+              <option value="">ফ্লোর নির্বাচন করুন</option>
+              {uniqueFloors.map((floorName) => (
+                <option key={floorName} value={floorName}>
+                  {floorName}
+                </option>
+              ))}
+            </select>
+            
+            <select
               value={line}
               onChange={(e) => setLine(e.target.value)}
               className="bg-gray-700 text-gray-200 border-none rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none"
-            />
+              required
+              disabled={!floor}
+            >
+              <option value="">লাইন নির্বাচন করুন</option>
+              {filteredLines.map((lineNumber) => (
+                <option key={lineNumber} value={lineNumber}>
+                  {lineNumber}
+                </option>
+              ))}
+            </select>
+            
             <button
               type="submit"
               className="md:col-span-3 bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-300 transform hover:scale-105 disabled:bg-gray-500"
-              disabled={loading}
+              disabled={loading || !date || !floor || !line}
             >
               {loading ? 'খোঁজা হচ্ছে...' : 'দৈনিক রিপোর্ট খুঁজুন'}
             </button>

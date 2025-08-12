@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function OperatorForm() {
@@ -9,28 +9,37 @@ export default function OperatorForm() {
     designation: '',
     allowedProcesses: []
   });
-  const [processInput, setProcessInput] = useState('');
+  const [processes, setProcesses] = useState([]);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
+
+  useEffect(() => {
+    const fetchProcesses = async () => {
+      try {
+        const response = await fetch('/api/processes');
+        if (response.ok) {
+          const data = await response.json();
+          setProcesses(data);
+        }
+      } catch (error) {
+        console.error('Error fetching processes:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProcesses();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const addProcess = () => {
-    if (processInput && !formData.allowedProcesses.includes(processInput)) {
-      setFormData(prev => ({
-        ...prev,
-        allowedProcesses: [...prev.allowedProcesses, processInput]
-      }));
-      setProcessInput('');
-    }
-  };
-
-  const removeProcess = (process) => {
+  const handleProcessChange = (e) => {
+    const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
     setFormData(prev => ({
       ...prev,
-      allowedProcesses: prev.allowedProcesses.filter(p => p !== process)
+      allowedProcesses: selectedOptions
     }));
   };
 
@@ -51,6 +60,10 @@ export default function OperatorForm() {
       console.error('Error:', error);
     }
   };
+
+  if (loading) {
+    return <div className="container mx-auto p-4">Loading...</div>;
+  }
 
   return (
     <div className="container mx-auto p-4">
@@ -91,29 +104,30 @@ export default function OperatorForm() {
         </div>
         <div>
           <label className="block mb-1">Allowed Processes:</label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={processInput}
-              onChange={(e) => setProcessInput(e.target.value)}
-              className="flex-1 p-2 border rounded"
-              placeholder="Add process"
-            />
-            <button
-              type="button"
-              onClick={addProcess}
-              className="bg-blue-500 text-white px-4 py-2 rounded"
-            >
-              Add
-            </button>
-          </div>
+          <select
+            multiple
+            value={formData.allowedProcesses}
+            onChange={handleProcessChange}
+            className="w-full p-2 border rounded h-auto min-h-[42px]"
+            required
+          >
+            {processes.map((process) => (
+              <option key={process._id} value={process.name}>
+                {process.name}
+              </option>
+            ))}
+          </select>
+          <p className="text-sm text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple options</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {formData.allowedProcesses.map((process) => (
               <span key={process} className="bg-gray-200 px-3 py-1 rounded-full flex items-center">
                 {process}
                 <button
                   type="button"
-                  onClick={() => removeProcess(process)}
+                  onClick={() => setFormData(prev => ({
+                    ...prev,
+                    allowedProcesses: prev.allowedProcesses.filter(p => p !== process)
+                  }))}
                   className="ml-2 text-red-500"
                 >
                   ×

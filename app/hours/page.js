@@ -8,10 +8,45 @@ export default function HourlyReportPage() {
   const [hour, setHour] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitMessage, setSubmitMessage] = useState({ type: '', text: '' });
+  const [floors, setFloors] = useState([]);
 
-  // Fetch reports on page load
+  // Fetch floors and reports on page load
   useEffect(() => {
-    fetchReports();
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        // Fetch floors
+        const floorsRes = await fetch('/api/floors');
+        if (!floorsRes.ok) {
+          throw new Error('Failed to fetch floors');
+        }
+        const floorsData = await floorsRes.json();
+        setFloors(floorsData.data);
+
+        // Fetch reports
+        const reportsRes = await fetch('/api/hours', { cache: 'no-store' });
+        if (!reportsRes.ok) {
+          throw new Error('Failed to fetch reports');
+        }
+        const reportsData = await reportsRes.json();
+        
+        // Group reports by floor
+        const groupedReports = {};
+        reportsData.forEach(report => {
+          if (!groupedReports[report.floor]) {
+            groupedReports[report.floor] = [];
+          }
+          groupedReports[report.floor].push(report);
+        });
+        setReports(groupedReports);
+      } catch (error) {
+        console.error(error);
+        setSubmitMessage({ type: 'error', text: error.message });
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
   }, []);
 
   const fetchReports = async () => {
@@ -104,20 +139,26 @@ export default function HourlyReportPage() {
   return (
     <div className="min-h-screen bg-gray-100 p-8 flex items-center justify-center">
       <div className="w-full max-w-4xl bg-white p-8 rounded-xl shadow-lg">
-        <h1 className="text-3xl font-bold text-center mb-6 text-gray-800">Hourly Production Report</h1>
+        <h1 className="text-3xl font-bold text-center mb-6 text-gray-800">Add Hour by Floor Wise</h1>
 
         <form onSubmit={handleSubmit} className="space-y-4 mb-8">
           <div className="grid md:grid-cols-2 gap-4">
             <div>
               <label htmlFor="floor" className="block text-sm font-medium text-gray-700">Floor</label>
-              <input
-                type="text"
+              <select
                 id="floor"
                 value={floor}
                 onChange={(e) => setFloor(e.target.value)}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"
                 required
-              />
+              >
+                <option value="">Select a floor</option>
+                {floors.map((floor) => (
+                  <option key={floor._id} value={floor.floorName}>
+                    {floor.floorName}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>

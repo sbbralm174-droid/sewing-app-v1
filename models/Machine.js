@@ -11,14 +11,7 @@ const MachineSchema = new mongoose.Schema({
     ref: 'MachineType',
     required: true
   },
-  lineNumber: {
-    type: String,
-    required: true
-  },
-  floor: {
-    type: String,
-    required: true
-  },
+  
   currentStatus: {
     type: String,
     default: 'idle'

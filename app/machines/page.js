@@ -80,7 +80,7 @@ export default function MachineForm() {
             ))}
           </select>
         </div>
-        <div>
+        {/* <div>
           <label className="block mb-1">Line Number:</label>
           <input
             type="text"
@@ -101,7 +101,7 @@ export default function MachineForm() {
             className="w-full p-2 border rounded"
             required
           />
-        </div>
+        </div> */}
         <div>
           <label className="block mb-1">Current Status:</label>
           <select
