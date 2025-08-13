@@ -26,9 +26,9 @@ const DailyProductionSchema = new mongoose.Schema({
   line: { type: String, required: true },
   process: { type: String, required: true },
   status: { type: String, enum: ['present', 'absent'], required: true },
-  machineType: { type: String, required: true }, 
-  uniqueMachine: { type: String, required: true }, 
-  target: { type: Number, required: true },
+  machineType: { type: String,  }, 
+  uniqueMachine: { type: String,  }, 
+  target: { type: Number, },
   workAs: { type: String, enum: ['operator', 'helper'], required: true },
   hourlyProduction: [HourlyProductionSchema],
   createdAt: { type: Date, default: Date.now }

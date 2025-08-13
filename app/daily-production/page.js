@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation';
 export default function DailyProductionForm() {
     const [formData, setFormData] = useState({
         date: new Date().toISOString().split('T')[0],
-        operator: null, // এখন operator একটি object
-        supervisor: null, // এখন supervisor একটি object
-        floor: '', // এখন floorName স্ট্রিং হিসেবে থাকবে
+        operator: null,
+        supervisor: null,
+        floor: '',
         line: '',
         process: '',
         status: 'present',
@@ -56,12 +56,10 @@ export default function DailyProductionForm() {
                 setSupervisors(await supervisorsRes.json());
 
                 const floorLinesData = await floorLinesRes.json();
-
                 const uniqueFloors = [...new Map(
                     floorLinesData.map(item => [item.floor._id, { _id: item.floor._id, floorName: item.floor.floorName }])
                 ).values()];
                 setFloors(uniqueFloors);
-
                 setLines([...new Set(floorLinesData.map(item => item.lineNumber))]);
 
                 setProcesses(await processesRes.json());
@@ -80,23 +78,18 @@ export default function DailyProductionForm() {
     }, []);
 
     useEffect(() => {
-        if (formData.machineType) {
-            const filtered = machines.filter(machine => {
-                return machine.machineType && machine.machineType.name === formData.machineType;
-            });
-            setFilteredMachines(filtered);
-            if (!filtered.some(m => m.uniqueId === formData.uniqueMachine)) {
-                setFormData(prev => ({ ...prev, uniqueMachine: '' }));
-            }
-        } else {
-            setFilteredMachines([]);
+        const filtered = machines.filter(machine => {
+            return machine.machineType && machine.machineType.name === formData.machineType;
+        });
+        setFilteredMachines(filtered);
+        if (formData.workAs === 'operator' && !filtered.some(m => m.uniqueId === formData.uniqueMachine)) {
             setFormData(prev => ({ ...prev, uniqueMachine: '' }));
         }
-    }, [formData.machineType, machines]);
+    }, [formData.machineType, formData.workAs, formData.uniqueMachine, machines]);
 
-    const checkDuplicateEntry = async (operatorId, machineId, date) => {
+    const checkDuplicateEntry = async (operatorId, uniqueMachine, date, workAs) => {
         try {
-            // Check for operator duplicate
+            // Check for operator duplicate (common for both roles)
             const operatorRes = await fetch(`/api/daily-production?date=${date}&operatorId=${operatorId}`);
             if (!operatorRes.ok) {
                 throw new Error('Failed to check for operator duplicate.');
@@ -106,17 +99,18 @@ export default function DailyProductionForm() {
                 return 'This operator already has a production entry for the selected date.';
             }
 
-            // Check for machine duplicate
-            const machineRes = await fetch(`/api/daily-production?date=${date}&machine=${machineId}`);
-            if (!machineRes.ok) {
-                throw new Error('Failed to check for machine duplicate.');
+            // Check for machine duplicate only for operators
+            if (workAs === 'operator' && uniqueMachine) {
+                const machineRes = await fetch(`/api/daily-production?date=${date}&machine=${uniqueMachine}`);
+                if (!machineRes.ok) {
+                    throw new Error('Failed to check for machine duplicate.');
+                }
+                const machineEntries = await machineRes.json();
+                if (machineEntries.length > 0) {
+                    return 'This machine already has a production entry for the selected date.';
+                }
             }
-            const machineEntries = await machineRes.json();
-            if (machineEntries.length > 0) {
-                return 'This machine already has a production entry for the selected date.';
-            }
-
-            return null; // No duplicate found
+            return null;
         } catch (error) {
             console.error('Error checking duplicate:', error);
             setDuplicateError(error.message || 'Failed to check for duplicate entries.');
@@ -124,40 +118,46 @@ export default function DailyProductionForm() {
         }
     };
 
-
     const handleChange = (e) => {
         const { name, value } = e.target;
         setDuplicateError('');
 
-        if (name === 'operator') {
+        // For 'operator', clear the uniqueMachine if the machineType is changed
+        if (name === 'machineType' && formData.workAs === 'operator') {
+            setFormData(prev => ({ ...prev, [name]: value, uniqueMachine: '' }));
+        } else if (name === 'operator') {
             const selectedOperator = operators.find(op => op.operatorId === value);
             setFormData(prev => ({ ...prev, operator: selectedOperator || null }));
         } else if (name === 'supervisor') {
-            // সুপারভাইজারের ID থেকে সম্পূর্ণ অবজেক্ট খুঁজে state-এ সংরক্ষণ করা হচ্ছে।
-            // এই লজিকটি আপনার কোডে ইতিমধ্যে সঠিক ছিল।
             const selectedSupervisor = supervisors.find(sup => sup.supervisorId === value);
             setFormData(prev => ({ ...prev, supervisor: selectedSupervisor || null }));
-        } else if (name === 'floor') {
-            // floorName স্ট্রিং হিসেবে state-এ সংরক্ষণ করা হচ্ছে
-            setFormData(prev => ({ ...prev, floor: value }));
         } else {
             setFormData(prev => ({ ...prev, [name]: value }));
         }
     };
-
+    
     const handleSubmit = async (e) => {
         e.preventDefault();
         setDuplicateError('');
 
-        if (!formData.operator || !formData.uniqueMachine || !formData.supervisor) {
-            setDuplicateError('Please select an operator, supervisor, and a machine.');
+        if (!formData.operator || !formData.supervisor) {
+            setDuplicateError('Please select an operator and a supervisor.');
             return;
         }
 
+        // Validate operator-specific fields only if 'workAs' is operator
+        if (formData.workAs === 'operator') {
+            if (!formData.uniqueMachine || !formData.target) {
+                setDuplicateError('As an operator, you must select a machine and set a target.');
+                return;
+            }
+        }
+        
         const duplicateMessage = await checkDuplicateEntry(
             formData.operator.operatorId,
             formData.uniqueMachine,
-            formData.date
+            formData.date,
+            formData.workAs
         );
 
         if (duplicateMessage) {
@@ -165,10 +165,8 @@ export default function DailyProductionForm() {
             return;
         }
 
-        // এখানে আমরা একটি নতুন পেলোড তৈরি করছি যেখানে সুপারভাইজার শুধুমাত্র একটি স্ট্রিং (নাম)।
         const payload = {
             ...formData,
-            // supervisor অবজেক্টের পরিবর্তে শুধুমাত্র তার নাম পাঠানো হচ্ছে।
             supervisor: formData.supervisor.name,
         };
 
@@ -189,7 +187,7 @@ export default function DailyProductionForm() {
             setDuplicateError('Something went wrong while submitting.');
         }
     };
-
+    
     if (isLoading) {
         return <div className="container mx-auto p-4 text-center text-gray-400 bg-gray-900 min-h-screen flex items-center justify-center">Loading data... Please wait.</div>;
     }
@@ -326,61 +324,6 @@ export default function DailyProductionForm() {
                         </select>
                     </div>
 
-                    {/* Machine Type */}
-                    <div>
-                        <label className="block mb-1 text-sm font-medium text-gray-300">Machine Type:</label>
-                        <select
-                            name="machineType"
-                            value={formData.machineType}
-                            onChange={handleChange}
-                            className="w-full p-3 border border-gray-600 rounded-md shadow-sm bg-gray-700 text-white"
-                            required
-                        >
-                            <option value="">Select Machine Type</option>
-                            {machineTypes.map(type => (
-                                <option key={type._id} value={type.name}>
-                                    {type.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* Unique Machine */}
-                    {formData.machineType && (
-                        <div>
-                            <label className="block mb-1 text-sm font-medium text-gray-300">Unique Machine:</label>
-                            <select
-                                name="uniqueMachine"
-                                value={formData.uniqueMachine}
-                                onChange={handleChange}
-                                className="w-full p-3 border border-gray-600 rounded-md shadow-sm bg-gray-700 text-white"
-                                required
-                            >
-                                <option value="">Select Machine</option>
-                                {filteredMachines.map(machine => (
-                                    <option key={machine._id} value={machine.uniqueId}>
-                                        {machine.uniqueId}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
-
-                    {/* Target */}
-                    <div>
-                        <label htmlFor="target" className="block text-sm font-medium text-gray-300 mb-1">Target:</label>
-                        <input
-                            type="number"
-                            id="target"
-                            name="target"
-                            value={formData.target}
-                            onChange={handleChange}
-                            className="w-full p-3 border border-gray-600 rounded-md shadow-sm bg-gray-700 text-white focus:ring-blue-500 focus:border-blue-500"
-                            required
-                            min="1"
-                        />
-                    </div>
-
                     {/* Work As */}
                     <div>
                         <label htmlFor="workAs" className="block text-sm font-medium text-gray-300 mb-1">Work As:</label>
@@ -395,6 +338,59 @@ export default function DailyProductionForm() {
                             <option value="operator">Operator</option>
                             <option value="helper">Helper</option>
                         </select>
+                    </div>
+                    
+                    {/* Machine Type */}
+                    <div>
+                        <label className="block mb-1 text-sm font-medium text-gray-300">Machine Type:</label>
+                        <select
+                            name="machineType"
+                            value={formData.machineType}
+                            onChange={handleChange}
+                            className="w-full p-3 border border-gray-600 rounded-md shadow-sm bg-gray-700 text-white"
+                            required={formData.workAs === 'operator'} // Conditional required
+                        >
+                            <option value="">Select Machine Type</option>
+                            {machineTypes.map(type => (
+                                <option key={type._id} value={type.name}>
+                                    {type.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Unique Machine */}
+                    <div>
+                        <label className="block mb-1 text-sm font-medium text-gray-300">Unique Machine:</label>
+                        <select
+                            name="uniqueMachine"
+                            value={formData.uniqueMachine}
+                            onChange={handleChange}
+                            className="w-full p-3 border border-gray-600 rounded-md shadow-sm bg-gray-700 text-white"
+                            required={formData.workAs === 'operator'} // Conditional required
+                        >
+                            <option value="">Select Machine</option>
+                            {filteredMachines.map(machine => (
+                                <option key={machine._id} value={machine.uniqueId}>
+                                    {machine.uniqueId}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Target */}
+                    <div>
+                        <label htmlFor="target" className="block text-sm font-medium text-gray-300 mb-1">Target:</label>
+                        <input
+                            type="number"
+                            id="target"
+                            name="target"
+                            value={formData.target}
+                            onChange={handleChange}
+                            className="w-full p-3 border border-gray-600 rounded-md shadow-sm bg-gray-700 text-white focus:ring-blue-500 focus:border-blue-500"
+                            required={formData.workAs === 'operator'} // Conditional required
+                            min="1"
+                        />
                     </div>
 
                     {duplicateError && (
@@ -414,4 +410,3 @@ export default function DailyProductionForm() {
         </div>
     );
 }
-
