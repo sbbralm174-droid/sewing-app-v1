@@ -1,6 +1,9 @@
 import { connectDB } from '@/lib/db';
-import Process from '@/models/Process';
+//import Process from '@/models/Process';
 import { NextResponse } from 'next/server';
+import "@/models/MachineType";
+import Process from "@/models/Process";
+
 
 export async function POST(req) {
   try {
