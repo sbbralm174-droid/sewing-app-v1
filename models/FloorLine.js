@@ -10,21 +10,7 @@ const FloorLineSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  supervisor: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Supervisor'
-  },
-  operators: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Operator'
-  }],
-  machines: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Machine'
-  }],
-  currentProcess: {
-    type: String
-  },
+  
   createdAt: {
     type: Date,
     default: Date.now

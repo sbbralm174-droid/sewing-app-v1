@@ -24,9 +24,6 @@ export async function GET() {
     // .populate('floor') - এই লাইনটি ঠিক আছে, এটি ফ্লোর অবজেক্ট এনে দেবে।
     const floorLines = await FloorLine.find({})
       .populate('floor')
-      .populate('supervisor')
-      .populate('operators')
-      .populate('machines');
     return NextResponse.json(floorLines);
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });

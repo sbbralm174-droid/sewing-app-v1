@@ -19,7 +19,7 @@ export async function POST(req) {
 export async function GET() {
   try {
     await connectDB();
-    const processes = await Process.find({}).populate('compatibleMachineTypes');
+    const processes = await Process.find({})
     return NextResponse.json(processes);
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });

@@ -9,10 +9,7 @@ const ProcessSchema = new mongoose.Schema({
   description: {
     type: String
   },
-  compatibleMachineTypes: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'MachineType'
-  }],
+  
   createdAt: {
     type: Date,
     default: Date.now
