@@ -14,6 +14,11 @@ const OperatorSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  grade: {   //  new field
+    type: String,
+    enum: ["A", "A+", "A++", "B+", "B++"], 
+    required: true
+  },
   allowedProcesses: [{
     type: String,
     required: true

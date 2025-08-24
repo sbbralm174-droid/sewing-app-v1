@@ -128,7 +128,31 @@ export default function OperatorForm() {
               </select>
             </div>
             <div>
-              <label className="block mb-1 text-sm font-medium">Allowed Processes:</label>
+            <div>
+  <label className="block mb-1 text-sm font-medium">Grade:</label>
+  <select
+    name="grade"
+    value={formData.grade || ""}
+    onChange={handleChange}
+    className="w-full p-2 rounded-md border-transparent bg-[#2D3039] text-[#E5E9F0] focus:ring-2 focus:ring-indigo-500 sm:text-sm"
+    required
+  >
+    <option value="">Select Grade</option>
+    <option value="A">A</option>
+    <option value="A+">A+</option>
+    <option value="A++">A++</option>
+    <option value="B+">B+</option>
+    <option value="B++">B++</option>
+  </select>
+</div>
+
+              {/* ✅ Selected count দেখানো হচ্ছে */}
+              <label className="block mb-1 text-sm font-medium">
+                Allowed Processes 
+                <span className="ml-2 text-xs text-gray-400">
+                  ({formData.allowedProcesses.length} selected)
+                </span>
+              </label>
               
               {/* ✅ Searchable Process List */}
               <input

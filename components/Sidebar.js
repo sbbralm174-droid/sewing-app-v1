@@ -58,6 +58,7 @@ export default function Sidebar() {
         { href: '/admin/machine-types', label: 'Machine Types' },
         { href: '/admin/machines', label: 'Machines' },
         { href: '/admin/operators', label: 'Operators' },
+        { href: '/admin/operators/update', label: 'Operator update' },
         { href: '/admin/supervisors', label: 'Supervisor' },
       ],
     },

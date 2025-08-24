@@ -68,17 +68,17 @@ export default function MachineDashboard() {
     fetchData();
   }, [selectedDate]);
 
-  // Filter whenever search fields change
   useEffect(() => {
     const filtered = allMachines.filter(machine =>
-      machine.machineType.name.toLowerCase().includes(searchType.toLowerCase()) &&
-      machine.uniqueId.toLowerCase().includes(searchId.toLowerCase()) &&
-      machine.status.toLowerCase().includes(searchStatus.toLowerCase()) &&
-      machine.lastUsageDate.toLowerCase().includes(searchUsage.toLowerCase()) &&
-      machine.lastUsageLocation.toLowerCase().includes(searchLocation.toLowerCase())
+      (machine.machineType?.name?.toLowerCase() || '').includes(searchType.toLowerCase()) &&
+      (machine.uniqueId?.toLowerCase() || '').includes(searchId.toLowerCase()) &&
+      (machine.status?.toLowerCase() || '').includes(searchStatus.toLowerCase()) &&
+      (machine.lastUsageDate?.toLowerCase() || '').includes(searchUsage.toLowerCase()) &&
+      (machine.lastUsageLocation?.toLowerCase() || '').includes(searchLocation.toLowerCase())
     );
     setFilteredMachines(filtered);
   }, [searchType, searchId, searchStatus, searchUsage, searchLocation, allMachines]);
+  
 
   if (loading) {
     return (
@@ -260,7 +260,7 @@ export default function MachineDashboard() {
                 <tbody className="divide-y divide-gray-700">
                   {filteredMachines.map(machine => (
                     <tr key={machine.uniqueId}>
-                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm">{machine.machineType.name}</td>
+                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm">{machine.machineType?.name || 'N/A'}</td>
                       <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm">{machine.uniqueId}</td>
                       <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap text-sm">
                         <span 
