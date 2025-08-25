@@ -22,7 +22,6 @@ export default function MachineDashboard() {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
     };
-    
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -96,6 +95,21 @@ export default function MachineDashboard() {
   const totalMachines = allMachines.length;
   const idleMachines = totalMachines - runningMachines.length;
 
+  // 👉 Machine Type wise stats
+  const typeWiseStats = allMachines.reduce((acc, machine) => {
+    const type = machine.machineType?.name || 'Unknown';
+    if (!acc[type]) {
+      acc[type] = { total: 0, running: 0, idle: 0 };
+    }
+    acc[type].total++;
+    if (machine.status === 'Running') {
+      acc[type].running++;
+    } else {
+      acc[type].idle++;
+    }
+    return acc;
+  }, {});
+
   return (
     <Layout>
       <div className="p-4 md:p-8 min-h-screen" style={{ backgroundColor: '#1A1B22', fontFamily: "'Inter', sans-serif", color: '#E5E9F0' }}>
@@ -113,6 +127,7 @@ export default function MachineDashboard() {
           />
         </div>
 
+        {/* ✅ Global stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 mb-6">
           <div className="p-4 md:p-6 rounded-lg shadow-md" style={{ backgroundColor: '#2D3039' }}>
             <h2 className="text-base md:text-lg font-semibold">Total Machines</h2>
@@ -128,9 +143,26 @@ export default function MachineDashboard() {
           </div>
         </div>
 
+        {/* ✅ Type wise stats */}
+        <div className="p-4 md:p-6 rounded-lg shadow-md mb-6" style={{ backgroundColor: '#2D3039' }}>
+          <h2 className="text-lg md:text-xl font-bold mb-3 md:mb-4">Machine Type Wise Status</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {Object.entries(typeWiseStats).map(([type, stats]) => (
+              <div key={type} className="p-4 rounded-lg shadow" style={{ backgroundColor: '#3B4252' }}>
+                <h3 className="text-base md:text-lg font-semibold mb-2">{type}</h3>
+                <p>Total: <span className="font-bold" style={{ color: '#5E81AC' }}>{stats.total}</span></p>
+                <p>Running: <span className="font-bold" style={{ color: '#A3BE8C' }}>{stats.running}</span></p>
+                <p>Idle: <span className="font-bold" style={{ color: '#BF616A' }}>{stats.idle}</span></p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ✅ Table / Card view */}
         <div className="p-4 md:p-6 rounded-lg shadow-md" style={{ backgroundColor: '#2D3039' }}>
           <h2 className="text-lg md:text-xl font-bold mb-3 md:mb-4">All Machines Status</h2>
-          
+          {/* ... তোমার আগের table/card কোড এখানে অপরিবর্তিত থাকবে ... */}
+
           {isMobile ? (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-2 mb-3">
@@ -281,6 +313,7 @@ export default function MachineDashboard() {
               </table>
             </div>
           )}
+
         </div>
       </div>
     </Layout>

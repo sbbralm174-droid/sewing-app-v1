@@ -7,6 +7,7 @@ export default function OperatorForm() {
     name: '',
     operatorId: '',
     designation: 'Operator',
+    grade: '',
     allowedProcesses: []
   });
   const [processes, setProcesses] = useState([]);
@@ -58,7 +59,7 @@ export default function OperatorForm() {
       });
       if (response.ok) {
         setSuccessMessage('✅ Operator added successfully!');
-        setFormData({ name: '', operatorId: '', designation: 'Operator', allowedProcesses: [] });
+        setFormData({ name: '', operatorId: '', designation: 'Operator', grade: '', allowedProcesses: [] });
         setTimeout(() => setSuccessMessage(''), 3000);
       }
     } catch (error) {
@@ -91,7 +92,15 @@ export default function OperatorForm() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-4"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault(); // ✅ Enter চাপলে submit হবে না
+              }
+            }}
+          >
             <div>
               <label className="block mb-1 text-sm font-medium">Name:</label>
               <input
@@ -128,70 +137,74 @@ export default function OperatorForm() {
               </select>
             </div>
             <div>
-            <div>
-  <label className="block mb-1 text-sm font-medium">Grade:</label>
-  <select
-    name="grade"
-    value={formData.grade || ""}
-    onChange={handleChange}
-    className="w-full p-2 rounded-md border-transparent bg-[#2D3039] text-[#E5E9F0] focus:ring-2 focus:ring-indigo-500 sm:text-sm"
-    required
-  >
-    <option value="">Select Grade</option>
-    <option value="A">A</option>
-    <option value="A+">A+</option>
-    <option value="A++">A++</option>
-    <option value="B+">B+</option>
-    <option value="B++">B++</option>
-  </select>
-</div>
-
-              {/* ✅ Selected count দেখানো হচ্ছে */}
-              <label className="block mb-1 text-sm font-medium">
-                Allowed Processes 
-                <span className="ml-2 text-xs text-gray-400">
-                  ({formData.allowedProcesses.length} selected)
-                </span>
-              </label>
-              
-              {/* ✅ Searchable Process List */}
-              <input
-                type="text"
-                placeholder="Search process..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full mb-2 p-2 rounded-md border-transparent bg-[#2D3039] text-[#E5E9F0] focus:ring-2 focus:ring-indigo-500 sm:text-sm"
-              />
-
-              <div className="max-h-40 overflow-y-auto border border-[#2D3039] rounded-md p-2 bg-[#2D3039]">
-                {filteredProcesses.map((process) => (
-                  <label key={process._id} className="flex items-center gap-2 mb-1 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.allowedProcesses.includes(process.name)}
-                      onChange={() => handleProcessToggle(process.name)}
-                    />
-                    <span>{process.name}</span>
-                  </label>
-                ))}
-              </div>
-
-              {/* ✅ Selected Chips */}
-              <div className="mt-2 flex flex-wrap gap-2">
-                {formData.allowedProcesses.map((process) => (
-                  <span key={process} className="bg-[#2D3039] px-3 py-1 rounded-full flex items-center">
-                    {process}
-                    <button
-                      type="button"
-                      onClick={() => handleProcessToggle(process)}
-                      className="ml-2 text-red-400"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
+              <label className="block mb-1 text-sm font-medium">Grade:</label>
+              <select
+                name="grade"
+                value={formData.grade}
+                onChange={handleChange}
+                className="w-full p-2 rounded-md border-transparent bg-[#2D3039] text-[#E5E9F0] focus:ring-2 focus:ring-indigo-500 sm:text-sm"
+                required
+              >
+                <option value="">Select Grade</option>
+                <option value="A">A</option>
+                <option value="A+">A+</option>
+                <option value="A++">A++</option>
+                <option value="A++">B</option>
+                <option value="B+">B+</option>
+                <option value="B++">B++</option>
+                <option value="B++">C</option>
+                <option value="B++">D</option>
+                <option value="B++">E</option>
+                <option value="B++">F</option>
+              </select>
             </div>
+
+            {/* ✅ Selected count দেখানো হচ্ছে */}
+            <label className="block mb-1 text-sm font-medium">
+              Allowed Processes 
+              <span className="ml-2 text-xs text-gray-400">
+                ({formData.allowedProcesses.length} selected)
+              </span>
+            </label>
+            
+            {/* ✅ Searchable Process List */}
+            <input
+              type="text"
+              placeholder="Search process..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full mb-2 p-2 rounded-md border-transparent bg-[#2D3039] text-[#E5E9F0] focus:ring-2 focus:ring-indigo-500 sm:text-sm"
+            />
+
+            <div className="max-h-40 overflow-y-auto border border-[#2D3039] rounded-md p-2 bg-[#2D3039]">
+              {filteredProcesses.map((process) => (
+                <label key={process._id} className="flex items-center gap-2 mb-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.allowedProcesses.includes(process.name)}
+                    onChange={() => handleProcessToggle(process.name)}
+                  />
+                  <span>{process.name}</span>
+                </label>
+              ))}
+            </div>
+
+            {/* ✅ Selected Chips */}
+            <div className="mt-2 flex flex-wrap gap-2">
+              {formData.allowedProcesses.map((process) => (
+                <span key={process} className="bg-[#2D3039] px-3 py-1 rounded-full flex items-center">
+                  {process}
+                  <button
+                    type="button"
+                    onClick={() => handleProcessToggle(process)}
+                    className="ml-2 text-red-400"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+
             <button
               type="submit"
               className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md shadow-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"

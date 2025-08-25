@@ -79,6 +79,7 @@ export default function Sidebar() {
         { href: '/reports/search-by-process', label: 'Search by Process' },
         { href: '/reports/breakdown-check', label: 'breakdown check' },
         { href: '/reports/breackdown-check-1', label: 'breackdown-check-1' },
+        { href: '/reports/operator-pressent-absent-report', label: 'operator-pressent-absent-report' },
       ],
     },
   ];
