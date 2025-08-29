@@ -4,16 +4,18 @@ const ProcessSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
-    unique: true
   },
   description: {
-    type: String
+    type: String,
   },
-  
   createdAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
   }
 });
 
-module.exports = mongoose.models.Process || mongoose.model('Process', ProcessSchema);
+// unique case-insensitive index
+ProcessSchema.index({ name: 1 }, { unique: true, collation: { locale: 'en', strength: 2 } });
+
+module.exports =
+  mongoose.models.Process || mongoose.model('Process', ProcessSchema);

@@ -31,6 +31,7 @@ export default function DailyProductionForm() {
     const [isLoading, setIsLoading] = useState(true);
     const [duplicateError, setDuplicateError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
+    const [isLineDone, setIsLineDone] = useState(false);
     const router = useRouter();
     const dateRef = useRef(null);
 
@@ -247,6 +248,38 @@ export default function DailyProductionForm() {
                 const errData = await response.json();
                 setDuplicateError(errData.error || 'Failed to submit form.');
             }
+
+            // Now, check if the line completion checkbox is marked
+            if (isLineDone && formData.line) {
+                const lineCompletionPayload = {
+                    date: formData.date,
+                    floor: formData.floor,
+                    line: formData.line,
+                    supervisor: formData.supervisor.name,
+                };
+        
+                const completionRes = await fetch('/api/line-completion', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(lineCompletionPayload),
+                });
+        
+                if (!completionRes.ok) {
+                    // Check if the response body is not empty before parsing as JSON
+                    const contentType = completionRes.headers.get("content-type");
+                    if (contentType && contentType.indexOf("application/json") !== -1) {
+                        const errData = await completionRes.json();
+                        setDuplicateError(`Failed to mark line as complete: ${errData.error}`);
+                    } else {
+                        setDuplicateError('Failed to mark line as complete. Server returned a non-JSON response.');
+                    }
+                    return;
+                }
+            }
+
+
+
+
         } catch (error) {
             console.error('Error submitting form:', error);
             setDuplicateError('Something went wrong while submitting.');
@@ -274,7 +307,18 @@ export default function DailyProductionForm() {
                 <div className="bg-gray-800 shadow-md rounded-lg p-8 max-w-4xl w-full">
                     <h1 className="text-3xl font-extrabold mb-8 text-center text-blue-400">Daily Production Entry 📊</h1>
                     <form onSubmit={handleSubmit} className="space-y-6">
-
+                        {/* Line Done Checkbox */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-1">
+                                <input
+                                    type="checkbox"
+                                    checked={isLineDone}
+                                    onChange={(e) => setIsLineDone(e.target.checked)}
+                                    className="mr-2 h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                                />
+                                Mark this line as complete for the day
+                            </label>
+                        </div>
                         {/* Date */}
                         <div>
                             <label className="block text-sm font-medium text-gray-300 mb-1">Date:</label>

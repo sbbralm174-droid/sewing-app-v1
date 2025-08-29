@@ -9,7 +9,9 @@ export default function OperatorUpdate() {
   const [message, setMessage] = useState('');
   const [loadingProcesses, setLoadingProcesses] = useState(true);
 
-  // Fetch all processes for checkbox list
+  // 🔹 New state for process search
+  const [processSearch, setProcessSearch] = useState('');
+
   useEffect(() => {
     const fetchProcesses = async () => {
       try {
@@ -80,8 +82,9 @@ export default function OperatorUpdate() {
     }
   };
 
+  // 🔹 Filter processes by processSearch
   const filteredProcesses = processes.filter(p =>
-    p.name.toLowerCase().includes(searchTerm.toLowerCase())
+    p.name.toLowerCase().includes(processSearch.toLowerCase())
   );
 
   return (
@@ -89,10 +92,11 @@ export default function OperatorUpdate() {
       <div className="min-h-screen bg-[#1A1B22] text-[#E5E9F0] p-6">
         <h1 className="text-2xl font-bold mb-4">Update Operator</h1>
 
+        {/* Operator Search */}
         <div className="mb-4 flex gap-2">
           <input
             type="text"
-            placeholder="Search by Name or ID"
+            placeholder="Search Operator by Name or ID"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="p-2 rounded bg-[#2D3039] text-white flex-1"
@@ -158,8 +162,17 @@ export default function OperatorUpdate() {
                   </span>
                 </label>
 
+                {/* 🔹 Process Search Box */}
+                <input
+                  type="text"
+                  placeholder="Search processes..."
+                  value={processSearch}
+                  onChange={(e) => setProcessSearch(e.target.value)}
+                  className="w-full mb-2 p-2 rounded bg-[#2D3039] text-white"
+                />
+
                 <div className="max-h-40 overflow-y-auto border border-[#2D3039] rounded-md p-2 bg-[#2D3039] mb-2">
-                  {processes.map((process) => (
+                  {filteredProcesses.map((process) => (
                     <label key={process._id} className="flex items-center gap-2 mb-1 cursor-pointer">
                       <input
                         type="checkbox"
