@@ -59,7 +59,7 @@ export default function ViewReportByFloor() {
 
   const handleSearch = async () => {
     if (!date || !selectedFloor) {
-      setError("অনুগ্রহ করে তারিখ এবং ফ্লোরের নাম উভয়ই দিন।");
+      setError("Please provide both a date and a floor name.");
       return;
     }
 
@@ -131,9 +131,9 @@ export default function ViewReportByFloor() {
 
   return (
     <div className="p-6 bg-[#1A1B22] text-[#E5E9F0] font-sans min-h-screen">
-      <h2 className="text-2xl font-bold mb-6">ফ্লোর অনুযায়ী সেভ করা রিপোর্ট দেখুন</h2>
+      <h2 className="text-2xl font-bold mb-6">View Saved Reports by Floor</h2>
 
-      {/* সার্চ ফিল্ড এবং বাটন */}
+      {/* Search fields and button */}
       <div className="flex flex-col md:flex-row gap-4 mb-6">
         <input
           type="date"
@@ -146,7 +146,7 @@ export default function ViewReportByFloor() {
           onChange={(e) => setSelectedFloor(e.target.value)}
           className="border p-2 rounded bg-[#2D3039] text-[#E5E9F0]"
         >
-          <option value="">ফ্লোর নির্বাচন করুন</option>
+          <option value="">Select a Floor</option>
           {floors.map((fl, idx) => (
             <option key={idx} value={fl}>
               {fl}
@@ -158,20 +158,20 @@ export default function ViewReportByFloor() {
           className="bg-blue-600 text-[#E5E9F0] px-6 py-2 rounded font-semibold"
           disabled={loading}
         >
-          {loading ? "অনুসন্ধান হচ্ছে..." : "অনুসন্ধান করুন"}
+          {loading ? "Searching..." : "Search"}
         </button>
       </div>
 
-      {/* লোডিং এবং ত্রুটি বার্তা */}
-      {loading && <p className="text-gray-400">রিপোর্ট লোড হচ্ছে...</p>}
+      {/* Loading and error messages */}
+      {loading && <p className="text-gray-400">Loading report...</p>}
       {error && <p className="text-red-500">{error}</p>}
       
-      {/* রিপোর্ট প্রদর্শনের অংশ */}
+      {/* Report display section */}
       {allData.matched.length > 0 && (
         <div className="space-y-8">
           {/* Matched Processes Table (Combined) */}
           <div className="mt-4 overflow-x-auto">
-            <h4 className="text-md font-semibold mb-2 text-green-400">Matched Processes</h4>
+            <h4 className="text-md font-semibold mb-2 text-green-400">Matched Processes from breakdown</h4>
             <table className="w-full border border-collapse text-sm">
               <thead>
                 <tr className="bg-[#1A1B22]">
@@ -227,7 +227,7 @@ export default function ViewReportByFloor() {
         <div className="space-y-8">
           {/* Unmatched Processes Table (Combined) */}
           <div className="mt-4 overflow-x-auto">
-            <h4 className="text-md font-semibold mb-2 text-red-400">Unmatched Processes</h4>
+            <h4 className="text-md font-semibold mb-2 text-red-400">Unmatched Processes from breakdown</h4>
             <table className="w-full border border-collapse text-sm">
               <thead>
                 <tr className="bg-[#1A1B22]">
@@ -243,7 +243,7 @@ export default function ViewReportByFloor() {
                   <th className="border p-2">Status</th>
                   <th className="border p-2">Work As</th>
                 </tr>
-                 <tr className="bg-[#2D3039]">
+                <tr className="bg-[#2D3039]">
                   <td className="border p-2"><input type="text" name="operatorId" onChange={handleUnmatchedFilterChange} className="w-full bg-[#1A1B22] text-[#E5E9F0] rounded p-1 text-xs" placeholder="Filter" /></td>
                   <td className="border p-2"><input type="text" name="line" onChange={handleUnmatchedFilterChange} className="w-full bg-[#1A1B22] text-[#E5E9F0] rounded p-1 text-xs" placeholder="Filter" /></td>
                   <td className="border p-2"><input type="text" name="operatorName" onChange={handleUnmatchedFilterChange} className="w-full bg-[#1A1B22] text-[#E5E9F0] rounded p-1 text-xs" placeholder="Filter" /></td>
@@ -283,7 +283,7 @@ export default function ViewReportByFloor() {
         <div className="space-y-8">
           {/* Missing Processes List (Combined) */}
           <div className="mt-4">
-            <h4 className="text-md font-semibold mb-2 text-yellow-400">Missing Processes</h4>
+            <h4 className="text-md font-semibold mb-2 text-yellow-400">Missing Processes from breakdown</h4>
             <ul className="list-disc pl-5">
               {allData.missing.map((p, idx) => (
                 <li key={idx} className="text-yellow-200">{`Line: ${p.line} - Process: ${p.process}`}</li>

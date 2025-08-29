@@ -37,43 +37,43 @@ export default function DailyProductionForm() {
 
     // Custom styles for react-select (dark theme)
     const customSelectStyles = {
-      control: (provided, state) => ({
-        ...provided,
-        backgroundColor: '#1f2937', // gray-800
-        borderColor: state.isFocused ? '#3b82f6' : '#4b5563', // blue on focus
-        color: 'white',
-        minHeight: '48px',
-      }),
-      menu: (provided) => ({
-        ...provided,
-        backgroundColor: '#1f2937',
-        color: 'white',
-      }),
-      option: (provided, state) => ({
-        ...provided,
-        backgroundColor: state.isFocused ? '#374151' : '#1f2937', // gray-700 hover
-        color: 'white',
-        cursor: 'pointer',
-      }),
-      singleValue: (provided) => ({
-        ...provided,
-        color: 'white',
-      }),
-      input: (provided) => ({
-        ...provided,
-        color: 'white',
-      }),
-      placeholder: (provided) => ({
-        ...provided,
-        color: '#9ca3af',
-      }),
-      dropdownIndicator: (provided) => ({
-        ...provided,
-        color: 'white',
-      }),
-      indicatorSeparator: () => ({
-        display: 'none',
-      }),
+        control: (provided, state) => ({
+            ...provided,
+            backgroundColor: '#1f2937', // gray-800
+            borderColor: state.isFocused ? '#3b82f6' : '#4b5563', // blue on focus
+            color: 'white',
+            minHeight: '48px',
+        }),
+        menu: (provided) => ({
+            ...provided,
+            backgroundColor: '#1f2937',
+            color: 'white',
+        }),
+        option: (provided, state) => ({
+            ...provided,
+            backgroundColor: state.isFocused ? '#374151' : '#1f2937', // gray-700 hover
+            color: 'white',
+            cursor: 'pointer',
+        }),
+        singleValue: (provided) => ({
+            ...provided,
+            color: 'white',
+        }),
+        input: (provided) => ({
+            ...provided,
+            color: 'white',
+        }),
+        placeholder: (provided) => ({
+            ...provided,
+            color: '#9ca3af',
+        }),
+        dropdownIndicator: (provided) => ({
+            ...provided,
+            color: 'white',
+        }),
+        indicatorSeparator: () => ({
+            display: 'none',
+        }),
     };
 
     // Initial Data Load
@@ -179,7 +179,7 @@ export default function DailyProductionForm() {
         setDuplicateError('');
 
         if (name === 'operator') {
-            setFormData(prev => ({ ...prev, operator: selected }));
+            setFormData(prev => ({ ...prev, operator: selected, process: '' }));
             setOperatorProcesses(selected?.allowedProcesses || []);
         } else if (name === 'supervisor') {
             setFormData(prev => ({ ...prev, supervisor: selected }));
@@ -276,10 +276,6 @@ export default function DailyProductionForm() {
                     return;
                 }
             }
-
-
-
-
         } catch (error) {
             console.error('Error submitting form:', error);
             setDuplicateError('Something went wrong while submitting.');
@@ -296,7 +292,7 @@ export default function DailyProductionForm() {
     const floorOptions = floors.map(f => ({ value: f.floorName, label: f.floorName }));
     const lineOptions = lines.map(l => ({ value: l, label: l }));
     const processOptions = operatorProcesses.map(p => ({ value: p, label: p }));
-    const statusOptions = [{ value: 'present', label: 'Present' }, { value: 'absent', label: 'Absent' }];
+    const statusOptions = [{ value: 'present', label: 'Present' }, ];
     const workAsOptions = [{ value: 'operator', label: 'Operator' }, { value: 'helper', label: 'Helper' }];
     const machineTypeOptions = machineTypes.map(mt => ({ value: mt.name, label: mt.name }));
     const uniqueMachineOptions = filteredMachines.map(m => ({ value: m.uniqueId, label: m.uniqueId }));

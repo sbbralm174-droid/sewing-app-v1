@@ -1,4 +1,4 @@
-//  api/report/breakdown-check-get-by-floor
+// api/report/breakdown-check-get-by-floor
 
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
@@ -12,20 +12,20 @@ export async function GET(req) {
     const floor = searchParams.get('floor');
 
     if (!date || !floor) {
-      return NextResponse.json({ message: 'তারিখ এবং ফ্লোরের নাম আবশ্যক' }, { status: 400 });
+      return NextResponse.json({ message: 'Date and floor name are required' }, { status: 400 });
     }
 
     // Find reports based on date and floor
     const reports = await Report.find({ date, floor });
 
     if (!reports || reports.length === 0) {
-      return NextResponse.json({ message: 'এই তারিখ এবং ফ্লোরের জন্য কোনো রিপোর্ট পাওয়া যায়নি' }, { status: 404 });
+      return NextResponse.json({ message: 'No reports found for this date and floor' }, { status: 404 });
     }
 
     return NextResponse.json(reports, { status: 200 });
 
   } catch (error) {
     console.error('Error fetching report:', error);
-    return NextResponse.json({ message: 'সার্ভার ত্রুটি', error: error.message }, { status: 500 });
+    return NextResponse.json({ message: 'Server error', error: error.message }, { status: 500 });
   }
 }
