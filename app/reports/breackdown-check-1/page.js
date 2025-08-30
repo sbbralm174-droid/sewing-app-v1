@@ -94,7 +94,23 @@ export default function LineReport() {
 
     setIsSaving(true);
     try {
-      // Step 1: Check if the report for this date and line already exists
+      // Step 1: Check if the line has been marked as complete for this date
+      const completionRes = await fetch(`/api/line-completion?date=${date}&line=${selectedLine}`);
+      if (!completionRes.ok) {
+        const errorData = await completionRes.json();
+        alert(`Failed to check line completion status: ${errorData.error}`);
+        setIsSaving(false);
+        return;
+      }
+
+      const completionData = await completionRes.json();
+      if (completionData.length === 0) {
+        alert("This line is not complete yet, please complete the line first.");
+        setIsSaving(false);
+        return;
+      }
+      
+      // Step 2: Check if the report for this date and line already exists
       const existenceRes = await fetch(`/api/report/breakdown-check-get-by-floor?date=${date}&floor=${selectedFloor}`);
       
       let reportExists = false;
@@ -289,7 +305,7 @@ export default function LineReport() {
                 return (
                   <>
                     {allRecords.map((op, idx) => {
-                      const proc = op.process.replace(/\s/g, "").toLowerCase(); 
+                      const proc = op.process.replace(/\s/g, "").toLowerCase();
                       let isMatched = false;
 
                       if (excelLeft[proc] && excelLeft[proc] > 0) {
