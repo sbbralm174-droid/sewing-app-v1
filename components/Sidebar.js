@@ -67,6 +67,7 @@ export default function Sidebar() {
       links: [
         { href: '/supervisor/processes', label: 'Processes' },
         { href: '/supervisor/daily-production', label: 'Daily Production' },
+        { href: '/supervisor/line-completion', label: 'line-completion' },
       ],
     },
     {
