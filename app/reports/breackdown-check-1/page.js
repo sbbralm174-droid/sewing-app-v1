@@ -96,9 +96,20 @@ export default function LineReport() {
     try {
       // Step 1: Check if the report for this date and line already exists
       const existenceRes = await fetch(`/api/report/breakdown-check-get-by-floor?date=${date}&floor=${selectedFloor}`);
-      const reports = await existenceRes.json();
       
-      const reportExists = reports.some(report => report.line === selectedLine);
+      let reportExists = false;
+      
+      if (existenceRes.ok) {
+        // If response is successful (200), parse as array
+        const reports = await existenceRes.json();
+        reportExists = Array.isArray(reports) && reports.some(report => report.line === selectedLine);
+      } else if (existenceRes.status === 404) {
+        // If no reports found (404), it means the report doesn't exist yet
+        reportExists = false;
+      } else {
+        // Handle other errors
+        throw new Error(`API error: ${existenceRes.status}`);
+      }
       
       if (reportExists) {
         alert("The report for this date and line has already been saved.");
