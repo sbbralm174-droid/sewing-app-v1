@@ -1,6 +1,105 @@
 "use client";
 import Layout from "@/components/Layout";
 import { useState, useEffect } from "react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  Line,
+  ComposedChart,
+} from "recharts";
+
+
+// This is the ParetoChart component integrated directly into the file
+const ParetoChart = ({ data, totalHour }) => {
+  if (!data || data.length === 0 || !totalHour) {
+    return null;
+  }
+
+  // Calculate % Achieved for each operator
+  const processedData = data.map((item) => {
+    const totalTarget = item.target && totalHour ? item.target * totalHour : 0;
+    const achievementPercent =
+      totalTarget > 0 ? (item.achievement / totalTarget) * 100 : 0;
+    return {
+      name: item.operatorId,
+      achievementPercent: parseFloat(achievementPercent.toFixed(1)),
+    };
+  });
+
+  // Sort data in descending order by achievementPercent
+  processedData.sort((a, b) => b.achievementPercent - a.achievementPercent);
+
+  // Calculate cumulative percentage
+  let cumulativeTotal = 0;
+  const totalAchievement = processedData.reduce(
+    (sum, item) => sum + item.achievementPercent,
+    0
+  );
+
+  const finalData = processedData.map((item) => {
+    cumulativeTotal += item.achievementPercent;
+    return {
+      ...item,
+      cumulativePercent: (cumulativeTotal / totalAchievement) * 100,
+    };
+  });
+
+  return (
+    <div style={{ width: "100%", height: 400, marginBottom: "2rem" }}>
+      <ResponsiveContainer>
+        <ComposedChart
+          data={finalData}
+          margin={{
+            top: 20,
+            right: 20,
+            bottom: 20,
+            left: 20,
+          }}
+        >
+          <CartesianGrid stroke="#4C566A" />
+          <XAxis dataKey="name" stroke="#E5E9F0" />
+          <YAxis
+            yAxisId="left"
+            label={{ value: "% Achieved", angle: -90, position: "insideLeft", fill: "#E5E9F0" }}
+            stroke="#E5E9F0"
+          />
+          <YAxis
+            yAxisId="right"
+            orientation="right"
+            label={{ value: "Cumulative %", angle: 90, position: "insideRight", fill: "#E5E9F0" }}
+            stroke="#E5E9F0"
+            domain={[0, 100]}
+          />
+          <Tooltip
+            contentStyle={{ backgroundColor: "#2D3039", borderColor: "#4C566A" }}
+            itemStyle={{ color: "#E5E9F0" }}
+          />
+          <Legend />
+          <Bar
+            yAxisId="left"
+            dataKey="achievementPercent"
+            name="% Achieved"
+            fill="#8884d8"
+          />
+          <Line
+            yAxisId="right"
+            dataKey="cumulativePercent"
+            name="Cumulative %"
+            stroke="#ff7300"
+            dot={false}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
+
 
 export default function DailyProductionPage() {
   const [date, setDate] = useState("");
@@ -9,8 +108,6 @@ export default function DailyProductionPage() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  // নতুন state for hours
   const [totalHour, setTotalHour] = useState("");
   const [currentHour, setCurrentHour] = useState("");
 
@@ -35,6 +132,13 @@ export default function DailyProductionPage() {
     setError("");
     setResult(null);
 
+    // Basic validation
+    if (!date || !line) {
+      setError("Please select a date and a line.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch(
         `/api/report/line-report?date=${date}&line=${line}`
@@ -44,11 +148,16 @@ export default function DailyProductionPage() {
       if (!res.ok) {
         setError(data.error || data.message || "Something went wrong");
       } else {
-        setResult(data);
-        console.log(data);
+        const updatedData = data.tableData.map((item) => ({
+          ...item,
+          totalHour: totalHour,
+          currentHour: currentHour,
+        }));
+        setResult({ ...data, tableData: updatedData });
       }
-    } catch {
-      setError("Failed to fetch data");
+    } catch (e) {
+      setError("Failed to fetch data. Check your network or server logs.");
+      console.error(e);
     }
     setLoading(false);
   };
@@ -74,28 +183,39 @@ export default function DailyProductionPage() {
               <th className="px-4 py-2 border">Machine Type</th>
               <th className="px-4 py-2 border">Machine No.</th>
               <th className="px-4 py-2 border">Process</th>
-              <th className="px-4 py-2 border">Target</th>
+              <th className="px-4 py-2 border">Hourly Target</th>
               <th className="px-4 py-2 border">Achievement</th>
-              <th className="px-4 py-2 border">% Achieved</th>
-
-              {/* নতুন ৩টা কলাম */}
+              <th className="px-4 py-2 border">total Achieved %</th>
+              <th className="px-4 py-2 border">hourly Achieved %</th>
               <th className="px-4 py-2 border">Total Target</th>
-              <th className="px-4 py-2 border">Current Production</th>
+              <th className="px-4 py-2 border">Expected Production</th>
               <th className="px-4 py-2 border">Deviation</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row, idx) => {
-              const achievementPercent =
-                row.target > 0
-                  ? ((row.achievement / row.target) * 100).toFixed(1)
-                  : "0";
-
               const totalTarget =
                 row.target && totalHour ? row.target * totalHour : 0;
-              const currentProduction =
+
+              const achievementPercent =
+                totalTarget > 0
+                  ? ((row.achievement / totalTarget) * 100).toFixed(1)
+                  : 0;
+                  
+                  
+
+
+              const estimatedCurrentProduction =
                 row.target && currentHour ? row.target * currentHour : 0;
-              const deviation = currentProduction - (row.achievement || 0);
+
+
+                const hourlyAchievementPercent =
+                  totalTarget > 0
+                    ? ((row.achievement / estimatedCurrentProduction) * 100).toFixed(1)
+                    : 0;
+
+              const deviation =
+                (row.achievement || 0) - estimatedCurrentProduction;
 
               return (
                 <tr
@@ -113,10 +233,11 @@ export default function DailyProductionPage() {
                   <td className="border px-4 py-2">{row.target}</td>
                   <td className="border px-4 py-2">{row.achievement}</td>
                   <td className="border px-4 py-2">{achievementPercent}%</td>
-
-                  {/* নতুন ডাটা */}
+                  <td className="border px-4 py-2">{hourlyAchievementPercent}%</td>
                   <td className="border px-4 py-2">{totalTarget}</td>
-                  <td className="border px-4 py-2">{currentProduction}</td>
+                  <td className="border px-4 py-2">
+                    {estimatedCurrentProduction}
+                  </td>
                   <td className="border px-4 py-2">{deviation}</td>
                 </tr>
               );
@@ -201,7 +322,7 @@ export default function DailyProductionPage() {
             type="number"
             placeholder="Total Hour"
             value={totalHour}
-            onChange={(e) => setTotalHour(e.target.value)}
+            onChange={(e) => setTotalHour(Number(e.target.value))}
             className="border rounded px-3 py-2"
             style={{
               backgroundColor: "#2D3039",
@@ -215,7 +336,7 @@ export default function DailyProductionPage() {
             type="number"
             placeholder="Current Hour"
             value={currentHour}
-            onChange={(e) => setCurrentHour(e.target.value)}
+            onChange={(e) => setCurrentHour(Number(e.target.value))}
             className="border rounded px-3 py-2"
             style={{
               backgroundColor: "#2D3039",
@@ -259,41 +380,33 @@ export default function DailyProductionPage() {
                 style={{ color: "#D8DEE9" }}
               >
                 <span className="mr-4">
-                  Total Operators: {result.operators?.length || 0}
-                </span>
-                <span className="mr-4">
-                  Total Helpers: {result.helpers?.length || 0}
-                </span>
-                <span className="mr-4">
-                  Total Manpower:{" "}
-                  {(result.operators?.length || 0) +
-                    (result.helpers?.length || 0)}
+                  Total Manpower: {result.tableData?.length || 0}
                 </span>
                 <span className="mr-4">
                   Total Target:{" "}
-                  {[...(result.operators || []), ...(result.helpers || [])].reduce(
+                  {result.tableData?.reduce(
                     (sum, r) => sum + (r.target || 0),
                     0
-                  )}
+                  ) || 0}
                 </span>
                 <span className="mr-4">
                   Total Achievement:{" "}
-                  {[...(result.operators || []), ...(result.helpers || [])].reduce(
+                  {result.tableData?.reduce(
                     (sum, r) => sum + (r.achievement || 0),
                     0
-                  )}
+                  ) || 0}
                 </span>
                 <span>
                   Achievement %:{" "}
                   {(() => {
-                    const totalTarget = [
-                      ...(result.operators || []),
-                      ...(result.helpers || []),
-                    ].reduce((sum, r) => sum + (r.target || 0), 0);
-                    const totalAch = [
-                      ...(result.operators || []),
-                      ...(result.helpers || []),
-                    ].reduce((sum, r) => sum + (r.achievement || 0), 0);
+                    const totalTarget = result.tableData?.reduce(
+                      (sum, r) => sum + (r.target || 0),
+                      0
+                    ) || 0;
+                    const totalAch = result.tableData?.reduce(
+                      (sum, r) => sum + (r.achievement || 0),
+                      0
+                    ) || 0;
                     return totalTarget > 0
                       ? ((totalAch / totalTarget) * 100).toFixed(1)
                       : "0";
@@ -303,16 +416,15 @@ export default function DailyProductionPage() {
               </div>
             </div>
 
-            {/* Tables */}
+            {/* Render the new Pareto chart component */}
+            <ParetoChart data={result.tableData} totalHour={totalHour} />
+
+
+            {/* Render the single table with the combined data */}
             <Table
-              title="Operators"
-              rows={result.operators}
+              title="Production Report"
+              rows={result.tableData}
               color="text-blue-400"
-            />
-            <Table
-              title="Helpers"
-              rows={result.helpers}
-              color="text-green-400"
             />
           </div>
         )}

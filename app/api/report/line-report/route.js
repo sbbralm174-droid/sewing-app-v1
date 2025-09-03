@@ -60,15 +60,11 @@ export async function GET(req) {
       };
     });
 
-    // Separate helpers & operators
-    const operators = tableData.filter((d) => d.workAs === "operator");
-    const helpers = tableData.filter((d) => d.workAs === "helper");
-
+    // Return the combined tableData array directly
     return NextResponse.json({
       line: lineNumber,
       supervisor: supervisorName,
-      operators,
-      helpers,
+      tableData, // This now contains both operators and helpers
     });
   } catch (err) {
     console.error(err);
