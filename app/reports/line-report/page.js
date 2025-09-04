@@ -12,23 +12,32 @@ import {
   ResponsiveContainer,
   Line,
   ComposedChart,
+  LabelList,
 } from "recharts";
 
-
 // This is the ParetoChart component integrated directly into the file
-const ParetoChart = ({ data, totalHour }) => {
+const ParetoChart = ({ data, totalHour, currentHour }) => {
   if (!data || data.length === 0 || !totalHour) {
     return null;
   }
 
-  // Calculate % Achieved for each operator
+  // Calculate % Achieved and Hourly % for each operator
   const processedData = data.map((item) => {
     const totalTarget = item.target && totalHour ? item.target * totalHour : 0;
     const achievementPercent =
       totalTarget > 0 ? (item.achievement / totalTarget) * 100 : 0;
+    
+    const estimatedCurrentProduction =
+      item.target && currentHour ? item.target * currentHour : 0;
+    const hourlyAchievementPercent =
+      estimatedCurrentProduction > 0
+        ? (item.achievement / estimatedCurrentProduction) * 100
+        : 0;
+
     return {
       name: item.operatorId,
       achievementPercent: parseFloat(achievementPercent.toFixed(1)),
+      hourlyAchievementPercent: parseFloat(hourlyAchievementPercent.toFixed(1)),
     };
   });
 
@@ -50,6 +59,24 @@ const ParetoChart = ({ data, totalHour }) => {
     };
   });
 
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      const dataPoint = payload[0].payload;
+      return (
+        <div
+          className="p-3 border rounded shadow"
+          style={{ backgroundColor: "#2D3039", borderColor: "#4C566A" }}
+        >
+          <p className="text-sm font-bold" style={{ color: "#E5E9F0" }}>{`Operator: ${label}`}</p>
+          <p className="text-xs mt-1" style={{ color: "#8884d8" }}>{`Total Achieved %: ${dataPoint.achievementPercent}%`}</p>
+          <p className="text-xs mt-1" style={{ color: "#ff7300" }}>{`Hourly Achieved %: ${dataPoint.hourlyAchievementPercent}%`}</p>
+          <p className="text-xs mt-1" style={{ color: "#E5E9F0" }}>{`Cumulative %: ${dataPoint.cumulativePercent.toFixed(1)}%`}</p>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <div style={{ width: "100%", height: 400, marginBottom: "2rem" }}>
       <ResponsiveContainer>
@@ -63,30 +90,46 @@ const ParetoChart = ({ data, totalHour }) => {
           }}
         >
           <CartesianGrid stroke="#4C566A" />
-          <XAxis dataKey="name" stroke="#E5E9F0" />
+          <XAxis
+            dataKey="name"
+            stroke="#E5E9F0"
+            angle={-45} // Rotate labels by -45 degrees
+            textAnchor="end" // Align the text to the end
+            interval={0} // Show all labels
+            height={70} // Increase height to prevent cutoff
+          />
           <YAxis
             yAxisId="left"
-            label={{ value: "% Achieved", angle: -90, position: "insideLeft", fill: "#E5E9F0" }}
+            label={{
+              value: "% Achieved",
+              angle: -90,
+              position: "insideLeft",
+              fill: "#E5E9F0",
+            }}
             stroke="#E5E9F0"
           />
           <YAxis
             yAxisId="right"
             orientation="right"
-            label={{ value: "Cumulative %", angle: 90, position: "insideRight", fill: "#E5E9F0" }}
+            label={{
+              value: "Cumulative %",
+              angle: 90,
+              position: "insideRight",
+              fill: "#E5E9F0",
+            }}
             stroke="#E5E9F0"
             domain={[0, 100]}
           />
-          <Tooltip
-            contentStyle={{ backgroundColor: "#2D3039", borderColor: "#4C566A" }}
-            itemStyle={{ color: "#E5E9F0" }}
-          />
+          <Tooltip content={<CustomTooltip />} />
           <Legend />
           <Bar
             yAxisId="left"
             dataKey="achievementPercent"
-            name="% Achieved"
+            name="Total Achieved %"
             fill="#8884d8"
-          />
+          >
+            <LabelList dataKey="achievementPercent" position="top" fill="#E5E9F0" />
+          </Bar>
           <Line
             yAxisId="right"
             dataKey="cumulativePercent"
@@ -99,7 +142,6 @@ const ParetoChart = ({ data, totalHour }) => {
     </div>
   );
 };
-
 
 export default function DailyProductionPage() {
   const [date, setDate] = useState("");
@@ -185,8 +227,8 @@ export default function DailyProductionPage() {
               <th className="px-4 py-2 border">Process</th>
               <th className="px-4 py-2 border">Hourly Target</th>
               <th className="px-4 py-2 border">Achievement</th>
-              <th className="px-4 py-2 border">total Achieved %</th>
-              <th className="px-4 py-2 border">hourly Achieved %</th>
+              <th className="px-4 py-2 border">Total Achieved %</th>
+              <th className="px-4 py-2 border">Hourly Achieved %</th>
               <th className="px-4 py-2 border">Total Target</th>
               <th className="px-4 py-2 border">Expected Production</th>
               <th className="px-4 py-2 border">Deviation</th>
@@ -201,18 +243,14 @@ export default function DailyProductionPage() {
                 totalTarget > 0
                   ? ((row.achievement / totalTarget) * 100).toFixed(1)
                   : 0;
-                  
-                  
-
 
               const estimatedCurrentProduction =
                 row.target && currentHour ? row.target * currentHour : 0;
 
-
-                const hourlyAchievementPercent =
-                  totalTarget > 0
-                    ? ((row.achievement / estimatedCurrentProduction) * 100).toFixed(1)
-                    : 0;
+              const hourlyAchievementPercent =
+                estimatedCurrentProduction > 0
+                  ? ((row.achievement / estimatedCurrentProduction) * 100).toFixed(1)
+                  : 0;
 
               const deviation =
                 (row.achievement || 0) - estimatedCurrentProduction;
@@ -417,8 +455,11 @@ export default function DailyProductionPage() {
             </div>
 
             {/* Render the new Pareto chart component */}
-            <ParetoChart data={result.tableData} totalHour={totalHour} />
-
+            <ParetoChart
+              data={result.tableData}
+              totalHour={totalHour}
+              currentHour={currentHour}
+            />
 
             {/* Render the single table with the combined data */}
             <Table
