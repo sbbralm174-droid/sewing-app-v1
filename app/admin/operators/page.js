@@ -149,13 +149,13 @@ export default function OperatorForm() {
                 <option value="A">A</option>
                 <option value="A+">A+</option>
                 <option value="A++">A++</option>
-                <option value="A++">B</option>
+                <option value="B">B</option>
                 <option value="B+">B+</option>
                 <option value="B++">B++</option>
-                <option value="B++">C</option>
-                <option value="B++">D</option>
-                <option value="B++">E</option>
-                <option value="B++">F</option>
+                <option value="C">C</option>
+                <option value="D">D</option>
+                <option value="E">E</option>
+                <option value="F">F</option>
               </select>
             </div>
 
