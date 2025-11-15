@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import SidebarNavLayout from '@/components/SidebarNavLayout';
 
 export default function LineCompletion() {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
@@ -123,6 +124,7 @@ export default function LineCompletion() {
 
   return (
     <div className="p-6 bg-[#1A1B22] text-[#E5E9F0] font-sans min-h-screen">
+      <SidebarNavLayout />
       <h2 className="text-2xl font-bold mb-6">Line Completion Status</h2>
 
       <div className="flex flex-col gap-4 mb-6">

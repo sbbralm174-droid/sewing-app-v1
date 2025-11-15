@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
+import SidebarNavLayout from '@/components/SidebarNavLayout';
 
 export default function HourlyReportPage() {
   const [reports, setReports] = useState({});
@@ -119,8 +120,9 @@ export default function HourlyReportPage() {
   };
 
   return (
-    <Layout>
+   
       <div className="min-h-screen bg-[#1A1B22] text-[#E5E9F0] p-8 flex items-center justify-center font-sans">
+        <SidebarNavLayout/>
         <div className="w-full max-w-4xl bg-[#1A1B22] p-8 rounded-xl shadow-lg border border-[#2D3039]">
           <h1 className="text-3xl font-bold text-center mb-6">Add Hour by Floor Wise</h1>
 
@@ -220,6 +222,5 @@ export default function HourlyReportPage() {
           </div>
         </div>
       </div>
-    </Layout>
   );
 }

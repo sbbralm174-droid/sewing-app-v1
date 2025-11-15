@@ -1,11 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import SidebarNavLayout from '@/components/SidebarNavLayout';
+
 
 export default function ReportPage() {
   const [date, setDate] = useState("");
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
+
 
   // Column search state
   const [filters, setFilters] = useState({
@@ -63,6 +66,7 @@ export default function ReportPage() {
 
   return (
     <div className="p-6 max-w-[1400px] mx-auto bg-[#1A1B22] min-h-screen text-[#E5E9F0]">
+      <SidebarNavLayout />
       <h1 className="text-3xl font-bold mb-6">Daily Operator Report</h1>
 
       {/* Date Search */}

@@ -1,6 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
+import SidebarNavLayout from '@/components/SidebarNavLayout';
+
 
 export default function MachineForm() {
   const [formData, setFormData] = useState({
@@ -57,8 +59,9 @@ export default function MachineForm() {
   };
 
   return (
-    <Layout>
+    
       <div className="min-h-screen bg-[#1A1B22] text-[#E5E9F0] font-sans flex items-center justify-center p-4">
+       <SidebarNavLayout/>
         <div className="w-full max-w-lg bg-[#1A1B22] p-6 rounded-lg shadow-lg border border-[#2D3039]">
           <h1 className="text-2xl font-bold mb-6 text-center">Add New Machine</h1>
 
@@ -119,6 +122,6 @@ export default function MachineForm() {
           </form>
         </div>
       </div>
-    </Layout>
+    
   );
 }

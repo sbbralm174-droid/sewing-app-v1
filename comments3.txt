@@ -1,0 +1,635 @@
+1. supervisor entry page.
+2. hourly production entry page.
+3. line wide production details.
+4. operator wise production details.
+5. Machine status report
+6. An operator highest process score.
+7. supervisor report
+8. machine servicing report with notification system. (parts)
+9. 
+
+
+
+
+
+
+
+
+import mongoose from "mongoose";
+
+const CommentSchema = new mongoose.Schema({
+  postId: { type: mongoose.Schema.Types.ObjectId, ref: "Post", required: true, index: true },
+  parentId: { type: mongoose.Schema.Types.ObjectId, ref: "Comment", default: null, index: true },
+  author: { type: String, required: true },
+  content: { type: String, required: true },
+  replyTo: { type: String, default: null }, // @mention name of replied-to user
+  replyCount: { type: Number, default: 0 }, // denormalized count for quick UI
+  createdAt: { type: Date, default: Date.now, index: true },
+});
+
+// Compound index to support common queries: postId + parentId sorted by createdAt
+CommentSchema.index({ postId: 1, parentId: 1, createdAt: 1 });
+
+export default mongoose.models.Comment || mongoose.model("Comment", CommentSchema);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+niche 6 ta model dissi. ei 6 ta model er datao deoa hoise bujhar jonno. ek ekta model er nid othoba birthCertificate ek ek jaygay ase ebong konotar birthCertificate  nao thakte pare.  ekhon nid othoba birthCertificate search die oi operator er sokol totho ber korte hobe. kon totho ta kon model theke astese setao janate hobe. tai ekta api toiri kore dao. ebong porikha korar jonno api url dao
+
+
+
+
+// /models/IepInterviewStepOne';
+[
+  {
+    "_id": "691455107b5ec91f34d88b92",
+    "name": "Mosiur Rahman",
+    "nid": "12341234",
+    "picture": "/uploads/photos/57c671c1-9032-45e4-a0e2-dc82df940ba6.jpg",
+    "stepCompleted": 1,
+    "result": "PASSED",
+    "createdAt": "2025-11-12T09:36:16.664Z",
+    "updatedAt": "2025-11-12T09:36:16.664Z",
+    "candidateId": "GMST-00000054",
+    "__v": 0
+  },
+  {
+    "_id": "691455407b5ec91f34d88b98",
+    "name": "tarek rahman",
+    "nid": "123412344",
+    "picture": "/uploads/photos/dddddfa4-34e2-4ded-9c78-c94dcd56c1e8.jpg",
+    "stepCompleted": 1,
+    "result": "FAILED",
+    "createdAt": "2025-11-12T09:37:04.628Z",
+    "updatedAt": "2025-11-12T09:37:04.628Z",
+    "candidateId": "GMST-00000055",
+    "__v": 0
+  },
+  {
+    "_id": "69145891531d97fc43f107af",
+    "name": "Mosiur Rahman",
+    "nid": "dfg",
+    "picture": "/uploads/photos/81054ddb-67fc-4133-848f-061e7ff730a8.webp",
+    "stepCompleted": 1,
+    "failureReason": "fsdf",
+    "result": "FAILED",
+    "createdAt": "2025-11-12T09:51:13.353Z",
+    "updatedAt": "2025-11-12T09:51:13.353Z",
+    "candidateId": "GMST-00000056",
+    "__v": 0
+  },
+  {
+    "_id": "691458f6531d97fc43f107b5",
+    "name": "fgdfg",
+    "nid": "dfgfgh",
+    "picture": "/uploads/photos/53466679-123f-4028-ab9d-be42bf98e787.webp",
+    "stepCompleted": 1,
+    "failureReason": "ami banglay lekhi",
+    "result": "FAILED",
+    "createdAt": "2025-11-12T09:52:54.384Z",
+    "updatedAt": "2025-11-12T09:52:54.384Z",
+    "candidateId": "GMST-00000057",
+    "__v": 0
+  },
+  {
+    "_id": "6914689d531d97fc43f10876",
+    "name": "ghjgh",
+    "nid": "fgh",
+    "picture": "/uploads/photos/f19812ac-f42c-4879-9ba3-be697f703a70.webp",
+    "stepCompleted": 1,
+    "result": "PASSED",
+    "createdAt": "2025-11-12T10:59:41.591Z",
+    "updatedAt": "2025-11-12T10:59:41.591Z",
+    "candidateId": "GMST-00000058",
+    "__v": 0
+  },
+  {
+    "_id": "6914698e531d97fc43f10891",
+    "name": "sabbir",
+    "nid": "dfg",
+    "picture": "/uploads/photos/5c7ff01e-2e33-4d0d-b90e-d5254f42bb57.jpg",
+    "stepCompleted": 1,
+    "result": "PASSED",
+    "createdAt": "2025-11-12T11:03:42.645Z",
+    "updatedAt": "2025-11-12T11:03:42.645Z",
+    "candidateId": "GMST-00000059",
+    "__v": 0
+  },
+  {
+    "_id": "69146fc5531d97fc43f108ea",
+    "name": "ghjfgh",
+    "nid": "fghfg",
+    "picture": "/uploads/photos/21307eb0-7ea5-4a8a-9fae-ce71a37f1446.jpg",
+    "stepCompleted": 1,
+    "result": "PASSED",
+    "createdAt": "2025-11-12T11:30:13.659Z",
+    "updatedAt": "2025-11-12T11:30:13.659Z",
+    "candidateId": "GMST-00000060",
+    "__v": 0
+  },
+  {
+    "_id": "69147859531d97fc43f109cb",
+    "name": "Mosiur Rahman",
+    "nid": "123123123",
+    "picture": "/uploads/photos/169ab677-435f-4668-9488-bbaef8237157.jpg",
+    "stepCompleted": 1,
+    "result": "PASSED",
+    "createdAt": "2025-11-12T12:06:49.560Z",
+    "updatedAt": "2025-11-12T12:06:49.560Z",
+    "candidateId": "GMST-00000061",
+    "__v": 0
+  },
+  {
+    "_id": "69153f60531d97fc43f10a03",
+    "name": "jobbar",
+    "nid": "111",
+    "picture": "/uploads/photos/12080c2a-d551-40fa-bb04-17999412ddc8.jpeg",
+    "stepCompleted": 1,
+    "result": "PASSED",
+    "createdAt": "2025-11-13T02:16:00.868Z",
+    "updatedAt": "2025-11-13T02:16:00.868Z",
+    "candidateId": "GMST-00000062",
+    "__v": 0
+  }
+]
+
+
+
+// /models/iepInterviewDownAdmin';
+
+
+[
+  {
+    "_id": "691466a9531d97fc43f1085c",
+    "candidateId": "GMST-00000054",
+    "stepCompleted": 1,
+    "result": "PASSED",
+    "failureReason": null,
+    "interviewData": {
+      "_id": "691455107b5ec91f34d88b92",
+      "name": "Mosiur Rahman",
+      "nid": "12341234",
+      "picture": "/uploads/photos/57c671c1-9032-45e4-a0e2-dc82df940ba6.jpg",
+      "stepCompleted": 1,
+      "result": "PASSED",
+      "createdAt": "2025-11-12T09:36:16.664Z",
+      "updatedAt": "2025-11-12T09:36:16.664Z",
+      "candidateId": "GMST-00000054",
+      "__v": 0
+    },
+    "createdAt": "2025-11-12T10:51:21.995Z",
+    "updatedAt": "2025-11-12T10:51:21.995Z",
+    "__v": 0
+  },
+  {
+    "_id": "6914699e531d97fc43f10897",
+    "candidateId": "GMST-00000059",
+    "stepCompleted": 1,
+    "result": "FAILED",
+    "failureReason": "dfg",
+    "interviewData": {
+      "_id": "6914698e531d97fc43f10891",
+      "name": "sabbir",
+      "nid": "dfg",
+      "picture": "/uploads/photos/5c7ff01e-2e33-4d0d-b90e-d5254f42bb57.jpg",
+      "stepCompleted": 1,
+      "result": "PASSED",
+      "createdAt": "2025-11-12T11:03:42.645Z",
+      "updatedAt": "2025-11-12T11:03:42.645Z",
+      "candidateId": "GMST-00000059",
+      "__v": 0
+    },
+    "createdAt": "2025-11-12T11:03:58.776Z",
+    "updatedAt": "2025-11-12T11:03:58.776Z",
+    "__v": 0
+  },
+  {
+    "_id": "6914700d531d97fc43f108fb",
+    "candidateId": "GMST-00000060",
+    "stepCompleted": 1,
+    "result": "FAILED",
+    "failureReason": "dfg",
+    "interviewData": {
+      "_id": "69146fc5531d97fc43f108ea",
+      "name": "ghjfgh",
+      "nid": "fghfg",
+      "picture": "/uploads/photos/21307eb0-7ea5-4a8a-9fae-ce71a37f1446.jpg",
+      "stepCompleted": 1,
+      "result": "PASSED",
+      "createdAt": "2025-11-12T11:30:13.659Z",
+      "updatedAt": "2025-11-12T11:30:13.659Z",
+      "candidateId": "GMST-00000060",
+      "__v": 0
+    },
+    "createdAt": "2025-11-12T11:31:25.804Z",
+    "updatedAt": "2025-11-12T11:31:25.804Z",
+    "__v": 0
+  },
+  {
+    "_id": "691470d1531d97fc43f1090a",
+    "candidateId": "GMST-00000058",
+    "stepCompleted": 1,
+    "result": "PASSED",
+    "failureReason": null,
+    "interviewData": {
+      "_id": "6914689d531d97fc43f10876",
+      "name": "ghjgh",
+      "nid": "fgh",
+      "picture": "/uploads/photos/f19812ac-f42c-4879-9ba3-be697f703a70.webp",
+      "stepCompleted": 1,
+      "result": "PASSED",
+      "createdAt": "2025-11-12T10:59:41.591Z",
+      "updatedAt": "2025-11-12T10:59:41.591Z",
+      "candidateId": "GMST-00000058",
+      "__v": 0
+    },
+    "createdAt": "2025-11-12T11:34:41.100Z",
+    "updatedAt": "2025-11-12T11:34:41.100Z",
+    "__v": 0
+  },
+  {
+    "_id": "69153f90531d97fc43f10a19",
+    "candidateId": "GMST-00000062",
+    "stepCompleted": 1,
+    "result": "FAILED",
+    "failureReason": "sdf",
+    "interviewData": {
+      "_id": "69153f60531d97fc43f10a03",
+      "name": "jobbar",
+      "nid": "111",
+      "picture": "/uploads/photos/12080c2a-d551-40fa-bb04-17999412ddc8.jpeg",
+      "stepCompleted": 1,
+      "result": "PASSED",
+      "createdAt": "2025-11-13T02:16:00.868Z",
+      "updatedAt": "2025-11-13T02:16:00.868Z",
+      "candidateId": "GMST-00000062",
+      "__v": 0
+    },
+    "createdAt": "2025-11-13T02:16:48.323Z",
+    "updatedAt": "2025-11-13T02:16:48.323Z",
+    "__v": 0
+  },
+  {
+    "_id": "69153fb4531d97fc43f10a29",
+    "candidateId": "GMST-00000061",
+    "stepCompleted": 1,
+    "result": "PASSED",
+    "failureReason": null,
+    "interviewData": {
+      "_id": "69147859531d97fc43f109cb",
+      "name": "Mosiur Rahman",
+      "nid": "123123123",
+      "picture": "/uploads/photos/169ab677-435f-4668-9488-bbaef8237157.jpg",
+      "stepCompleted": 1,
+      "result": "PASSED",
+      "createdAt": "2025-11-12T12:06:49.560Z",
+      "updatedAt": "2025-11-12T12:06:49.560Z",
+      "candidateId": "GMST-00000061",
+      "__v": 0
+    },
+    "createdAt": "2025-11-13T02:17:24.935Z",
+    "updatedAt": "2025-11-13T02:17:24.935Z",
+    "__v": 0
+  }
+]
+
+
+
+// /models/AdminInterview';
+
+{
+  "success": true,
+  "data": [
+    {
+      "_id": "6915402a531d97fc43f10a48",
+      "candidateId": {
+        "_id": "69153fe1531d97fc43f10a3a",
+        "candidateId": "GMST-00000061",
+        "name": "Mosiur Rahman",
+        "nid": "123123123",
+        "picture": "/uploads/photos/169ab677-435f-4668-9488-bbaef8237157.jpg",
+        "videos": [],
+        "interviewDate": "2025-11-13T00:00:00.000Z",
+        "interviewer": "bodruzzaman",
+        "department": "sd",
+        "vivaDetails": [
+          {
+            "question": "fd",
+            "answer": "df",
+            "remark": "",
+            "_id": "69153fe1531d97fc43f10a3b"
+          }
+        ],
+        "processAndScore": {
+          "Band Collar Attach": 200
+        },
+        "grade": "C",
+        "result": "PASSED",
+        "remarks": "",
+        "promotedToAdmin": true,
+        "canceledReason": "",
+        "createdAt": "2025-11-13T02:18:09.313Z",
+        "updatedAt": "2025-11-13T02:19:23.038Z",
+        "__v": 0
+      },
+      "salary": 3453,
+      "joiningDate": "2025-11-13T00:00:00.000Z",
+      "designation": "try",
+      "result": "PASSED",
+      "remarks": "",
+      "canceledReason": "",
+      "promotedToOperator": true,
+      "createdAt": "2025-11-13T02:19:22.892Z",
+      "updatedAt": "2025-11-13T02:19:22.892Z",
+      "__v": 0
+    }
+  ]
+}
+
+
+
+
+
+
+//  models/IepInterview';
+
+
+[
+  {
+    "_id": "69146002531d97fc43f107cc",
+    "candidateId": "GMST-00000054",
+    "name": "Mosiur Rahman",
+    "nid": "12341234",
+    "picture": "/uploads/photos/57c671c1-9032-45e4-a0e2-dc82df940ba6.jpg",
+    "videos": [],
+    "interviewDate": "2025-11-12T00:00:00.000Z",
+    "interviewer": "cvb",
+    "department": "cvb",
+    "vivaDetails": [
+      {
+        "question": "",
+        "answer": "",
+        "remark": "",
+        "_id": "69146002531d97fc43f107cd"
+      }
+    ],
+    "processAndScore": {
+      "Band Collar Attach": 157
+    },
+    "grade": "C",
+    "result": "FAILED",
+    "remarks": "",
+    "promotedToAdmin": false,
+    "canceledReason": "",
+    "createdAt": "2025-11-12T10:22:58.187Z",
+    "updatedAt": "2025-11-12T10:22:58.187Z",
+    "__v": 0
+  },
+  {
+    "_id": "691460a8531d97fc43f107e0",
+    "candidateId": "GMST-00000055",
+    "name": "tarek rahman",
+    "nid": "123412344",
+    "picture": "/uploads/photos/dddddfa4-34e2-4ded-9c78-c94dcd56c1e8.jpg",
+    "videos": [],
+    "interviewDate": "2025-11-12T00:00:00.000Z",
+    "interviewer": "czxc",
+    "department": "sd",
+    "vivaDetails": [
+      {
+        "question": "",
+        "answer": "",
+        "remark": "",
+        "_id": "691460a8531d97fc43f107e1"
+      }
+    ],
+    "processAndScore": {
+      "Band Collar Attach": 157
+    },
+    "grade": "C",
+    "result": "PASSED",
+    "remarks": "",
+    "promotedToAdmin": false,
+    "canceledReason": "",
+    "createdAt": "2025-11-12T10:25:44.414Z",
+    "updatedAt": "2025-11-12T10:25:44.414Z",
+    "__v": 0
+  },
+  {
+    "_id": "69147a27531d97fc43f109e6",
+    "candidateId": "GMST-00000058",
+    "name": "ghjgh",
+    "nid": "fgh",
+    "picture": "/uploads/photos/f19812ac-f42c-4879-9ba3-be697f703a70.webp",
+    "videos": [],
+    "interviewDate": "2025-11-12T00:00:00.000Z",
+    "interviewer": "cvb",
+    "department": "zxcv",
+    "vivaDetails": [
+      {
+        "question": "sdf",
+        "answer": "sdf",
+        "remark": "",
+        "_id": "69147a27531d97fc43f109e7"
+      }
+    ],
+    "processAndScore": {
+      "Band Collar Attach": 106
+    },
+    "grade": "C",
+    "result": "PASSED",
+    "remarks": "",
+    "promotedToAdmin": false,
+    "canceledReason": "",
+    "createdAt": "2025-11-12T12:14:31.925Z",
+    "updatedAt": "2025-11-12T12:14:31.925Z",
+    "__v": 0
+  },
+  {
+    "_id": "69153fe1531d97fc43f10a3a",
+    "candidateId": "GMST-00000061",
+    "name": "Mosiur Rahman",
+    "nid": "123123123",
+    "picture": "/uploads/photos/169ab677-435f-4668-9488-bbaef8237157.jpg",
+    "videos": [],
+    "interviewDate": "2025-11-13T00:00:00.000Z",
+    "interviewer": "bodruzzaman",
+    "department": "sd",
+    "vivaDetails": [
+      {
+        "question": "fd",
+        "answer": "df",
+        "remark": "",
+        "_id": "69153fe1531d97fc43f10a3b"
+      }
+    ],
+    "processAndScore": {
+      "Band Collar Attach": 200
+    },
+    "grade": "C",
+    "result": "PASSED",
+    "remarks": "",
+    "promotedToAdmin": true,
+    "canceledReason": "",
+    "createdAt": "2025-11-13T02:18:09.313Z",
+    "updatedAt": "2025-11-13T02:19:23.038Z",
+    "__v": 0
+  }
+]
+
+
+
+
+
+
+
+/models/Operator';
+
+[
+
+  {
+    "_id": "6912fc60e2c3cd051985a942",
+    "name": "khalekuzzaman",
+    "operatorId": "TGS-0110523454",
+    "joiningDate": "2025-11-11T00:00:00.000Z",
+    "nid": "1234123445645345",
+    "picture": "/uploads/photos/e2a9cf48-c06f-4d40-96cb-9461283f8efd.jpg",
+    "videos": [],
+    "designation": "OPERATOR",
+    "grade": "C",
+    "allowedProcesses": {
+      "Band Collar Attach": 84
+    },
+    "occurrenceReports": [],
+    "resignationHistory": [],
+    "previousProcessScores": [],
+    "createdAt": "2025-11-11T09:05:36.767Z",
+    "updatedAt": "2025-11-11T09:05:36.767Z",
+    "__v": 0
+  },
+  {
+    "_id": "69140953c133635453514249",
+    "name": "a",
+    "operatorId": "SF",
+    "joiningDate": "2025-11-12T00:00:00.000Z",
+    "nid": "1",
+    "picture": "/uploads/photos/39198de0-b61b-403e-9a95-7cc9769c4ba5.jpg",
+    "videos": [],
+    "designation": "sdf",
+    "grade": "C",
+    "allowedProcesses": {
+      "Band Collar Attach": 180
+    },
+    "occurrenceReports": [],
+    "resignationHistory": [],
+    "previousProcessScores": [],
+    "createdAt": "2025-11-12T04:13:07.501Z",
+    "updatedAt": "2025-11-12T04:13:07.501Z",
+    "__v": 0
+  },
+  {
+    "_id": "691411f5e253f8b5f407df1f",
+    "name": "b",
+    "operatorId": "34",
+    "joiningDate": "2025-11-12T00:00:00.000Z",
+    "nid": "2",
+    "picture": "/uploads/photos/bf25daf0-cadd-47ca-8691-07d7cee9d2bc.jpg",
+    "videos": [],
+    "designation": "er",
+    "grade": "C",
+    "allowedProcesses": {
+      "Band Collar Attach": 84
+    },
+    "occurrenceReports": [],
+    "resignationHistory": [],
+    "previousProcessScores": [],
+    "createdAt": "2025-11-12T04:49:57.193Z",
+    "updatedAt": "2025-11-12T04:49:57.193Z",
+    "__v": 0
+  },
+  {
+    "_id": "6915402f531d97fc43f10a53",
+    "name": "Mosiur Rahman",
+    "operatorId": "TGS-0054556",
+    "joiningDate": "2025-11-13T00:00:00.000Z",
+    "nid": "123123123",
+    "picture": "/uploads/photos/169ab677-435f-4668-9488-bbaef8237157.jpg",
+    "videos": [],
+    "designation": "try",
+    "grade": "C",
+    "allowedProcesses": {
+      "Band Collar Attach": 200
+    },
+    "occurrenceReports": [],
+    "resignationHistory": [],
+    "previousProcessScores": [],
+    "createdAt": "2025-11-13T02:19:27.466Z",
+    "updatedAt": "2025-11-13T02:19:27.466Z",
+    "__v": 0
+  }
+]
+
+
+
+
+
+//    /models/ResignHistory';
+
+
+[
+  {
+    "_id": "6915674292b7665ccde6a225",
+    "operatorId": "TGS-0110523454",
+    "name": "khalekuzzaman",
+    "nid": "1234123445645345",
+    "designation": "OPERATOR",
+    "grade": "C",
+    "joiningDate": "2025-11-11T00:00:00.000Z",
+    "department": "sewing",
+    "approvedBy": "dfg",
+    "reason": "dfg sg",
+    "performanceMark": "good",
+    "remarks": "sdg",
+    "picture": "/uploads/photos/e2a9cf48-c06f-4d40-96cb-9461283f8efd.jpg",
+    "allowedProcesses": {
+      "Band Collar Attach": 84
+    },
+    "previousProcessScores": [],
+    "occurrenceReports": [],
+    "resignationDate": "2025-11-13T05:06:10.360Z",
+    "createdAt": "2025-11-13T05:06:10.369Z",
+    "updatedAt": "2025-11-13T05:06:10.369Z",
+    "__v": 0
+  }
+]

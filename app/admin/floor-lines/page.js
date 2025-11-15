@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react';
-import Layout from '@/components/Layout';
+import SidebarNavLayout from '@/components/SidebarNavLayout';
 
 export default function FloorLineForm() {
   const [formData, setFormData] = useState({
@@ -90,8 +90,9 @@ export default function FloorLineForm() {
   }, {});
 
   return (
-    <Layout>
+    
       <div className="container mx-auto p-4 bg-[#1A1B22] text-[#E5E9F0] font-sans min-h-screen">
+       <SidebarNavLayout />
         <h1 className="text-2xl font-bold mb-4">Add New Floor Line</h1>
 
         {/* ✅ Success Message */}
@@ -168,6 +169,6 @@ export default function FloorLineForm() {
           ))
         )}
       </div>
-    </Layout>
+
   );
 }

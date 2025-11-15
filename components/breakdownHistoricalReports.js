@@ -168,60 +168,60 @@ export default function ViewReportByFloor() {
       
       {/* Report display section */}
       {allData.matched.length > 0 && (
-        <span> </span>
-        // <div className="space-y-8">
-        //   {/* Matched Processes Table (Combined) */}
-        //   <div className="mt-4 overflow-x-auto">
-        //     <h4 className="text-md font-semibold mb-2 text-green-400">Matched Processes from breakdown</h4>
-        //     <table className="w-full border border-collapse text-sm">
-        //       <thead>
-        //         <tr className="bg-[#1A1B22]">
-        //           <th className="border p-2">Operator ID</th>
-        //           <th className="border p-2">Line</th>
-        //           <th className="border p-2">Name</th>
-        //           <th className="border p-2">Designation</th>
-        //           <th className="border p-2">Machine Type</th>
-        //           <th className="border p-2">Unique Machine</th>
-        //           <th className="border p-2">Process</th>
-        //           <th className="border p-2">Target</th>
-        //           <th className="border p-2">Achievement</th>
-        //           <th className="border p-2">Status</th>
-        //           <th className="border p-2">Work As</th>
-        //         </tr>
-        //         <tr className="bg-[#2D3039]">
-        //           <td className="border p-2"><input type="text" name="operatorId" onChange={handleMatchedFilterChange} className="w-full bg-[#1A1B22] text-[#E5E9F0] rounded p-1 text-xs" placeholder="Filter" /></td>
-        //           <td className="border p-2"><input type="text" name="line" onChange={handleMatchedFilterChange} className="w-full bg-[#1A1B22] text-[#E5E9F0] rounded p-1 text-xs" placeholder="Filter" /></td>
-        //           <td className="border p-2"><input type="text" name="operatorName" onChange={handleMatchedFilterChange} className="w-full bg-[#1A1B22] text-[#E5E9F0] rounded p-1 text-xs" placeholder="Filter" /></td>
-        //           <td className="border p-2"><input type="text" name="designation" onChange={handleMatchedFilterChange} className="w-full bg-[#1A1B22] text-[#E5E9F0] rounded p-1 text-xs" placeholder="Filter" /></td>
-        //           <td className="border p-2"><input type="text" name="machineType" onChange={handleMatchedFilterChange} className="w-full bg-[#1A1B22] text-[#E5E9F0] rounded p-1 text-xs" placeholder="Filter" /></td>
-        //           <td className="border p-2"><input type="text" name="uniqueMachine" onChange={handleMatchedFilterChange} className="w-full bg-[#1A1B22] text-[#E5E9F0] rounded p-1 text-xs" placeholder="Filter" /></td>
-        //           <td className="border p-2"><input type="text" name="process" onChange={handleMatchedFilterChange} className="w-full bg-[#1A1B22] text-[#E5E9F0] rounded p-1 text-xs" placeholder="Filter" /></td>
-        //           <td className="border p-2"><input type="text" name="target" onChange={handleMatchedFilterChange} className="w-full bg-[#1A1B22] text-[#E5E9F0] rounded p-1 text-xs" placeholder="Filter" /></td>
-        //           <td className="border p-2"><input type="text" name="achievement" onChange={handleMatchedFilterChange} className="w-full bg-[#1A1B22] text-[#E5E9F0] rounded p-1 text-xs" placeholder="Filter" /></td>
-        //           <td className="border p-2"><input type="text" name="status" onChange={handleMatchedFilterChange} className="w-full bg-[#1A1B22] text-[#E5E9F0] rounded p-1 text-xs" placeholder="Filter" /></td>
-        //           <td className="border p-2"><input type="text" name="workAs" onChange={handleMatchedFilterChange} className="w-full bg-[#1A1B22] text-[#E5E9F0] rounded p-1 text-xs" placeholder="Filter" /></td>
-        //         </tr>
-        //       </thead>
-        //       <tbody>
-        //         {filteredMatchedData.map((p, idx) => (
-        //           <tr key={idx} className="bg-green-800/20">
-        //             <td className="border p-2">{p.operatorId}</td>
-        //             <td className="border p-2">{p.line}</td>
-        //             <td className="border p-2">{p.operatorName}</td>
-        //             <td className="border p-2">{p.designation}</td>
-        //             <td className="border p-2">{p.machineType}</td>
-        //             <td className="border p-2">{p.uniqueMachine}</td>
-        //             <td className="border p-2">{p.process}</td>
-        //             <td className="border p-2">{p.target}</td>
-        //             <td className="border p-2">{p.achievement}</td>
-        //             <td className="border p-2">{p.status}</td>
-        //             <td className="border p-2">{p.workAs}</td>
-        //           </tr>
-        //         ))}
-        //       </tbody>
-        //     </table>
-        //   </div>
-        // </div>
+//<span> </span>
+        <div className="space-y-8">
+          {/* Matched Processes Table (Combined) */}
+          <div className="mt-4 overflow-x-auto">
+            <h4 className="text-md font-semibold mb-2 text-green-400">Matched Processes from breakdown</h4>
+            <table className="w-full border border-collapse text-sm">
+              <thead>
+                <tr className="bg-[#1A1B22]">
+                  <th className="border p-2">Operator ID</th>
+                  <th className="border p-2">Line</th>
+                  <th className="border p-2">Name</th>
+                  <th className="border p-2">Designation</th>
+                  <th className="border p-2">Machine Type</th>
+                  <th className="border p-2">Unique Machine</th>
+                  <th className="border p-2">Process</th>
+                  <th className="border p-2">Target</th>
+                  <th className="border p-2">Achievement</th>
+                  <th className="border p-2">Status</th>
+                  <th className="border p-2">Work As</th>
+                </tr>
+                <tr className="bg-[#2D3039]">
+                  <td className="border p-2"><input type="text" name="operatorId" onChange={handleMatchedFilterChange} className="w-full bg-[#1A1B22] text-[#E5E9F0] rounded p-1 text-xs" placeholder="Filter" /></td>
+                  <td className="border p-2"><input type="text" name="line" onChange={handleMatchedFilterChange} className="w-full bg-[#1A1B22] text-[#E5E9F0] rounded p-1 text-xs" placeholder="Filter" /></td>
+                  <td className="border p-2"><input type="text" name="operatorName" onChange={handleMatchedFilterChange} className="w-full bg-[#1A1B22] text-[#E5E9F0] rounded p-1 text-xs" placeholder="Filter" /></td>
+                  <td className="border p-2"><input type="text" name="designation" onChange={handleMatchedFilterChange} className="w-full bg-[#1A1B22] text-[#E5E9F0] rounded p-1 text-xs" placeholder="Filter" /></td>
+                  <td className="border p-2"><input type="text" name="machineType" onChange={handleMatchedFilterChange} className="w-full bg-[#1A1B22] text-[#E5E9F0] rounded p-1 text-xs" placeholder="Filter" /></td>
+                  <td className="border p-2"><input type="text" name="uniqueMachine" onChange={handleMatchedFilterChange} className="w-full bg-[#1A1B22] text-[#E5E9F0] rounded p-1 text-xs" placeholder="Filter" /></td>
+                  <td className="border p-2"><input type="text" name="process" onChange={handleMatchedFilterChange} className="w-full bg-[#1A1B22] text-[#E5E9F0] rounded p-1 text-xs" placeholder="Filter" /></td>
+                  <td className="border p-2"><input type="text" name="target" onChange={handleMatchedFilterChange} className="w-full bg-[#1A1B22] text-[#E5E9F0] rounded p-1 text-xs" placeholder="Filter" /></td>
+                  <td className="border p-2"><input type="text" name="achievement" onChange={handleMatchedFilterChange} className="w-full bg-[#1A1B22] text-[#E5E9F0] rounded p-1 text-xs" placeholder="Filter" /></td>
+                  <td className="border p-2"><input type="text" name="status" onChange={handleMatchedFilterChange} className="w-full bg-[#1A1B22] text-[#E5E9F0] rounded p-1 text-xs" placeholder="Filter" /></td>
+                  <td className="border p-2"><input type="text" name="workAs" onChange={handleMatchedFilterChange} className="w-full bg-[#1A1B22] text-[#E5E9F0] rounded p-1 text-xs" placeholder="Filter" /></td>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredMatchedData.map((p, idx) => (
+                  <tr key={idx} className="bg-green-800/20">
+                    <td className="border p-2">{p.operatorId}</td>
+                    <td className="border p-2">{p.line}</td>
+                    <td className="border p-2">{p.operatorName}</td>
+                    <td className="border p-2">{p.designation}</td>
+                    <td className="border p-2">{p.machineType}</td>
+                    <td className="border p-2">{p.uniqueMachine}</td>
+                    <td className="border p-2">{p.process}</td>
+                    <td className="border p-2">{p.target}</td>
+                    <td className="border p-2">{p.achievement}</td>
+                    <td className="border p-2">{p.status}</td>
+                    <td className="border p-2">{p.workAs}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
       
       {allData.unmatched.length > 0 && (

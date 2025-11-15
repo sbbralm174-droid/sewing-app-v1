@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
+import SidebarNavLayout from '@/components/SidebarNavLayout';
 
 export default function SupervisorForm() {
   const [formData, setFormData] = useState({
@@ -54,8 +55,9 @@ export default function SupervisorForm() {
   };
 
   return (
-    <Layout>
+    
       <div className="container mx-auto p-4" style={{ backgroundColor: '#1A1B22', color: '#E5E9F0', fontFamily: 'sans-serif' }}>
+        <SidebarNavLayout />
         <h1 className="text-2xl font-bold mb-4">Add New Supervisor</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -136,6 +138,6 @@ export default function SupervisorForm() {
           </button>
         </form>
       </div>
-    </Layout>
+    
   );
 }

@@ -1,15 +1,15 @@
 "use client";
 import { useState, useEffect } from "react";
-
+import SidebarNavLayout from '@/components/SidebarNavLayout';
 export default function LineReport() {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [selectedFloor, setSelectedFloor] = useState("");
   const [selectedLine, setSelectedLine] = useState("");
-  const [floors, setFloors] = useState([]); // State to hold floor names
-  const [lines, setLines] = useState([]); // State to hold lines for the selected floor
-  const [allLinesData, setAllLinesData] = useState({}); // To store all lines grouped by floor
+  const [floors, setFloors] = useState([]);
+  const [lines, setLines] = useState([]);
+  const [allLinesData, setAllLinesData] = useState({});
   const [data, setData] = useState(null);
-  const [excelProcesses, setExcelProcesses] = useState([]); // Now stores objects with original and sanitized processes
+  const [excelProcesses, setExcelProcesses] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
 
   // Initial data fetch: fetch all lines grouped by floor
@@ -20,9 +20,7 @@ export default function LineReport() {
         const result = await res.json();
         
         if (Array.isArray(result)) {
-          // Group lines by floor name
           const groupedData = result.reduce((acc, lineItem) => {
-            // Updated to use 'floorName' instead of 'name'
             const floorName = lineItem.floor?.floorName || "No Floor";
             if (!acc[floorName]) {
               acc[floorName] = [];
@@ -45,17 +43,30 @@ export default function LineReport() {
   const handleFloorChange = (e) => {
     const floor = e.target.value;
     setSelectedFloor(floor);
-    setSelectedLine(""); // Reset line when floor changes
+    setSelectedLine("");
     setLines(allLinesData[floor] || []);
   };
 
-  // Fetch line report data
+  // Fetch line report data - FIXED
   const fetchData = async () => {
     if (!date || !selectedLine) return;
     try {
       const res = await fetch(`/api/report/line-report?date=${date}&line=${selectedLine}`);
       const result = await res.json();
-      setData(result);
+      
+      // Transform the API response to match component structure
+      if (result.tableData) {
+        const transformedData = {
+          line: result.line,
+          supervisor: result.supervisor,
+          operators: result.tableData.filter(item => item.workAs === "operator"),
+          helpers: result.tableData.filter(item => item.workAs === "helper")
+        };
+        setData(transformedData);
+      } else {
+        // If API response already has operators and helpers, use as is
+        setData(result);
+      }
     } catch (err) {
       console.error("Error fetching line report", err);
     }
@@ -67,7 +78,6 @@ export default function LineReport() {
       .split(/\r?\n/)
       .filter((p) => p !== "");
       
-    // Store objects with both original and sanitized versions
     const processed = pastedLines.map(p => ({
       original: p,
       sanitized: p.replace(/\s/g, "").toLowerCase()
@@ -85,7 +95,7 @@ export default function LineReport() {
     return map;
   };
 
-  // Function to save the report
+  // Function to save the report - FIXED data structure
   const handleSaveReport = async () => {
     if (!data || !excelProcesses.length) {
       alert("Please fetch the report and paste Excel processes before saving.");
@@ -116,14 +126,11 @@ export default function LineReport() {
       let reportExists = false;
       
       if (existenceRes.ok) {
-        // If response is successful (200), parse as array
         const reports = await existenceRes.json();
         reportExists = Array.isArray(reports) && reports.some(report => report.line === selectedLine);
       } else if (existenceRes.status === 404) {
-        // If no reports found (404), it means the report doesn't exist yet
         reportExists = false;
       } else {
-        // Handle other errors
         throw new Error(`API error: ${existenceRes.status}`);
       }
       
@@ -133,6 +140,7 @@ export default function LineReport() {
         return;
       }
       
+      // Use the combined records for saving
       const allRecords = [...(data.operators || []), ...(data.helpers || [])];
       const excelMap = buildCountMap(excelProcesses);
       const excelLeft = { ...excelMap };
@@ -143,8 +151,8 @@ export default function LineReport() {
       
       const allProcessesSanitizedMap = {};
       allRecords.forEach(op => {
-        const proc = op.process.replace(/\s/g, "").toLowerCase();
-        allProcessesSanitizedMap[proc] = op.process; // Store original version
+        const proc = op.process ? op.process.replace(/\s/g, "").toLowerCase() : "";
+        allProcessesSanitizedMap[proc] = op.process;
         if (excelLeft[proc] && excelLeft[proc] > 0) {
           matchedRecords.push(op);
           excelLeft[proc] -= 1;
@@ -156,7 +164,6 @@ export default function LineReport() {
       // Build missing processes array using original names
       Object.entries(excelLeft).forEach(([procSanitized, count]) => {
         if (count > 0) {
-          // Find the original process name. If not found in allRecords, use the sanitized version as fallback.
           const originalProcess = excelProcesses.find(ep => ep.sanitized === procSanitized)?.original || procSanitized;
           for (let i = 0; i < count; i++) {
             missingProcesses.push(originalProcess);
@@ -167,7 +174,7 @@ export default function LineReport() {
       const reportData = {
         date,
         line: selectedLine,
-        floor: selectedFloor, // Changed to use selectedFloor
+        floor: selectedFloor,
         supervisor: data.supervisor,
         totalRecords: allRecords.length,
         allRecords: allRecords,
@@ -198,18 +205,38 @@ export default function LineReport() {
     }
   };
 
+  // Helper function to get all records for display
+  const getAllRecords = () => {
+    if (!data) return [];
+    
+    // If data has tableData (original API response), use that
+    if (data.tableData) {
+      return data.tableData;
+    }
+    
+    // If data has operators and helpers (transformed data), combine them
+    return [...(data.operators || []), ...(data.helpers || [])];
+  };
+
   return (
     <div className="p-6 bg-[#1A1B22] text-[#E5E9F0] font-sans min-h-screen">
+      <SidebarNavLayout/>
       <h2 className="text-xl font-bold mb-4">Line Report</h2>
 
       {/* Filters */}
       <div className="flex gap-4 mb-4">
+        <div 
+        
+            onClick={() => document.getElementById("date")?.showPicker()}
+        >
         <input
+          id="date"
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
           className="border p-2 rounded bg-[#2D3039] text-[#E5E9F0] placeholder-[#B0B0B0]"
         />
+        </div>
 
         {/* Floor dropdown */}
         <select
@@ -230,7 +257,7 @@ export default function LineReport() {
           value={selectedLine}
           onChange={(e) => setSelectedLine(e.target.value)}
           className="border p-2 rounded bg-[#2D3039] text-[#E5E9F0]"
-          disabled={!selectedFloor} // Disable line dropdown until a floor is selected
+          disabled={!selectedFloor}
         >
           <option value="">Select a line</option>
           {lines.map((ln, idx) => (
@@ -266,8 +293,8 @@ export default function LineReport() {
         />
       </div>
 
-      {/* Table */}
-      {data && (data.operators || data.helpers) && (
+      {/* Table - FIXED rendering logic */}
+      {data && getAllRecords().length > 0 && (
         <div>
           <h3 className="text-lg font-semibold mb-2">
             Line: {data.line} | Supervisor: {data.supervisor}
@@ -291,24 +318,17 @@ export default function LineReport() {
             </thead>
             <tbody>
               {(() => {
-                const allRecords = [
-                  ...(data.operators || []),
-                  ...(data.helpers || []),
-                ];
-
-                const excelMap = {};
-                excelProcesses.forEach(ep => {
-                  excelMap[ep.sanitized] = (excelMap[ep.sanitized] || 0) + 1;
-                });
+                const allRecords = getAllRecords();
+                const excelMap = buildCountMap(excelProcesses);
                 const excelLeft = { ...excelMap };
 
                 return (
                   <>
                     {allRecords.map((op, idx) => {
-                      const proc = op.process.replace(/\s/g, "").toLowerCase();
+                      const proc = op.process ? op.process.replace(/\s/g, "").toLowerCase() : "";
                       let isMatched = false;
 
-                      if (excelLeft[proc] && excelLeft[proc] > 0) {
+                      if (proc && excelLeft[proc] && excelLeft[proc] > 0) {
                         isMatched = true;
                         excelLeft[proc] -= 1;
                       }
@@ -336,8 +356,9 @@ export default function LineReport() {
                     })}
 
                     {Object.entries(excelLeft).map(([sanitizedProc, count], idx) => {
-                      // Find the original process name for display
-                      const originalProc = excelProcesses.find(ep => ep.sanitized === sanitizedProc)?.original;
+                      if (count <= 0) return null;
+                      
+                      const originalProc = excelProcesses.find(ep => ep.sanitized === sanitizedProc)?.original || sanitizedProc;
                       return Array.from({ length: count }).map((_, i) => (
                         <tr
                           key={`extra-${idx}-${i}`}
@@ -354,6 +375,13 @@ export default function LineReport() {
               })()}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Show message when no data */}
+      {data && getAllRecords().length === 0 && (
+        <div className="text-center p-4 bg-red-900/30 rounded">
+          No records found for the selected criteria
         </div>
       )}
     </div>

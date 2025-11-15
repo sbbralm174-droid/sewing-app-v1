@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Head from 'next/head';
 import Layout from '@/components/Layout';
+import SidebarNavLayout from '@/components/SidebarNavLayout';
 
 export default function FloorEntryPage() {
   const [floorName, setFloorName] = useState('');
@@ -44,10 +45,11 @@ export default function FloorEntryPage() {
 
   return (
     <>
-      <Layout>
+      
         <Head>
           <title>Floor Entry System</title>
         </Head>
+        <SidebarNavLayout />
         <div className="flex flex-col items-center justify-center min-h-screen bg-[#1A1B22] p-4 font-sans">
           <main className="bg-[#2D3039] p-8 rounded-xl shadow-lg w-full max-w-md">
             <h1 className="text-3xl font-bold text-[#E5E9F0] text-center mb-6">Add New Floor</h1>
@@ -80,7 +82,7 @@ export default function FloorEntryPage() {
             )}
           </main>
         </div>
-      </Layout>
+      
     </>
   );
 }

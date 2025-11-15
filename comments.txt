@@ -1,0 +1,130 @@
+//////////////////       The tasks that are remaining until now.       ////////////////////////
+
+const selectDateRef = useRef(null);
+ref={selectDateRef}
+onClick={() => selectDateRef.current?.showPicker()}
+
+
+1. DGM sir needed on entry form adding buyer and styles ok
+2. Maruf sir needed operator hourly rejection
+3. All input from server.  
+
+
+
+
+
+
+bar- name & process
+paredo- id & process
+defect report operator wise. date range and total.  -- (ok) /admin/defects/search
+
+ekta operator kon line e koto ghonta kaj kortese today date e.
+
+ekta operator kon line e koto din kaj korese. setar report
+
+ekta line e sorbo nimno 18 din or  manual date e koto jon kaj korese tar list ebong oi mase ki kono absent royese ki na (ok)
+
+operator join date operator kono report khele  ebong operator chole gele se ki karone gese. tar ekta report thakbe (ok)
+
+add pie chart on machine report (ui)
+
+leave operator report.
+
+koto jon operator helper e kortese. ebong koto jon helper  operatory kortese tar ekta report toiri korte hobe.
+
+operator er sorbocho ebong second sorbocho process production. (ok)
+
+npt.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Reports
+
+/admin/occurrence-report/search --
+reports/heighest-process-score 
+/reports/line-report
+/reports/machine-report (machine report updatable)------------------
+/reports/operator-pressent-absent-report (payrol data correction) -- 
+/reports/search-by-process
+/reports/supervisor-report 
+/reports/floor-wise-breakdown-matching
+/reports/date-range-operator-search 
+/reports/operator-work --
+
+/reports/floor-line-wise-report (problem ui&ux)
+
+
+top-10-process scorer list ---------
+
+
+
+entry form
+
+/admin/buyers
+/admin/styles
+/admin/defects
+/admin/defects/search --
+/admin/floor
+/admin/floor-lines
+admin/hourly-production-entry
+/admin/hours
+/admin/machine-parts-upload --
+/admin/machine-types
+/admin/machines
+/admin/occurrence-report/add --
+/admin/operators
+/admin/operators/update
+/admin/resign
+/admin/supervisors
+/reports/breackdown-check-1
+
+
+supervisor entry
+
+/supervisor/daily-production
+/supervisor/delete-daily-production-entry
+/supervisor/line-completion
+/supervisor/processes
+/supervisor/reposition
+/supervisor/update-daily-production
+
+
+
+
+
+
+
+ekhane process gulo evabe sajate hobe. excell ta ki tumi notun ekta excell e convert korte parba nicher moto kore
+
+Operator Name  , 	ID No. ,           	Designation	 ,    Grade	 ,  Update Matrix,   Join Date,    	Salary, process																																																		 
+AMIR    HAMJA,	TGS-005716	JR. ,     OPERATOR,	  A,	                    A,	           4-Mar-20, 	9715,  {"Placket box":171,"Side vent top stitch":103,"Zipper join":100,"Moon join":157} 
+
+
+
+
+
+
+
+
+
+

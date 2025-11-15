@@ -1,6 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
+import SidebarNavLayout from '@/components/SidebarNavLayout';
+
 
 export default function OperatorUpdate() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -88,8 +90,9 @@ export default function OperatorUpdate() {
   );
 
   return (
-    <Layout>
+    
       <div className="min-h-screen bg-[#1A1B22] text-[#E5E9F0] p-6">
+        <SidebarNavLayout />
         <h1 className="text-2xl font-bold mb-4">Update Operator</h1>
 
         {/* Operator Search */}
@@ -211,6 +214,6 @@ export default function OperatorUpdate() {
           </div>
         )}
       </div>
-    </Layout>
+    
   );
 }

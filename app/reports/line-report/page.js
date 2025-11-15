@@ -14,6 +14,7 @@ import {
   ComposedChart,
   LabelList,
 } from "recharts";
+import SidebarNavLayout from '@/components/SidebarNavLayout';
 
 // This is the ParetoChart component integrated directly into the file
 const ParetoChart = ({ data, totalHour, currentHour }) => {
@@ -143,6 +144,98 @@ const ParetoChart = ({ data, totalHour, currentHour }) => {
   );
 };
 
+// New Bar Chart Component
+// New Bar Chart Component
+const SimpleBarChart = ({ data, totalHour, currentHour }) => {
+  if (!data || data.length === 0) {
+    return null;
+  }
+
+  // Process data for bar chart - show achievement vs total target
+  const processedData = data.map((item) => {
+    const totalTarget = item.target && totalHour ? item.target * totalHour : 0;
+
+    return {
+      name: item.operatorId,
+      totalTarget: totalTarget, // This is the Total Target (Hourly Target * Total Hour)
+      achievement: item.achievement || 0, // This is the Achievement (Units Produced)
+    };
+  });
+
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div
+          className="p-3 border rounded shadow"
+          style={{ backgroundColor: "#2D3039", borderColor: "#4C566A" }}
+        >
+          <p className="text-sm font-bold" style={{ color: "#E5E9F0" }}>{`Operator: ${label}`}</p>
+          {payload.map((entry, index) => (
+            <p
+              key={index}
+              className="text-xs mt-1"
+              style={{ color: entry.color }}
+            >
+              {`${entry.name}: ${entry.value}`}
+            </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <div style={{ width: "100%", height: 400, marginBottom: "2rem" }}>
+      <ResponsiveContainer>
+        <BarChart
+          data={processedData}
+          margin={{
+            top: 20,
+            right: 20,
+            bottom: 20,
+            left: 20,
+          }}
+        >
+          <CartesianGrid stroke="#4C566A" />
+          <XAxis
+            dataKey="name"
+            stroke="#E5E9F0"
+            angle={-45}
+            textAnchor="end"
+            interval={0}
+            height={70}
+          />
+          <YAxis
+            stroke="#E5E9F0"
+            label={{
+              value: "Production Units",
+              angle: -90,
+              position: "insideLeft",
+              fill: "#E5E9F0",
+            }}
+          />
+          <Tooltip content={<CustomTooltip />} />
+          <Legend />
+          <Bar
+            dataKey="totalTarget" // Changed dataKey from 'target' to 'totalTarget'
+            name="Total Target"
+            fill="#4C566A"
+            radius={[2, 2, 0, 0]}
+          />
+          <Bar
+            dataKey="achievement"
+            name="Achievement"
+            fill="#8884d8"
+            radius={[2, 2, 0, 0]}
+          />
+          {/* Removed the 'expectedProduction' Bar to focus on Total Target vs Achievement */}
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
+
 export default function DailyProductionPage() {
   const [date, setDate] = useState("");
   const [line, setLine] = useState("");
@@ -152,6 +245,7 @@ export default function DailyProductionPage() {
   const [error, setError] = useState("");
   const [totalHour, setTotalHour] = useState("");
   const [currentHour, setCurrentHour] = useState("");
+  const [chartType, setChartType] = useState("bar"); // 'bar' or 'pareto'
 
   // Fetch floor lines
   useEffect(() => {
@@ -298,7 +392,7 @@ export default function DailyProductionPage() {
   );
 
   return (
-    <Layout>
+    
       <div
         className="p-6"
         style={{
@@ -307,6 +401,7 @@ export default function DailyProductionPage() {
           color: "#E5E9F0",
         }}
       >
+        <SidebarNavLayout/>
         <h1
           className="text-2xl font-bold mb-4 text-center"
           style={{ color: "#E5E9F0" }}
@@ -383,6 +478,21 @@ export default function DailyProductionPage() {
             }}
           />
 
+          {/* Chart Type Selector */}
+          <select
+            value={chartType}
+            onChange={(e) => setChartType(e.target.value)}
+            className="border rounded px-3 py-2 focus:ring-2"
+            style={{
+              backgroundColor: "#2D3039",
+              borderColor: "#4C566A",
+              color: "#E5E9F0",
+            }}
+          >
+            <option value="bar">Bar Chart</option>
+            <option value="pareto">Pareto Chart</option>
+          </select>
+
           <button
             onClick={fetchData}
             disabled={!date || !line || loading}
@@ -454,12 +564,20 @@ export default function DailyProductionPage() {
               </div>
             </div>
 
-            {/* Render the new Pareto chart component */}
-            <ParetoChart
-              data={result.tableData}
-              totalHour={totalHour}
-              currentHour={currentHour}
-            />
+            {/* Render chart based on selected type */}
+            {chartType === "bar" ? (
+              <SimpleBarChart
+                data={result.tableData}
+                totalHour={totalHour}
+                currentHour={currentHour}
+              />
+            ) : (
+              <ParetoChart
+                data={result.tableData}
+                totalHour={totalHour}
+                currentHour={currentHour}
+              />
+            )}
 
             {/* Render the single table with the combined data */}
             <Table
@@ -470,6 +588,6 @@ export default function DailyProductionPage() {
           </div>
         )}
       </div>
-    </Layout>
+ 
   );
 }

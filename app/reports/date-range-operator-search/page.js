@@ -1,166 +1,226 @@
-"use client";
-import { useState } from "react";
-import Layout from "@/components/Layout";
+'use client';
 
-export default function DailyProductionSearchPage() {
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [operatorSearch, setOperatorSearch] = useState("");
+import { useState } from 'react';
+
+export default function ProductionSearch() {
+  const [formData, setFormData] = useState({
+    operatorId: '',
+    startDate: '',
+    endDate: ''
+  });
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSearch = async () => {
-    if (!startDate || !endDate || !operatorSearch) {
-      alert("Please fill all fields");
-      return;
-    }
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setLoading(true);
+    setError('');
+    setResults([]);
+
     try {
-      const res = await fetch("/api/report/date-range-operator-search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ startDate, endDate, operatorSearch }),
+      const response = await fetch('/api/report/date-range-operator-search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
       });
 
-      const data = await res.json();
-      setResults(data);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Search failed');
+      }
+
+      setResults(data.data);
     } catch (err) {
-      console.error(err);
-      alert("Error fetching data");
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const calculateAchievement = (hourlyProduction) => {
-    if (!Array.isArray(hourlyProduction)) return 0;
-    return hourlyProduction.reduce(
-      (sum, entry) => sum + (entry.productionCount || 0),
-      0
-    );
+  const calculateTotalProduction = (hourlyProduction) => {
+    return hourlyProduction.reduce((total, hour) => total + hour.productionCount, 0);
+  };
+
+  const calculateTotalDefects = (hourlyProduction) => {
+    return hourlyProduction.reduce((total, hour) => {
+      const hourDefects = hour.defects.reduce((hourTotal, defect) => hourTotal + defect.count, 0);
+      return total + hourDefects;
+    }, 0);
   };
 
   return (
-    <Layout>
-      <div
-        className="p-6 max-w-6xl mx-auto"
-        style={{
-          backgroundColor: "#1A1B22",
-          color: "#E5E9F0",
-          fontFamily: "sans-serif",
-        }}
-      >
-        <h1 className="text-2xl font-bold mb-4">Daily Production Search</h1>
-
-        {/* Filters */}
-        <div className="flex flex-wrap gap-4 items-end mb-6">
+    <div className="max-w-6xl mx-auto p-6">
+      {/* Search Form */}
+      <div className="bg-white rounded-lg shadow-md mt-14 p-6 mb-6">
+        <h2 className="text-2xl font-bold text-gray-800 mb-6">Operator Search</h2>
+        
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <label className="block text-sm font-medium">Start Date</label>
-            <input
-              type="date"
-              className="border rounded p-2"
-              style={{ backgroundColor: "#2D3039", color: "#E5E9F0" }}
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium">End Date</label>
-            <input
-              type="date"
-              className="border rounded p-2"
-              style={{ backgroundColor: "#2D3039", color: "#E5E9F0" }}
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium">Operator</label>
+            <label htmlFor="operatorId" className="block text-sm font-medium text-gray-700 mb-2">
+              Operator ID *
+            </label>
             <input
               type="text"
-              placeholder="Name or ID"
-              className="border rounded p-2"
-              style={{ backgroundColor: "#2D3039", color: "#E5E9F0" }}
-              value={operatorSearch}
-              onChange={(e) => setOperatorSearch(e.target.value)}
+              id="operatorId"
+              name="operatorId"
+              value={formData.operatorId}
+              onChange={handleChange}
+              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Enter operator ID"
             />
           </div>
-          <button
-            onClick={handleSearch}
-            className="bg-blue-600 text-white px-4 py-2 rounded"
-          >
-            Search
-          </button>
-        </div>
 
-        {/* Table */}
-        {loading ? (
-          <p>Loading...</p>
-        ) : results.length > 0 ? (
-          <div
-            className="overflow-x-auto border rounded"
-            style={{ color: "#E5E9F0" }}
-          >
-            <table className="w-full border-collapse">
-              <thead>
-                <tr style={{ backgroundColor: "#2D3039" }}>
-                  <th className="border p-2">Date</th>
-                  <th className="border p-2">Operator ID</th>
-                  <th className="border p-2">Name</th>
-                  <th className="border p-2">Floor</th>
-                  <th className="border p-2">Line</th>
-                  <th className="border p-2">Process</th>
-                  <th className="border p-2">Machine Type</th>
-                  <th className="border p-2">Unique Machine</th>
-                  <th className="border p-2">Target</th>
-                  <th className="border p-2">Achievement</th>
-                  <th className="border p-2">Achievement %</th>
-                  <th className="border p-2">Work As</th>
+          <div>
+            <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-2">
+              Start Date *
+            </label>
+            <input
+              type="date"
+              id="startDate"
+              name="startDate"
+              value={formData.startDate}
+              onChange={handleChange}
+              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-2">
+              End Date *
+            </label>
+            <input
+              type="date"
+              id="endDate"
+              name="endDate"
+              value={formData.endDate}
+              onChange={handleChange}
+              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div className="flex items-end">
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Searching...' : 'Search'}
+            </button>
+          </div>
+        </form>
+
+        {error && (
+          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
+            <p className="text-red-700">{error}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Results */}
+      {results.length > 0 && (
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="px-6 py-4 bg-gray-50 border-b">
+            <h3 className="text-lg font-semibold text-gray-800">
+              Search Results ({results.length} records found)
+            </h3>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Operator
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Work Details
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Production
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Defects
+                  </th>
+                  
                 </tr>
               </thead>
-              <tbody>
-                {results.map((prod, i) => {
-                  const achievement = calculateAchievement(
-                    prod.hourlyProduction
-                  );
-                  const achievementPercent = prod.target
-                    ? ((achievement / prod.target) * 100).toFixed(1) + "%"
-                    : "0%";
-
-                  return (
-                    <tr
-                      key={i}
-                      style={{
-                        backgroundColor: i % 2 === 0 ? "#1A1B22" : "#2D3039",
-                      }}
-                    >
-                      <td className="border p-2">
-                        {new Date(prod.date).toLocaleDateString()}
-                      </td>
-                      <td className="border p-2">
-                        {prod.operator?.operatorId}
-                      </td>
-                      <td className="border p-2">{prod.operator?.name}</td>
-                      <td className="border p-2">{prod.floor}</td>
-                      <td className="border p-2">{prod.line}</td>
-                      <td className="border p-2">{prod.process}</td>
-                      <td className="border p-2">{prod.machineType}</td>
-                      <td className="border p-2">{prod.uniqueMachine}</td>
-                      <td className="border p-2">{prod.target}</td>
-                      <td className="border p-2">{achievement}</td>
-                      <td className="border p-2">{achievementPercent}</td>
-                      <td className="border p-2">{prod.workAs}</td>
-                    </tr>
-                  );
-                })}
+              <tbody className="bg-white divide-y divide-gray-200">
+                {results.map((production) => (
+                  <tr key={production._id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {new Date(production.date).toLocaleDateString()}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">
+                        {production.operator.name}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        ID: {production.operator.operatorId}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {production.operator.designation}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        <strong>Floor:</strong> {production.floor}
+                      </div>
+                      <div className="text-sm text-gray-900">
+                        <strong>Line:</strong> {production.line}
+                      </div>
+                      <div className="text-sm text-gray-900">
+                        <strong>Process:</strong> {production.process}
+                      </div>
+                      <div className="text-sm text-gray-900">
+                        <strong>Work as:</strong> {production.workAs}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        <strong>Total:</strong> {calculateTotalProduction(production.hourlyProduction)}
+                      </div>
+                      <div className="text-sm text-gray-900">
+                        <strong>Target:</strong> {production.target || 'N/A'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        <strong>Total Defects:</strong> {calculateTotalDefects(production.hourlyProduction)}
+                      </div>
+                    </td>
+                    
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
-        ) : (
-          <p>No records found</p>
-        )}
-      </div>
-    </Layout>
+        </div>
+      )}
+
+      {results.length === 0 && !loading && formData.operatorId && (
+        <div className="text-center py-8">
+          <p className="text-gray-500">No production records found for the given criteria.</p>
+        </div>
+      )}
+    </div>
   );
 }

@@ -5,7 +5,7 @@ import { FiCalendar, FiFilter, FiAlertCircle, FiLoader, FiChevronDown } from "re
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import Layout from "@/components/Layout";
+import SidebarNavLayout from '@/components/SidebarNavLayout';
 
 function num(n) {
   return new Intl.NumberFormat().format(n ?? 0);
@@ -56,8 +56,9 @@ export default function DailyProductionPage() {
   }, [lineData.rows, floorFilter]);
 
   return (
-    <Layout>
+    
       <LocalizationProvider dateAdapter={AdapterDateFns}>
+       < SidebarNavLayout/>
         <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto rounded-xl shadow-sm"
           style={{
             backgroundColor: "#1A1B22",
@@ -313,6 +314,6 @@ export default function DailyProductionPage() {
           </section>
         </div>
       </LocalizationProvider>
-    </Layout>
+   
   );
 }

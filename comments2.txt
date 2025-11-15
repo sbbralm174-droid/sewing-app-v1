@@ -1,0 +1,297 @@
+next js app router use koro. tailwind, js use koro
+ekhan theke database connection nao --> import { connectDB } from '@/lib/db';
+
+
+
+
+ekta api ebong ui toiri korte hobe. ekta process die search dile tar sorbocho score onujai operator list asbe ebong score asbe.. jei operator er oi process nei sei operator batil hobe. ekta serial number thakbe tahole kon operator koto position e ase ta dekha jabe.
+
+next js app router . tailwind, js use koro
+ekhan theke database connection nao --> import { connectDB } from '@/lib/db';
+
+
+ei '/api/operators' api theke operator ebong allowedProcesses paoa jay. ekhon prothome check korte hobe je ekhane jei process ta select kora hosse sei process ta jodi operator er allowedProcesses  e already theke thake tahole add korar proyojon nei. kintu jodi na thake tahole process ta add korte hobe. ebong allowedProcesses er value hobe 0.
+
+
+/api/operators
+[ 
+ {
+    "_id": "690975598ef9ef5dbbfa6e52",
+    "name": "sabbir",
+    "operatorId": "TGS-011052232",
+    "joiningDate": "2025-11-04T00:00:00.000Z",
+    "nid": "123412341234",
+    "picture": "/uploads/photos/690975598ef9ef5dbbfa6e52_picture_1762230952674.png",
+    "videos": [
+      {
+        "name": "690975598ef9ef5dbbfa6e52_video_1762233765773.webm",
+        "url": "/uploads/videos/690975598ef9ef5dbbfa6e52_video_1762233765773.webm",
+        "_id": "6909953e18e3f93e85abdcdd",
+        "uploadedAt": "2025-11-04T05:55:10.166Z"
+      },
+      {
+        "name": "690975598ef9ef5dbbfa6e52_video_1762233871335.webm",
+        "url": "/uploads/videos/690975598ef9ef5dbbfa6e52_video_1762233871335.webm",
+        "_id": "6909953e18e3f93e85abdcde",
+        "uploadedAt": "2025-11-04T05:55:10.166Z"
+      },
+      {
+        "name": "Google Gemini.mp4",
+        "url": "/uploads/videos/690975598ef9ef5dbbfa6e52_video_1762235710156.mp4",
+        "originalName": "Google Gemini.mp4",
+        "_id": "6909953e18e3f93e85abdcdf",
+        "uploadedAt": "2025-11-04T05:55:10.166Z"
+      }
+    ],
+    "designation": "OPERATOR",
+    "grade": "C",
+    "allowedProcesses": {
+      "Sleeve join(Mora)": 56,
+      "Waist belt join": 67,
+      "Band Collar Attach": 160,
+      "Placket box": 89,
+      "Side vent attach(Twill tape)": 120
+    },
+    "occurrenceReports": [
+      ""
+    ],
+    "resignationHistory": [
+      ""
+    ],
+    "previousProcessScores": [
+      ""
+    ],
+    "createdAt": "2025-11-04T03:39:05.569Z",
+    "updatedAt": "2025-11-04T05:55:10.164Z",
+    "__v": 0
+  },
+  {
+    "_id": "690b3ba04b3bb0c0e19bb1f0",
+    "name": "Mosiur Rahman",
+    "operatorId": "DGDF-45",
+    "joiningDate": "2025-11-05T00:00:00.000Z",
+    "nid": "12341234765456",
+    "picture": "/uploads/photos/fe114eff-354f-405b-a91a-b90456d9d57b.jpg",
+    "videos": [],
+    "designation": "OPERATOR",
+    "grade": "C",
+    "allowedProcesses": {
+      "Band Collar Attach": 120
+    },
+    "occurrenceReports": [],
+    "resignationHistory": [],
+    "previousProcessScores": [],
+    "createdAt": "2025-11-05T11:57:20.620Z",
+    "updatedAt": "2025-11-05T11:57:20.620Z",
+    "__v": 0
+  }
+]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ekhane 4 ta api deoa hoise. 4 ta api tei 1 ta common jinis ase candidateId, ebong 1 number betito porer tin tatei result royese. tomake ekhon ekta table toiri korte hobe prothom api er joto gulo candidate ase prottek candidate nie ese. porer dhap gulote kar ki result na ekhono porer step e jay ni seta table e show korte hobe. ebong prothom api theke date nie setao rakhte hobe.
+
+
+next js app router . tailwind, js use koro
+
+
+
+
+
+
+
+
+
+
+
+
+// app/admin/iep-interview/step-one/page.js - শুধু প্রয়োজনীয় অংশগুলো দেখানো হলো
+'use client'
+import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Webcam from 'react-webcam';
+import NidOrBirthCertificateSearch from '@/components/NidOrBirthCertificate';
+
+export default function VivaInterviewStep1() {
+  const router = useRouter();
+  const [formData, setFormData] = useState({
+    name: '',
+    nid: '',
+    birthCertificate: '',
+    picture: '',
+    failureReason: ''
+  });
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [formErrors, setFormErrors] = useState({});
+  const [showWebcam, setShowWebcam] = useState(false);
+  const [capturedImage, setCapturedImage] = useState(null);
+  const [showFailureReason, setShowFailureReason] = useState(false);
+  const [showSearch, setShowSearch] = useState(false); // Search popup show korbe ki na
+  const [searchValue, setSearchValue] = useState(''); // Search er value store korbe
+  
+  const photoFileRef = useRef(null);
+  const webcamRef = useRef(null);
+
+  // NID field e value change hole searchValue o update hobe
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Jodi NID field e change hoy, tahole searchValue o update hobe
+    if (name === 'nid') {
+      setSearchValue(value);
+    }
+    
+    if (successMessage) setSuccessMessage('');
+    if (errorMessage) setErrorMessage('');
+    
+    if (formErrors[name]) {
+      setFormErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  // Search button click handler
+  const handleSearch = () => {
+    if (!formData.nid.trim()) {
+      alert('Please enter NID number first');
+      return;
+    }
+    
+    setSearchValue(formData.nid); // formData.nid theke value niye searchValue set korbe
+    setShowSearch(true); // Popup show korbe
+  };
+
+  // ... বাকি সব functions same থাকবে
+
+  return (
+    <div className="min-h-screen mt-10 bg-gray-50 py-8">
+      <div className="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow-lg">
+        <div className="text-center mb-8">
+          <h1 className="text-2xl font-bold text-indigo-900">Basic Information</h1>
+          <p className="text-gray-600 mt-2">Provide candidate&apos;s basic details and photo</p>
+        </div>
+
+        {/* View Button - NID field er pore add korun */}
+        <div className="mb-4">
+          <button 
+            onClick={handleSearch}
+            disabled={!formData.nid.trim()}
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-md font-medium transition-colors"
+          >
+            🔍 View Operator Details
+          </button>
+          <p className="text-sm text-gray-500 mt-1">
+            NID number দিয়ে operator এর details দেখুন
+          </p>
+        </div>
+
+        {/* Search Component */}
+        {showSearch && (
+          <NidOrBirthCertificateSearch 
+            nidOrBirthCertificateValue={searchValue}
+            autoSearch={true}
+          />
+        )}
+
+        {/* ... বাকি form elements ... */}
+        
+        {/* Identification Fields */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block mb-2 text-lg font-medium text-gray-700">NID Number:</label>
+            <input
+              type="text"
+              name="nid"
+              value={formData.nid}
+              onChange={handleChange}
+              className="w-full p-3 rounded-md border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-base"
+              placeholder="Enter NID number"
+            />
+          </div>
+
+          <div>
+            <label className="block mb-2 text-lg font-medium text-gray-700">Birth Certificate ID:</label>
+            <input
+              type="text"
+              name="birthCertificate"
+              value={formData.birthCertificate}
+              onChange={handleChange}
+              className="w-full p-3 rounded-md border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-base"
+              placeholder="Enter birth certificate ID"
+            />
+          </div>
+        </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+
+        {/* ... বাকি code ... */}
+      </div>
+    </div>
+  );
+}
+
+
+
+
+
+
+

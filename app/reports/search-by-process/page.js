@@ -1,6 +1,7 @@
 "use client";
 import Layout from "@/components/Layout";
 import { useEffect, useState } from "react";
+import SidebarNavLayout from '@/components/SidebarNavLayout';
 
 export default function OperatorSearch() {
   const [processes, setProcesses] = useState([]);
@@ -53,11 +54,12 @@ export default function OperatorSearch() {
   );
 
   return (
-    <Layout>
+    
       <div
         className="max-w-5xl mx-auto p-6 font-sans min-h-screen"
         style={{ backgroundColor: "#1A1B22", color: "#E5E9F0", fontFamily: "'Inter', sans-serif" }}
       >
+        <SidebarNavLayout />
         <h2 className="text-3xl font-bold mb-6" style={{ color: "#E5E9F0" }}>
           🔍 Search Operators by Process
         </h2>
@@ -202,6 +204,6 @@ export default function OperatorSearch() {
           </div>
         )}
       </div>
-    </Layout>
+    
   );
 }

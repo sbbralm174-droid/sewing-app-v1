@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
+import SidebarNavLayout from '@/components/SidebarNavLayout';
 
 export default function ProcessForm() {
   const [formData, setFormData] = useState({
@@ -54,8 +55,8 @@ export default function ProcessForm() {
   };
 
   return (
-    <Layout>
       <div className="container mx-auto p-4" style={{ backgroundColor: '#1A1B22', color: '#E5E9F0', fontFamily: 'sans-serif' }}>
+        <SidebarNavLayout />
         <h1 className="text-2xl font-bold mb-4">Add New Process</h1>
 
         {/* Success message */}
@@ -124,6 +125,5 @@ export default function ProcessForm() {
           )}
         </div>
       </div>
-    </Layout>
   );
 }
