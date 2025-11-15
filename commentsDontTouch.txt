@@ -1,0 +1,172 @@
+Sub GenerateAllowedProcessesJSON()
+
+    ' কাজের জন্য প্রয়োজনীয় ভেরিয়েবল ঘোষণা
+    Dim wsData As Worksheet
+    Dim lastRow As Long
+    Dim lastProcessCol As Long
+    Dim i As Long ' Row Counter
+    Dim j As Long ' Column Counter
+    Dim processName As String
+    Dim processValue As Variant
+    Dim jsonString As String
+    Dim processRange As Range
+    
+    ' ডেটাশিট সেট করা হচ্ছে (আপনার আপলোড করা CSV-এর ডেটা Sheet1-এ আছে ধরে নিলাম)
+    Set wsData = ThisWorkbook.Sheets("Sheet1")
+    
+    ' ডেটা রো এবং কলামের শেষ পজিশন নির্ণয়
+    ' Column A (Name) ব্যবহার করে শেষ রো বের করা হচ্ছে
+    lastRow = wsData.Cells(wsData.Rows.Count, "A").End(xlUp).Row
+    
+    ' প্রসেস কলাম F (Band Collar Attach) থেকে শুরু হয়ে AU (BACK TAPE PIPING) পর্যন্ত আছে ধরে নিলাম
+    ' Process Name গুলো Row 2 এ আছে (Header Row)
+    Dim startCol As Long: startCol = 6 ' Column F
+    Dim endCol As Long: endCol = 47  ' Column AU
+
+    ' আউটপুট কলাম সেট করা হচ্ছে (EndCol এর পরে)
+    Dim outputCol As Long: outputCol = endCol + 1
+    
+    ' আউটপুট কলামের নাম সেট করা
+    wsData.Cells(2, outputCol).Value = "allowedProcessesJSON"
+    
+    ' 3 নম্বর রো থেকে ডেটা প্রসেসিং শুরু করা হচ্ছে (যদি Header 2 নম্বর রোতে থাকে)
+    For i = 3 To lastRow
+        jsonString = "" ' প্রতিটা নতুন অপারেটরের জন্য স্ট্রিং রিসেট করা হচ্ছে
+        
+        ' প্রতিটা প্রসেস কলামের মধ্য দিয়ে লুপ করা হচ্ছে
+        For j = startCol To endCol
+            
+            ' প্রসেসের নাম (Header) Row 2 থেকে নেওয়া হচ্ছে
+            processName = Trim(wsData.Cells(2, j).Value)
+            
+            ' প্রসেসের মান current row থেকে নেওয়া হচ্ছে
+            processValue = wsData.Cells(i, j).Value
+            
+            ' যদি মানটি সংখ্যা হয় এবং শূন্য না হয়, তবে তা JSON স্ট্রিং এ যোগ করা হবে
+            ' (CSV ফাইল থেকে মান এলে তা String হিসেবে আসতে পারে, তাই IsNumeric চেক করছি)
+            If IsNumeric(processValue) And CDbl(processValue) > 0 Then
+                
+                ' JSONKeyValuePair ফাংশন ব্যবহার করে Key-Value পেয়ার তৈরি
+                If jsonString <> "" Then jsonString = jsonString & ", "
+                
+                ' Key (Process Name)-এ ডাবল কোট এবং Value-তে কোনো কোট দেওয়া হচ্ছে না
+                jsonString = jsonString & """" & processName & """: " & CStr(processValue)
+            End If
+            
+        Next j
+        
+        ' JSON ফরমেটে পুরো স্ট্রিংটিকে আউটপুট কলামে লেখা
+        If jsonString <> "" Then
+            ' পুরো স্ট্রিংটিকে কার্লি ব্রেসেস {} দিয়ে আবদ্ধ করা
+            wsData.Cells(i, outputCol).Value = "{" & jsonString & "}"
+        Else
+            ' যদি কোনো Process না থাকে
+            wsData.Cells(i, outputCol).Value = "{}"
+        End If
+        
+    Next i
+    
+    ' কোড শেষ হওয়ার মেসেজ
+    MsgBox "AllowedProcesses JSON generation complete!", vbInformation
+
+End Sub
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// jodi proyojon hoy string theke convert korar jonne
+
+
+// কালেকশনের নাম আপনার কালেকশন অনুযায়ী পরিবর্তন করুন
+const COLLECTION_NAME = "operators";
+
+db.getCollection(COLLECTION_NAME).find({
+    // শুধুমাত্র those documents খুঁজে বের করা হচ্ছে, যেখানে allowedProcesses একটি স্ট্রিং
+    allowedProcesses: { $type: "string" } 
+}).forEach(function(doc) {
+    
+    // 1. JSON.parse() ব্যবহার করে স্ট্রিংটিকে একটি JavaScript Object-এ রূপান্তর করা হচ্ছে
+    try {
+        var parsedObject = JSON.parse(doc.allowedProcesses);
+
+        // 2. Document টিকে আপডেট করা হচ্ছে
+        db.getCollection(COLLECTION_NAME).updateOne(
+            { _id: doc._id },
+            { $set: { allowedProcesses: parsedObject } } // স্ট্রিং এর বদলে এখন Object সেট করা হচ্ছে
+        );
+        
+    } catch (e) {
+        // যদি কোনো কারণে স্ট্রিংটি ভুল JSON হয়, তবে এরর হ্যান্ডেল করা হচ্ছে
+        print(`Error parsing JSON for document ID: ${doc._id}. Error: ${e}`);
+    }
+});
+
+print("AllowedProcesses field conversion complete.");
+
+
+
+
+
+
+
