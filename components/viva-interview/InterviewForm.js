@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import BasicInfoSection from './BasicInfoSection';
 import VideosSection from './VideosSection';
 import VivaDetailsSection from './VivaDetailsSection';
-import ProcessScoreSection from './ProcessScoreSection';
 import ResultSection from './ResultSection';
+import MainAssessment from '../operator-assessment/Mainassessment';
 
 export default function InterviewForm({ candidateInfo, onBackToSearch }) {
   const router = useRouter();
@@ -31,6 +31,10 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
   const [errorMessage, setErrorMessage] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  
+  // Assessment data state
+  const [showAssessment, setShowAssessment] = useState(false);
+  const [assessmentData, setAssessmentData] = useState(null);
 
   // Load processes on component mount
   useEffect(() => {
@@ -125,6 +129,29 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
     }
   };
 
+  // Handle assessment data from MainAssessment component
+  const handleAssessmentData = (data) => {
+    setAssessmentData(data);
+    setShowAssessment(false);
+    
+    // You can map assessment data to process scores here if needed
+    if (data && data.scores) {
+      const processScores = {
+        machineScore: data.scores.machineScore,
+        dopScore: data.scores.dopScore,
+        practicalScore: data.scores.practicalScore,
+        qualityScore: data.scores.averageQualityScore,
+        educationScore: data.scores.educationScore,
+        totalScore: data.scores.totalScore
+      };
+      
+      setFormData(prev => ({
+        ...prev,
+        processAndScore: processScores
+      }));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
@@ -159,9 +186,10 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
         processAndScore: Object.fromEntries(
           Object.entries(formData.processAndScore).map(([key, value]) => [
             key, 
-            Math.min(1000, Math.max(0, parseInt(value) || 0))
+            Math.min(10000, Math.max(0, parseInt(value) || 0))
           ])
-        )
+        ),
+        assessmentData: assessmentData // Include assessment data if needed
       };
 
       const response = await fetch('/api/iep-interview/step-two', {
@@ -192,83 +220,113 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Success and Error Messages */}
-      {successMessage && (
-        <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-md text-center">
-          {successMessage}
-        </div>
-      )}
+    <div>
+      {showAssessment ? (
+        <MainAssessment onAssessmentComplete={handleAssessmentData} />
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Success and Error Messages */}
+          {successMessage && (
+            <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-md text-center">
+              {successMessage}
+            </div>
+          )}
 
-      {errorMessage && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-center">
-          {errorMessage}
-        </div>
-      )}
+          {errorMessage && (
+            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-center">
+              {errorMessage}
+            </div>
+          )}
 
-      {uploading && (
-        <div className="mb-4 p-3 bg-blue-100 text-blue-700 rounded-md">
-          <div className="flex justify-between items-center">
-            <span>Uploading videos... {uploadProgress}%</span>
+          {uploading && (
+            <div className="mb-4 p-3 bg-blue-100 text-blue-700 rounded-md">
+              <div className="flex justify-between items-center">
+                <span>Uploading videos... {uploadProgress}%</span>
+              </div>
+              <div className="w-full bg-blue-200 rounded-full h-2 mt-2">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                ></div>
+              </div>
+            </div>
+          )}
+
+          {/* Basic Info Section */}
+          <BasicInfoSection 
+            formData={formData} 
+            onChange={handleChange} 
+          />
+
+          {/* Videos Section */}
+          <VideosSection 
+            formData={formData}
+            setFormData={setFormData}
+            uploading={uploading}
+          />
+
+          {/* Viva Details Section */}
+          <VivaDetailsSection 
+            formData={formData}
+            setFormData={setFormData}
+          />
+
+          {/* Process Score Section */}
+         
+
+          {/* Assessment Integration Button */}
+          <div className="bg-white shadow-md rounded-lg p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Operator Assessment</h2>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 mb-2">
+                  {assessmentData 
+                    ? `Assessment completed for ${assessmentData.operatorName}`
+                    : 'No assessment data available'
+                  }
+                </p>
+                {assessmentData && (
+                  <p className="text-sm text-green-600">
+                    Total Score: {assessmentData.scores?.totalScore?.toFixed(1)} | 
+                    Grade: {assessmentData.finalAssessment?.grade}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAssessment(true)}
+                className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-md shadow-sm font-medium transition-colors"
+              >
+                {assessmentData ? 'Update Assessment' : 'Calculate Assessment'}
+              </button>
+            </div>
           </div>
-          <div className="w-full bg-blue-200 rounded-full h-2 mt-2">
-            <div 
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${uploadProgress}%` }}
-            ></div>
+
+          {/* Result Section */}
+          <ResultSection 
+            formData={formData}
+            onChange={handleChange}
+          />
+
+          <div className="flex space-x-4">
+            <button
+              type="button"
+              onClick={onBackToSearch}
+              className="px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-md shadow-sm font-medium transition-colors"
+            >
+              Back to Search
+            </button>
+
+            <button
+              type="submit"
+              disabled={submitting || uploading}
+              className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-3 rounded-md shadow-sm font-medium transition-colors"
+            >
+              {submitting ? 'Submitting...' : 'Complete Interview'}
+            </button>
           </div>
-        </div>
+        </form>
       )}
-
-      {/* Basic Info Section */}
-      <BasicInfoSection 
-        formData={formData} 
-        onChange={handleChange} 
-      />
-
-      {/* Videos Section */}
-      <VideosSection 
-        formData={formData}
-        setFormData={setFormData}
-        uploading={uploading}
-      />
-
-      {/* Viva Details Section */}
-      <VivaDetailsSection 
-        formData={formData}
-        setFormData={setFormData}
-      />
-
-      {/* Process and Score Section */}
-      <ProcessScoreSection 
-        formData={formData}
-        setFormData={setFormData}
-        processes={processes}
-      />
-
-      {/* Result Section */}
-      <ResultSection 
-        formData={formData}
-        onChange={handleChange}
-      />
-
-      <div className="flex space-x-4">
-        <button
-          type="button"
-          onClick={onBackToSearch}
-          className="px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-md shadow-sm font-medium transition-colors"
-        >
-          Back to Search
-        </button>
-
-        <button
-          type="submit"
-          disabled={submitting || uploading}
-          className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-3 rounded-md shadow-sm font-medium transition-colors"
-        >
-          {submitting ? 'Submitting...' : 'Complete Interview'}
-        </button>
-      </div>
-    </form>
+    </div>
   );
 }

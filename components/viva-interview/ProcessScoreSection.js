@@ -62,7 +62,9 @@ export default function ProcessScoreSection({ formData, setFormData, processes }
         [processName]: finalScore
       }
     }));
+    console.log(formData)
   };
+  
 
   const filteredProcesses = processes.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase())

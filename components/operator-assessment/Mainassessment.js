@@ -1,10 +1,10 @@
-// app/operator-assessment/page.js
+// components/operator-assessment/Mainassessment.js
 'use client'
 import { useState, useEffect } from 'react'
-import DataEntry from '@/components/operator-assessment/Data-entry'
-import AssessmentResults from '@/components/operator-assessment/assessment-results'
+import DataEntry from './Data-entry'
+import AssessmentResults from './assessment-results'
 
-export default function OperatorAssessment() {
+export default function MainAssessment({ onAssessmentComplete }) {
   const [currentView, setCurrentView] = useState('data-entry')
   const [assessmentData, setAssessmentData] = useState(null)
 
@@ -15,7 +15,6 @@ export default function OperatorAssessment() {
       setAssessmentData(JSON.parse(data))
     }
   }, [])
-
 
   // ডেটা সেভ করার ফাংশন
   const handleSaveData = (data) => {
@@ -28,7 +27,14 @@ export default function OperatorAssessment() {
   const handleBackToDataEntry = () => {
     setCurrentView('data-entry')
   }
-console.log('assessment data', assessmentData)
+
+  // Assessment সম্পূর্ণ হলে parent component কে ডেটা পাঠানো
+  const handleUseAssessment = () => {
+    if (assessmentData && onAssessmentComplete) {
+      onAssessmentComplete(assessmentData)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -63,6 +69,14 @@ console.log('assessment data', assessmentData)
               >
                 View Results
               </button>
+              {currentView === 'results' && onAssessmentComplete && (
+                <button
+                  onClick={handleUseAssessment}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                >
+                  Use This Assessment
+                </button>
+              )}
             </div>
           </div>
         </div>
