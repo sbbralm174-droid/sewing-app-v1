@@ -73,7 +73,7 @@ export default function AssessmentResults() {
     10
   )
 
-  // 3. Practical Score - maximum 50 porjonto
+  // 3. Practical Score - maximum 50 
   // Updated practical score calculation
 const practicalScore = Math.min(
   processesWithCalculations.reduce((sum, process) => {
@@ -90,18 +90,28 @@ const practicalScore = Math.min(
 )
 
   // Quality Score (unchanged)
-  const qualityScore = processesWithCalculations.reduce((sum, process) => {
-    const qualityPoints = {
-      'No Defect': 30,
-      '1 Operation Defect': 24,
-      '2 Operation Defect': 18
-    }
-    return sum + (qualityPoints[process.qualityStatus] || 0)
-  }, 0)
+  const qualityScoreData = processesWithCalculations.reduce((acc, process) => {
+  const qualityPoints = {
+    'No Defect': 30,
+    '1 Operation Defect': 24,
+    '2 Operation Defect': 18,
+    '3 Operation Defect': 12,
+    '4 Operation Defect': 6,
+    '5 Operation Defect': 0,
+  };
+  
+  acc.totalScore += qualityPoints[process.qualityStatus] || 0;
+  acc.count += 1;
+  return acc;
+}, { totalScore: 0, count: 0 });
+console.log(qualityScoreData)
+const averageQualityScore = qualityScoreData.count > 0 ? qualityScoreData.totalScore / qualityScoreData.count  : 0;
+
+
 
   const educationScore = data.educationalStatus === 'Five Above' ? 5 : 3
 
-  const totalScore = machineScore + dopScore + practicalScore + qualityScore + educationScore
+  const totalScore = machineScore + dopScore + practicalScore + averageQualityScore + educationScore;
 
   // Determine grade and designation
   let grade, level, designation
@@ -125,7 +135,7 @@ const practicalScore = Math.min(
       machineScore,
       dopScore,
       practicalScore,
-      qualityScore,
+      averageQualityScore,
       educationScore,
       totalScore
     },
@@ -231,7 +241,7 @@ const practicalScore = Math.min(
               <div className="text-sm text-gray-600">Practical Score</div>
             </div>
             <div className="text-center p-4 bg-red-50 rounded-lg">
-              <div className="text-2xl font-bold text-red-600">{calculatedResults.scores.qualityScore}</div>
+              <div className="text-2xl font-bold text-red-600">{calculatedResults.scores.averageQualityScore}</div>
               <div className="text-sm text-gray-600">Quality Score</div>
             </div>
             <div className="text-center p-4 bg-purple-50 rounded-lg">
@@ -268,12 +278,7 @@ const practicalScore = Math.min(
           >
             Back to Data Entry
           </button>
-          <button
-            onClick={() => router.push('/print')}
-            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          >
-            View Print Version
-          </button>
+          
         </div>
       </div>
     </div>

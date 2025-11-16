@@ -201,6 +201,7 @@ export default function FloatingLayout() {
         { name: 'supervisors', icon: '🎨', href: '/admin/supervisors'},
         { name: 'security search', icon: '🎨', href: '/admin/security-search'},
         { name: 'resign', icon: '🎨', href: '/admin/resign'},
+        { name: 'operator-assessment', icon: '🎨', href: '/operator-assessment/data-entry'},
       ]
     },
     { 
