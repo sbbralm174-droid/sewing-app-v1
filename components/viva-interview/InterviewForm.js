@@ -131,23 +131,28 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
 
   // Handle assessment data from MainAssessment component
   const handleAssessmentData = (data) => {
+    console.log('Received assessment data:', data);
     setAssessmentData(data);
     setShowAssessment(false);
     
-    // You can map assessment data to process scores here if needed
+    // Map assessment data to process scores
     if (data && data.scores) {
       const processScores = {
-        machineScore: data.scores.machineScore,
-        dopScore: data.scores.dopScore,
-        practicalScore: data.scores.practicalScore,
-        qualityScore: data.scores.averageQualityScore,
-        educationScore: data.scores.educationScore,
-        totalScore: data.scores.totalScore
+        machineScore: data.scores.machineScore || 0,
+        dopScore: data.scores.dopScore || 0,
+        practicalScore: data.scores.practicalScore || 0,
+        qualityScore: data.scores.averageQualityScore || 0,
+        educationScore: data.scores.educationScore || 0,
+        totalScore: data.scores.totalScore || 0
       };
+      
+      // Update grade from assessment
+      const grade = data.finalAssessment?.grade || 'C';
       
       setFormData(prev => ({
         ...prev,
-        processAndScore: processScores
+        processAndScore: processScores,
+        grade: grade
       }));
     }
   };
@@ -178,19 +183,27 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
         uploadedVideos = uploadedUrls.videos;
       }
 
+      // Prepare process scores with validation
+      const processScores = {
+        machineScore: Math.min(10000, Math.max(0, parseInt(formData.processAndScore.machineScore) || 0)),
+        dopScore: Math.min(10000, Math.max(0, parseInt(formData.processAndScore.dopScore) || 0)),
+        practicalScore: Math.min(10000, Math.max(0, parseInt(formData.processAndScore.practicalScore) || 0)),
+        qualityScore: Math.min(10000, Math.max(0, parseInt(formData.processAndScore.qualityScore) || 0)),
+        educationScore: Math.min(10000, Math.max(0, parseInt(formData.processAndScore.educationScore) || 0)),
+        totalScore: Math.min(10000, Math.max(0, parseInt(formData.processAndScore.totalScore) || 0))
+      };
+
       // Submit interview details
       const submissionData = {
         candidateId: candidateInfo.candidateId,
         ...formData,
         videos: uploadedVideos,
-        processAndScore: Object.fromEntries(
-          Object.entries(formData.processAndScore).map(([key, value]) => [
-            key, 
-            Math.min(10000, Math.max(0, parseInt(value) || 0))
-          ])
-        ),
-        assessmentData: assessmentData // Include assessment data if needed
+        processAndScore: processScores,
+        grade: formData.grade,
+        assessmentData: assessmentData // Include full assessment data if needed
       };
+
+      console.log('Submitting data:', submissionData);
 
       const response = await fetch('/api/iep-interview/step-two', {
         method: 'POST',
@@ -217,6 +230,35 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // Display current process scores
+  const renderProcessScores = () => {
+    if (!formData.processAndScore || Object.keys(formData.processAndScore).length === 0) {
+      return null;
+    }
+
+    return (
+      <div className="bg-white shadow-md rounded-lg p-6 mb-6">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Process Scores from Assessment</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {Object.entries(formData.processAndScore).map(([key, value]) => (
+            <div key={key} className="text-center p-3 bg-blue-50 rounded-lg">
+              <div className="text-sm font-medium text-gray-600 capitalize">
+                {key.replace(/([A-Z])/g, ' $1').trim()}
+              </div>
+              <div className="text-lg font-bold text-blue-600">
+                {typeof value === 'number' ? value.toFixed(1) : value}
+              </div>
+            </div>
+          ))}
+          <div className="text-center p-3 bg-green-50 rounded-lg">
+            <div className="text-sm font-medium text-gray-600">Grade</div>
+            <div className="text-lg font-bold text-green-600">{formData.grade}</div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -272,7 +314,7 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
           />
 
           {/* Process Score Section */}
-         
+          {renderProcessScores()}
 
           {/* Assessment Integration Button */}
           <div className="bg-white shadow-md rounded-lg p-6">
@@ -281,14 +323,15 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
               <div>
                 <p className="text-gray-600 mb-2">
                   {assessmentData 
-                    ? `Assessment completed for ${assessmentData.operatorName}`
+                    ? `Assessment completed - Grade: ${formData.grade}, Total Score: ${formData.processAndScore.totalScore || 0}`
                     : 'No assessment data available'
                   }
                 </p>
                 {assessmentData && (
                   <p className="text-sm text-green-600">
-                    Total Score: {assessmentData.scores?.totalScore?.toFixed(1)} | 
-                    Grade: {assessmentData.finalAssessment?.grade}
+                    Machine: {formData.processAndScore.machineScore || 0} | 
+                    DOP: {formData.processAndScore.dopScore || 0} | 
+                    Practical: {formData.processAndScore.practicalScore || 0}
                   </p>
                 )}
               </div>
