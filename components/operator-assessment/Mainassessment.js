@@ -373,6 +373,8 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
                       <option value="SNLS/DNLS">SNLS/DNLS</option>
                       <option value="Flat Lock">Flat Lock</option>
                       <option value="Over Lock">Over Lock</option>
+                      <option value="Eyelet">Eyelet</option>
+                      <option value="FOA">FOA</option>
                       <option value="Kansai">Kansai</option>
                       <option value="BH">BH</option>
                       <option value="BS">BS</option>
@@ -683,38 +685,39 @@ function calculateResults(data) {
   // Machine Score Calculation
   const calculateMachineScore = (processes) => {
   const specialMachines = ["SNLS/DNLS", "Over Lock", "Flat Lock"];
+  const semiSpecialMachines = ["F/Sleamer", "Kansai", "FOA"];
 
-  // Operator কোন কোন machine type এ কাজ করেছে
   const machinesUsed = [...new Set(processes.map(p => p.machineType))];
 
-  // Special machine count
+  // -------- Special Machine Score --------
   const specialCount = machinesUsed.filter(m => specialMachines.includes(m)).length;
 
-  // Special machine score
   let specialScore = 0;
   if (specialCount === 1) specialScore = 40;
   else if (specialCount === 2) specialScore = 60;
   else if (specialCount === 3) specialScore = 100;
 
-  // অন্যান্য মেশিন
-  const otherMachines = machinesUsed.filter(m => !specialMachines.includes(m));
+  let totalScore = specialScore;
 
-  let otherScore = 0;
-
-  // ⬇️ নতুন condition:
-  if (specialScore < 100) {
-    // প্রতিটি other machine এ 10 নম্বর
-    otherScore = otherMachines.length * 10;
-  } else {
-    // special = 100 হলে অন্য মেশিন এ কোন score add হবে না
-    otherScore = 0;
+  // -------- Semi-Special Score --------
+  if (totalScore < 100) {
+    const semiCount = machinesUsed.filter(m => semiSpecialMachines.includes(m)).length;
+    totalScore += semiCount * 20;
   }
 
-  // Final score কখনই 100 এর উপরে যাবে না
-  const finalScore = Math.min(specialScore + otherScore, 100);
+  // -------- Other Machines Score --------
+  if (totalScore < 100) {
+    const otherMachines = machinesUsed.filter(
+      m => !specialMachines.includes(m) && !semiSpecialMachines.includes(m)
+    );
 
-  return finalScore;
+    totalScore += otherMachines.length * 10;
+  }
+
+  // -------- Cap at 100 --------
+  return Math.min(totalScore, 100);
 };
+
 
 
 const machineScore = calculateMachineScore(data.processes);

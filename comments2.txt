@@ -307,6 +307,8 @@ export default function VivaInterviewStep1() {
 
 ekhane machine calculation ta update korte hobe. jodi specialMachines e keo 100 pay tahole tahole otherMachines er score add korte hobe na. jodi specialMachines keo 100 er niche pay tobei otherMachines er score add hobe.  ebong otherScore er codition ta correction korte hobe. prottek ta other machine er jonno 10 score pabe. total 100 er upor mark output hobe na.
 
+F/Sleamer,Kansai, ebong FOA ei tinta machine semispecial hisebe rakho. specialMachines scoring korar por jodi 100 na purno hoy tahle  semispecial machine er score 20 kore add hobe. tao jodi 100 puron na hoy tahole otherMachines e jabe .
+ebong 100 er upor scoring output hobe na.
 
 kore dao
 
