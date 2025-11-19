@@ -681,23 +681,33 @@ function calculateResults(data) {
   })
 
   // Machine Score Calculation
-  const machineScore = processesWithCalculations.reduce((sum, process) => {
-    const machinePoints = {
-      'SNLS/DNLS': 4,
-      'Over Lock': 5,
-      'Flat Lock': 6,
-      'Kansai': 6,
-      'BH': 3,
-      'BS': 3,
-      'BTK': 3,
-      'F/Sleamer': 6,
-    }
-    return sum + (machinePoints[process.machineType] || 0)
-  }, 0)
+  const calculateMachineScore = (processes) => {
+  const specialMachines = ["SNLS/DNLS", "Over Lock", "Flat Lock"];
 
-  const machineCount = processesWithCalculations.length
-  const averageMachineScore = machineCount > 0 ? machineScore / machineCount : 0
-  const finalMachineScore = ((averageMachineScore / 6) * 100) * 0.30
+  // Operator কোন কোন machine type এ কাজ করেছে
+  const machinesUsed = [...new Set(processes.map(p => p.machineType))];
+
+  // কতগুলো special machine সে পারে
+  const specialCount = machinesUsed.filter(m => specialMachines.includes(m)).length;
+
+  let specialScore = 0;
+  if (specialCount === 1) specialScore = 40;
+  else if (specialCount === 2) specialScore = 60;
+  else if (specialCount === 3) specialScore = 90;
+
+  // অন্যান্য মেশিন
+  const otherMachines = machinesUsed.filter(m => !specialMachines.includes(m));
+
+  // যদি অন্য machine কমপক্ষে ১টা পারে → 2 marks
+  const otherScore = otherMachines.length > 0 ? 10 : 0;
+
+  return specialScore + otherScore;
+};
+
+const machineScore = calculateMachineScore(data.processes);
+
+
+  const finalMachineScore = machineScore * 0.3;
 
   // DOP Score Calculation
   const dopScores = processesWithCalculations.map(process => {

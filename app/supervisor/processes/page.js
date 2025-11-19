@@ -10,7 +10,10 @@ export default function ProcessForm() {
     smv: '',
     comments: '',
     processStatus: 'Critical',
-    isAssessment: false
+    isAssessment: false,
+    subProcesses: '',
+    condition: '',
+    workEight: ''
   });
   const [processes, setProcesses] = useState([]);
   const [success, setSuccess] = useState('');
@@ -196,7 +199,8 @@ export default function ProcessForm() {
           smv: '',
           comments: '',
           processStatus: 'Critical',
-          isAssessment: false
+          isAssessment: false,
+
         });
         fetchProcesses();
         setTimeout(() => setSuccess(''), 3000);
@@ -218,7 +222,10 @@ export default function ProcessForm() {
       smv: process.smv.toString(),
       comments: process.comments || '',
       processStatus: process.processStatus,
-      isAssessment: process.isAssessment || false
+      isAssessment: process.isAssessment || false,
+      subProcess: process.subProcess || '',
+      condition: process.condition || '',
+      workEight: process.workEight || ''
     });
     setAutoGenerateCode(false); // Editing mode-তে auto-generate off
     setSmvChangeComment('');
@@ -357,6 +364,42 @@ export default function ProcessForm() {
                 className="w-full p-2 border border-gray-600 rounded-lg bg-gray-800 text-white"
                 required
                 placeholder="Enter process name"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Sub Process *</label>
+              <input
+                type="text"
+                name="subProcess"
+                value={formData.subProcess}
+                onChange={handleChange}
+                className="w-full p-2 border border-gray-600 rounded-lg bg-gray-800 text-white"
+                required
+                placeholder="Enter sub process name"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Condition </label>
+              <input
+                type="text"
+                name="condition"
+                value={formData.condition}
+                onChange={handleChange}
+                className="w-full p-2 border border-gray-600 rounded-lg bg-gray-800 text-white"
+                
+                placeholder="Enter condition"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Work Aid</label>
+              <input
+                type="text"
+                name="workAid"
+                value={formData.workEight}
+                onChange={handleChange}
+                className="w-full p-2 border border-gray-600 rounded-lg bg-gray-800 text-white"
+                placeholder="Enter work Aid"
               />
             </div>
             <div>
@@ -581,7 +624,7 @@ export default function ProcessForm() {
                     <th className="border border-gray-600 px-4 py-2 text-left">Name</th>
                     <th className="border border-gray-600 px-4 py-2 text-left">SMV</th>
                     <th className="border border-gray-600 px-4 py-2 text-left">SMV Version</th>
-                    <th className="border border-gray-600 px-4 py-2 text-left">Previous SMV</th>
+                    <th className="border border-gray-600 px-4 py-2 text-left">Description</th>
                     <th className="border border-gray-600 px-4 py-2 text-left">Status</th>
                     <th className="border border-gray-600 px-4 py-2 text-left">Assessment</th>
                     <th className="border border-gray-600 px-4 py-2 text-left">Last Updated</th>
@@ -602,8 +645,9 @@ export default function ProcessForm() {
                           v{process.smvVersion}
                         </span>
                       </td>
-                      <td className="border border-gray-600 px-4 py-2 text-right text-gray-400">
-                        {process.previousSmv ? `${process.previousSmv} (v${process.previousSmvVersion})` : '-'}
+                      <td className="border border-gray-600 px-4 py-2 text-xs text-white text-gray-400">
+                        {getStatusBadge(process.description)}
+                        {/* {process.previousSmv ? `${process.previousSmv} (v${process.previousSmvVersion})` : '-'} */}
                       </td>
                       <td className="border border-gray-600 px-4 py-2">
                         {getStatusBadge(process.processStatus)}

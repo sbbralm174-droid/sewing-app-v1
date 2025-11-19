@@ -295,3 +295,45 @@ export default function VivaInterviewStep1() {
 
 
 
+
+
+
+
+
+
+
+
+
+
+ekhane machine calculation ta update korte hobe. jodi specialMachines e keo 100 pay tahole tahole otherMachines er score add korte hobe na. jodi specialMachines keo 100 er niche pay tobei otherMachines er score add hobe.  ebong otherScore er codition ta correction korte hobe. prottek ta other machine er jonno 10 score pabe. total 100 er upor mark output hobe na.
+
+
+kore dao
+
+
+
+const calculateMachineScore = (processes) => {
+  const specialMachines = ["SNLS/DNLS", "Over Lock", "Flat Lock"];
+
+  // Operator কোন কোন machine type এ কাজ করেছে
+  const machinesUsed = [...new Set(processes.map(p => p.machineType))];
+
+  // কতগুলো special machine সে পারে
+  const specialCount = machinesUsed.filter(m => specialMachines.includes(m)).length;
+
+  let specialScore = 0;
+  if (specialCount === 1) specialScore = 40;
+  else if (specialCount === 2) specialScore = 60;
+  else if (specialCount === 3) specialScore = 100;
+
+  // অন্যান্য মেশিন
+  const otherMachines = machinesUsed.filter(m => !specialMachines.includes(m));
+
+  // eia change korte hobe
+  const otherScore = otherMachines.length > 0 ? 10 : 0;
+
+  return specialScore + otherScore;
+};
+
+
+
