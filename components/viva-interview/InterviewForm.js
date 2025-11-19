@@ -198,10 +198,10 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
       candidateId: candidateInfo.candidateId,
       ...formData,
       videos: uploadedVideos,
-      processAndScore: processScores,
+      processAndScore: assessmentData?.processCapacity || {},
       grade: formData.grade,
       assessmentData: assessmentData, // Include full assessment data
-      processCapacity: assessmentData?.processCapacity || {} // Add processCapacity here
+      processCapacity: processScores 
     };
 
     console.log('Submitting data with processCapacity:', submissionData);

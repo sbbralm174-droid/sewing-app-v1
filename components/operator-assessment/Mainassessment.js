@@ -67,6 +67,15 @@ export default function MainAssessment({ onAssessmentComplete }) {
 
       const processCapacity = calculateProcessCapacity(calculatedResults.processes)
       
+      // Supplementary machines যোগ করা
+      const supplementaryMachinesData = {}
+      if (assessmentData.supplementaryMachines) {
+        assessmentData.supplementaryMachines.forEach(machine => {
+          if (machine.checked) {
+            supplementaryMachinesData[machine.name] = true
+          }
+        })
+      }
       
       // Parent component-এ পাঠানোর জন্য ডেটা প্রস্তুত করা
       const assessmentResult = {
@@ -86,10 +95,12 @@ export default function MainAssessment({ onAssessmentComplete }) {
           designation: calculatedResults.finalAssessment.designation
         },
         processCapacity: processCapacity,
+        supplementaryMachines: supplementaryMachinesData,
         rawData: assessmentData
       }
 
       console.log('Process Capacity Data:', processCapacity)
+      console.log('Supplementary Machines:', supplementaryMachinesData)
       console.log('Sending assessment data to parent:', assessmentResult)
       
       if (onAssessmentComplete) {
@@ -168,7 +179,7 @@ export default function MainAssessment({ onAssessmentComplete }) {
   )
 }
 
-// Data Entry Component - Updated with API integration
+// Data Entry Component - Updated with supplementary machines dropdown
 function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorName, processesList }) {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -187,16 +198,39 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
         qualityStatus: 'No Defect',
         remarks: ''
       }
-    ]
+    ],
+    supplementaryMachines: []
   })
+
+  // Supplementary machines list
+  const supplementaryMachineOptions = [
+     'Eyelet', 'FOA', 
+    'Kansai', 'BH', 'BS', 'BTK', 'F/Sleamer'
+  ]
 
   // initialData থাকলে সেট করা
   useEffect(() => {
     if (initialData) {
-      setFormData(initialData)
+      const updatedData = {
+        ...initialData,
+        supplementaryMachines: initialData.supplementaryMachines || supplementaryMachineOptions.map(name => ({
+          name,
+          checked: false
+        }))
+      }
+      setFormData(updatedData)
       setOperatorName(initialData.operatorName)
+    } else {
+      // Initialize supplementary machines
+      setFormData(prev => ({
+        ...prev,
+        supplementaryMachines: supplementaryMachineOptions.map(name => ({
+          name,
+          checked: false
+        }))
+      }))
     }
-  }, [initialData, setOperatorName])
+  }, [initialData])
 
   // Process select করলে DOP এবং SMV auto-fill করা
   const handleProcessSelect = (index, selectedProcessName) => {
@@ -207,8 +241,8 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
       updatedProcesses[index] = {
         ...updatedProcesses[index],
         processName: selectedProcess.name,
-        dop: selectedProcess.processStatus, // API তে processStatus, UI তে DOP
-        smv: selectedProcess.smv // API তে smv, UI তেও smv
+        dop: selectedProcess.processStatus,
+        smv: selectedProcess.smv
       }
       setFormData({ ...formData, processes: updatedProcesses })
     }
@@ -246,6 +280,16 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
   const removeProcess = (index) => {
     const updatedProcesses = formData.processes.filter((_, i) => i !== index)
     setFormData({ ...formData, processes: updatedProcesses })
+  }
+
+  // Supplementary machine checkbox হ্যান্ডলার
+  const handleSupplementaryMachineChange = (index, checked) => {
+    const updatedSupplementaryMachines = [...formData.supplementaryMachines]
+    updatedSupplementaryMachines[index].checked = checked
+    setFormData({
+      ...formData,
+      supplementaryMachines: updatedSupplementaryMachines
+    })
   }
 
   const handleOperatorNameChange = (e) => {
@@ -355,7 +399,6 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
                   <th key={num} className="px-4 py-2 border">{num}st Cycle Time</th>
                 ))}
                 <th className="px-4 py-2 border">Quality Status</th>
-                
                 <th className="px-4 py-2 border">Actions</th>
               </tr>
             </thead>
@@ -439,7 +482,6 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
                       <option value="5 Operation Defect">5 Operation Defect</option>
                     </select>
                   </td>
-                  
                   <td className="px-4 py-2 border text-center">
                     <button
                       type="button"
@@ -453,6 +495,28 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Supplementary Machines Section */}
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">If he/she has been able to do any other machine</h3>
+        
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          {formData.supplementaryMachines.map((machine, index) => (
+            <div key={index} className="flex items-center space-x-2 p-2 border border-gray-200 rounded">
+              <input
+                type="checkbox"
+                id={`supplementary-${index}`}
+                checked={machine.checked}
+                onChange={(e) => handleSupplementaryMachineChange(index, e.target.checked)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor={`supplementary-${index}`} className="text-sm text-gray-700">
+                {machine.name}
+              </label>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -476,7 +540,7 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
   )
 }
 
-// Assessment Results Component - Updated
+// Assessment Results Component - Updated with supplementary machines
 function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment }) {
   const [calculatedResults, setCalculatedResults] = useState(null)
 
@@ -563,6 +627,26 @@ function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment 
           </table>
         </div>
       </div>
+
+      {/* Supplementary Machines Display */}
+      {assessmentData.supplementaryMachines && assessmentData.supplementaryMachines.some(machine => machine.checked) && (
+        <div className="bg-white shadow-md rounded-lg p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Others Machine Specialist</h2>
+          
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            {assessmentData.supplementaryMachines
+              .filter(machine => machine.checked)
+              .map((machine, index) => (
+                <div key={index} className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <span className="text-sm font-medium text-blue-800">{machine.name}</span>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
 
       {/* Final Assessment */}
       <div className="bg-white shadow-md rounded-lg p-6">
@@ -787,7 +871,7 @@ const machineScore = calculateMachineScore(data.processes);
 
   // Total Score Calculation - UPDATED (now out of 100)
   const totalScore = finalMachineScore + dopScore + practicalScore + averageQualityScore + educationScore + attitudeScore
-
+//ekhan kar sokol data database e jabe ebong console log e dekhabe
 
 console.log('averageQualityScore Score:', averageQualityScore);
  let grade, level, designation

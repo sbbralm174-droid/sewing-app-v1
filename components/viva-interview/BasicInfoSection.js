@@ -6,7 +6,7 @@ export default function BasicInfoSection({ formData, onChange }) {
     <div className="border border-gray-200 rounded-lg p-4">
       <h2 className="text-lg font-semibold mb-3 text-indigo-600">Interview Basic Information</h2>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block mb-1 text-lg font-medium text-black-700">
             Interview Date:
