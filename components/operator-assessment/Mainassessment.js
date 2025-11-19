@@ -687,22 +687,35 @@ function calculateResults(data) {
   // Operator কোন কোন machine type এ কাজ করেছে
   const machinesUsed = [...new Set(processes.map(p => p.machineType))];
 
-  // কতগুলো special machine সে পারে
+  // Special machine count
   const specialCount = machinesUsed.filter(m => specialMachines.includes(m)).length;
 
+  // Special machine score
   let specialScore = 0;
   if (specialCount === 1) specialScore = 40;
   else if (specialCount === 2) specialScore = 60;
-  else if (specialCount === 3) specialScore = 90;
+  else if (specialCount === 3) specialScore = 100;
 
   // অন্যান্য মেশিন
   const otherMachines = machinesUsed.filter(m => !specialMachines.includes(m));
 
-  // যদি অন্য machine কমপক্ষে ১টা পারে → 2 marks
-  const otherScore = otherMachines.length > 0 ? 10 : 0;
+  let otherScore = 0;
 
-  return specialScore + otherScore;
+  // ⬇️ নতুন condition:
+  if (specialScore < 100) {
+    // প্রতিটি other machine এ 10 নম্বর
+    otherScore = otherMachines.length * 10;
+  } else {
+    // special = 100 হলে অন্য মেশিন এ কোন score add হবে না
+    otherScore = 0;
+  }
+
+  // Final score কখনই 100 এর উপরে যাবে না
+  const finalScore = Math.min(specialScore + otherScore, 100);
+
+  return finalScore;
 };
+
 
 const machineScore = calculateMachineScore(data.processes);
 
