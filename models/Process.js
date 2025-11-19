@@ -32,7 +32,8 @@ const ProcessSchema = new mongoose.Schema({
     updatedAt: {
       type: Date,
       default: Date.now
-    }
+    },
+    comment: String // Added comment for history tracking
   }],
   comments: {
     type: String,
@@ -40,10 +41,18 @@ const ProcessSchema = new mongoose.Schema({
   },
   processStatus: {
     type: String,
-    enum: ['active', 'inactive', 'draft'],
-    default: 'active',
+    enum: ['Basic', 'Critical', 'Semi-Critical'],
+    default: 'Critical',
+  },
+  isAssessment: {
+    type: Boolean,
+    default: false, // নতুন field যোগ করা হয়েছে
   },
   createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+  updatedAt: {
     type: Date,
     default: Date.now,
   }
@@ -54,50 +63,63 @@ ProcessSchema.index({ name: 1 }, { unique: true, collation: { locale: 'en', stre
 
 // Pre-save middleware to handle SMV version tracking
 ProcessSchema.pre('save', function(next) {
-  // Check if smv has been modified AND it's not a new document being created
+  this.updatedAt = Date.now();
+  
   if (this.isModified('smv') && !this.isNew) {
-    // Determine the SMV value that was just before the change (the original value)
-    const oldSmv = this._originalSmv !== undefined ? this._originalSmv : this.smv;
-    const oldSmvVersion = this._originalSmvVersion !== undefined ? this._originalSmvVersion : this.smvVersion;
-
-    // Check if the actual numeric value of smv has changed
-    // This handles cases where .save() is called but smv value hasn't numerically changed
-    // Use .get('smv') to get the current value, and ._originalSmv for the value before modification tracking
-    if (this.smv !== this.get('smv')) {
-      // The current values in the document are the *new* values (after modification)
-      // The values we want to save in history and previous are the *old* values
-
-      // 1. Save the OLD values to history
-      this.smvHistory.push({
-        smv: oldSmv,
-        smvVersion: oldSmvVersion,
-        updatedAt: new Date()
-      });
-
-      // 2. Keep only the last 10 history entries
-      // The new entry is at the end, so we slice the beginning (oldest) entries
-      if (this.smvHistory.length > 10) {
-        this.smvHistory = this.smvHistory.slice(-10);
-      }
-
-      // 3. Set previous SMV values to the OLD values
-      this.previousSmv = oldSmv;
-      this.previousSmvVersion = oldSmvVersion;
-
-      // 4. Increment SMV version (the new version will be the current version + 1)
-      this.smvVersion = oldSmvVersion + 1;
-    }
-  } else if (this.isNew) {
-    // If it's a new document, initialize history with the initial SMV
+    // Save current SMV to history before updating
     this.smvHistory.push({
-        smv: this.smv,
-        smvVersion: this.smvVersion,
-        updatedAt: new Date()
+      smv: this.smv,
+      smvVersion: this.smvVersion,
+      updatedAt: new Date(),
+      comment: `SMV updated to ${this.smv} (v${this.smvVersion})`
     });
-    this.previousSmv = null; // null for the very first entry
-    this.previousSmvVersion = null; // null for the very first entry
+    
+    // Keep only the last 10 history entries
+    if (this.smvHistory.length > 10) {
+      this.smvHistory = this.smvHistory.slice(-10);
+    }
+    
+    // Set previous SMV values
+    this.previousSmv = this.smv;
+    this.previousSmvVersion = this.smvVersion;
+    
+    // Increment SMV version
+    this.smvVersion += 1;
   }
   next();
 });
+
+// Static method to update SMV with proper tracking
+ProcessSchema.statics.updateSMV = async function(processId, newSMV, comment = '') {
+  const process = await this.findById(processId);
+  if (!process) {
+    throw new Error('Process not found');
+  }
+
+  // Store current values before update
+  const currentSMV = process.smv;
+  const currentVersion = process.smvVersion;
+
+  // Update the process
+  const updatedProcess = await this.findByIdAndUpdate(
+    processId,
+    { 
+      smv: newSMV,
+      previousSmv: currentSMV,
+      previousSmvVersion: currentVersion,
+      $push: {
+        smvHistory: {
+          smv: currentSMV,
+          smvVersion: currentVersion,
+          updatedAt: new Date(),
+          comment: comment || `SMV changed from ${currentSMV} to ${newSMV}`
+        }
+      }
+    },
+    { new: true, runValidators: true }
+  );
+
+  return updatedProcess;
+};
 
 module.exports = mongoose.models.Process || mongoose.model('Process', ProcessSchema);

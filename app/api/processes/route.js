@@ -39,7 +39,6 @@ export async function GET() {
 }
 
 // Update Process
-// Update Process
 export async function PUT(req) {
   try {
     await connectDB();
@@ -52,7 +51,7 @@ export async function PUT(req) {
       );
     }
 
-    // 1. Fetch the existing process
+    // Check if process exists
     const existingProcess = await Process.findById(_id);
     if (!existingProcess) {
       return NextResponse.json(
@@ -76,22 +75,52 @@ export async function PUT(req) {
       }
     }
 
-    // 2. Prepare for pre('save') middleware (store old values if SMV is modified)
-    const isSmvModifiedInRequest = updateData.smv !== undefined && parseFloat(updateData.smv) !== existingProcess.smv;
-    if (isSmvModifiedInRequest) {
-        // Store old SMV and Version directly on the document for pre-save access
-        // This is a custom way to pass old values to pre-save logic
-        existingProcess._originalSmv = existingProcess.smv;
-        existingProcess._originalSmvVersion = existingProcess.smvVersion;
+    // Special handling for SMV updates
+    if (updateData.smv && updateData.smv !== existingProcess.smv) {
+      // Use the static method for SMV updates
+      const smvComment = updateData.smvChangeComment || `SMV updated from ${existingProcess.smv} to ${updateData.smv}`;
+      
+      // Remove SMV-related fields from updateData as they're handled separately
+      const { smv, smvChangeComment, ...otherUpdates } = updateData;
+      
+      // First update SMV with version tracking
+      const processWithUpdatedSMV = await Process.findByIdAndUpdate(
+        _id,
+        {
+          $set: {
+            smv: updateData.smv,
+            previousSmv: existingProcess.smv,
+            previousSmvVersion: existingProcess.smvVersion,
+            smvVersion: existingProcess.smvVersion + 1
+          },
+          $push: {
+            smvHistory: {
+              smv: existingProcess.smv,
+              smvVersion: existingProcess.smvVersion,
+              updatedAt: new Date(),
+              comment: smvComment
+            }
+          }
+        },
+        { new: true, runValidators: true }
+      );
+
+      // Apply other updates if any
+      if (Object.keys(otherUpdates).length > 0) {
+        await Process.findByIdAndUpdate(_id, otherUpdates);
+      }
+
+      // Fetch the fully updated process
+      const fullyUpdatedProcess = await Process.findById(_id);
+      return NextResponse.json(fullyUpdatedProcess, { status: 200 });
     }
 
-    // 3. Apply updates to the document
-    Object.assign(existingProcess, updateData);
-
-    // 4. Save the document (this triggers the pre('save') middleware)
-    const updatedProcess = await existingProcess.save();
-    
-    // The previousSmv and smvVersion fields will be updated by the pre-save hook
+    // Regular update for non-SMV changes
+    const updatedProcess = await Process.findByIdAndUpdate(
+      _id,
+      updateData,
+      { new: true, runValidators: true }
+    );
 
     return NextResponse.json(updatedProcess, { status: 200 });
   } catch (error) {
@@ -112,7 +141,7 @@ export async function PATCH(req) {
       );
     }
 
-    const process = await Process.findById(_id).select('smvHistory previousSmv previousSmvVersion');
+    const process = await Process.findById(_id).select('smvHistory previousSmv previousSmvVersion smv smvVersion');
     
     if (!process) {
       return NextResponse.json(
@@ -122,9 +151,11 @@ export async function PATCH(req) {
     }
 
     return NextResponse.json({
-      smvHistory: process.smvHistory,
+      currentSmv: process.smv,
+      currentSmvVersion: process.smvVersion,
       previousSmv: process.previousSmv,
-      previousSmvVersion: process.previousSmvVersion
+      previousSmvVersion: process.previousSmvVersion,
+      smvHistory: process.smvHistory
     }, { status: 200 });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });

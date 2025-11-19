@@ -9,7 +9,8 @@ export default function ProcessForm() {
     code: '',
     smv: '',
     comments: '',
-    processStatus: 'active'
+    processStatus: 'Critical',
+    isAssessment: false
   });
   const [processes, setProcesses] = useState([]);
   const [success, setSuccess] = useState('');
@@ -18,6 +19,8 @@ export default function ProcessForm() {
   const [error, setError] = useState('');
   const [smvHistory, setSmvHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [smvChangeComment, setSmvChangeComment] = useState('');
+  const [autoGenerateCode, setAutoGenerateCode] = useState(true);
 
   useEffect(() => {
     fetchProcesses();
@@ -32,6 +35,88 @@ export default function ProcessForm() {
     } catch (err) {
       console.error(err);
       setLoading(false);
+    }
+  };
+
+  const generateProcessCode = (processName, processStatus) => {
+    if (!processName) return '';
+    
+    // Remove special characters and extra spaces
+    const cleanName = processName
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9\s]/g, '')
+      .replace(/\s+/g, ' ');
+    
+    // Get words and take first 3 letters from each word (max 3 words)
+    const words = cleanName.split(' ').slice(0, 3);
+    
+    // Generate code from words
+    let generatedCode = '';
+    if (words.length === 1) {
+      // If single word, take first 4 characters
+      generatedCode = words[0].substring(0, 4);
+    } else {
+      // If multiple words, take first 2-3 characters from each
+      generatedCode = words.map(word => {
+        if (word.length <= 2) return word;
+        return word.substring(0, words.length === 2 ? 3 : 2);
+      }).join('');
+    }
+    
+    // Ensure code is 4-6 characters long
+    if (generatedCode.length < 4) {
+      generatedCode = generatedCode.padEnd(4, 'X');
+    } else if (generatedCode.length > 6) {
+      generatedCode = generatedCode.substring(0, 6);
+    }
+    
+    // Add prefix based on process status
+    let statusPrefix = '';
+    switch (processStatus) {
+      case 'Critical':
+        statusPrefix = 'CRI-';
+        break;
+      case 'Basic':
+        statusPrefix = 'BAS-';
+        break;
+      case 'Semi-Critical':
+        statusPrefix = 'SCRI-';
+        break;
+      default:
+        statusPrefix = 'CRI-';
+    }
+    
+    return statusPrefix + generatedCode;
+  };
+
+  const handleNameChange = (e) => {
+    const name = e.target.value;
+    
+    if (autoGenerateCode && !editingProcess) {
+      const generatedCode = generateProcessCode(name, formData.processStatus);
+      setFormData(prev => ({ 
+        ...prev, 
+        name: name,
+        code: generatedCode
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, name: name }));
+    }
+  };
+
+  const handleStatusChange = (e) => {
+    const status = e.target.value;
+    
+    if (autoGenerateCode && !editingProcess && formData.name) {
+      const generatedCode = generateProcessCode(formData.name, status);
+      setFormData(prev => ({ 
+        ...prev, 
+        processStatus: status,
+        code: generatedCode
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, processStatus: status }));
     }
   };
 
@@ -53,14 +138,40 @@ export default function ProcessForm() {
   };
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    
+    if (name === 'name') {
+      handleNameChange(e);
+    } else if (name === 'processStatus') {
+      handleStatusChange(e);
+    } else {
+      setFormData(prev => ({ 
+        ...prev, 
+        [name]: type === 'checkbox' ? checked : value 
+      }));
+    }
+  };
+
+  const handleAutoGenerateToggle = (e) => {
+    const isChecked = e.target.checked;
+    setAutoGenerateCode(isChecked);
+    
+    if (isChecked && !editingProcess && formData.name) {
+      const generatedCode = generateProcessCode(formData.name, formData.processStatus);
+      setFormData(prev => ({ ...prev, code: generatedCode }));
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
+
+    // Validate code
+    if (!formData.code.trim()) {
+      setError('Process code is required');
+      return;
+    }
 
     try {
       const payload = {
@@ -84,7 +195,8 @@ export default function ProcessForm() {
           code: '',
           smv: '',
           comments: '',
-          processStatus: 'active'
+          processStatus: 'Critical',
+          isAssessment: false
         });
         fetchProcesses();
         setTimeout(() => setSuccess(''), 3000);
@@ -105,62 +217,70 @@ export default function ProcessForm() {
       code: process.code,
       smv: process.smv.toString(),
       comments: process.comments || '',
-      processStatus: process.processStatus
+      processStatus: process.processStatus,
+      isAssessment: process.isAssessment || false
     });
+    setAutoGenerateCode(false); // Editing mode-তে auto-generate off
+    setSmvChangeComment('');
     setError('');
     setSuccess('');
   };
 
   const handleUpdate = async (e) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
+    e.preventDefault();
+    setError('');
+    setSuccess('');
 
-    try {
-      const payload = {
-        _id: editingProcess._id,
-        ...formData,
-        smv: parseFloat(formData.smv) // Ensure SMV is a number
-      };
+    try {
+      const isSmvChanged = editingProcess && parseFloat(formData.smv) !== editingProcess.smv;
       
-      // Compare the new SMV from payload with the old SMV from editingProcess
-      const isSmvChanged = payload.smv !== editingProcess.smv;
-      const oldSmvVersion = editingProcess.smvVersion; // Store the old version before update
+      const payload = {
+        _id: editingProcess._id,
+        ...formData,
+        smv: parseFloat(formData.smv) || 0
+      };
 
-      const response = await fetch('/api/processes', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      // Add SMV change comment if SMV is being changed
+      if (isSmvChanged && smvChangeComment) {
+        payload.smvChangeComment = smvChangeComment;
+      }
 
-      const result = await response.json();
+      const response = await fetch('/api/processes', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
 
-      if (response.ok) {
-        // Check if SMV was modified and the version actually incremented in the response
-        if (isSmvChanged && result.smvVersion === oldSmvVersion + 1) {
-          setSuccess(`Process updated successfully! SMV version updated from ${oldSmvVersion} to ${result.smvVersion}`);
-        } else {
-          setSuccess('Process updated successfully!');
-        }
-        setEditingProcess(null);
-        setFormData({
-          name: '',
-          description: '',
-          code: '',
-          smv: '',
-          comments: '',
-          processStatus: 'active'
-        });
-        fetchProcesses();
-        setTimeout(() => setSuccess(''), 5000);
-      } else {
-        setError(result.error || 'Failed to update process');
-      }
-    } catch (error) {
-      setError('Error updating process');
-      console.error('Error:', error);
-    }
-  };
+      const result = await response.json();
+
+      if (response.ok) {
+        if (isSmvChanged) {
+          setSuccess(`Process updated successfully! SMV version updated from ${editingProcess.smvVersion} to ${result.smvVersion}`);
+        } else {
+          setSuccess('Process updated successfully!');
+        }
+        setEditingProcess(null);
+        setFormData({
+          name: '',
+          description: '',
+          code: '',
+          smv: '',
+          comments: '',
+          processStatus: 'Critical',
+          isAssessment: false
+        });
+        setAutoGenerateCode(true); // Reset to auto-generate for new entries
+        setSmvChangeComment('');
+        fetchProcesses();
+        setTimeout(() => setSuccess(''), 5000);
+      } else {
+        setError(result.error || 'Failed to update process');
+      }
+    } catch (error) {
+      setError('Error updating process');
+      console.error('Error:', error);
+    }
+  };
 
   const cancelEdit = () => {
     setEditingProcess(null);
@@ -170,16 +290,19 @@ export default function ProcessForm() {
       code: '',
       smv: '',
       comments: '',
-      processStatus: 'active'
+      processStatus: 'Critical',
+      isAssessment: false
     });
+    setAutoGenerateCode(true); // Reset to auto-generate for new entries
+    setSmvChangeComment('');
     setError('');
   };
 
   const getStatusBadge = (status) => {
     const statusStyles = {
-      active: 'bg-green-100 text-green-800',
-      inactive: 'bg-red-100 text-red-800',
-      draft: 'bg-yellow-100 text-yellow-800'
+      Basic: 'bg-green-100 text-green-800',
+      Critical: 'bg-red-100 text-red-800',
+      'Semi-Critical': 'bg-yellow-100 text-yellow-800'
     };
     return (
       <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusStyles[status]}`}>
@@ -187,6 +310,19 @@ export default function ProcessForm() {
       </span>
     );
   };
+
+  const getAssessmentBadge = (isAssessment) => {
+    if (isAssessment) {
+      return (
+        <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+          Assessment
+        </span>
+      );
+    }
+    return null;
+  };
+
+  const isSmvChanged = editingProcess && parseFloat(formData.smv) !== editingProcess.smv;
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -220,18 +356,50 @@ export default function ProcessForm() {
                 onChange={handleChange}
                 className="w-full p-2 border border-gray-600 rounded-lg bg-gray-800 text-white"
                 required
+                placeholder="Enter process name"
               />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Code *</label>
-              <input
-                type="text"
-                name="code"
-                value={formData.code}
-                onChange={handleChange}
-                className="w-full p-2 border border-gray-600 rounded-lg bg-gray-800 text-white"
-                required
-              />
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  name="code"
+                  value={formData.code}
+                  onChange={handleChange}
+                  className="w-full p-2 border border-gray-600 rounded-lg bg-gray-800 text-white font-mono"
+                  required
+                  placeholder="Process code"
+                  maxLength={10}
+                />
+                {/* {!editingProcess && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const generatedCode = generateProcessCode(formData.name, formData.processStatus);
+                      setFormData(prev => ({ ...prev, code: generatedCode }));
+                    }}
+                    className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-medium whitespace-nowrap"
+                    disabled={!formData.name}
+                  >
+                    Generate
+                  </button>
+                )} */}
+              </div>
+              {/* {!editingProcess && (
+                <div className="flex items-center space-x-2 mt-2">
+                  <input
+                    type="checkbox"
+                    id="autoGenerate"
+                    checked={autoGenerateCode}
+                    onChange={handleAutoGenerateToggle}
+                    className="w-4 h-4 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
+                  />
+                  <label htmlFor="autoGenerate" className="text-sm text-gray-300">
+                    Auto-generate code from name and status
+                  </label>
+                </div>
+              )} */}
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
@@ -260,12 +428,46 @@ export default function ProcessForm() {
                 onChange={handleChange}
                 className="w-full p-2 border border-gray-600 rounded-lg bg-gray-800 text-white"
               >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="draft">Draft</option>
+                <option value="Basic">Basic</option>
+                <option value="Critical">Critical</option>
+                <option value="Semi-Critical">Semi-Critical</option>
               </select>
             </div>
           </div>
+          
+          {/* Assessment Checkbox */}
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              name="isAssessment"
+              id="isAssessment"
+              checked={formData.isAssessment}
+              onChange={handleChange}
+              className="w-4 h-4 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
+            />
+            <label htmlFor="isAssessment" className="text-sm font-medium">
+              Mark as Assessment Process
+            </label>
+          </div>
+          
+          {/* SMV Change Comment - Only show when editing and SMV is changed */}
+          {editingProcess && isSmvChanged && (
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                SMV Change Reason (Optional)
+                <span className="text-xs text-gray-400 ml-2">
+                  This will be saved in SMV history
+                </span>
+              </label>
+              <input
+                type="text"
+                value={smvChangeComment}
+                onChange={(e) => setSmvChangeComment(e.target.value)}
+                placeholder="Why are you changing the SMV value?"
+                className="w-full p-2 border border-yellow-600 rounded-lg bg-gray-800 text-white"
+              />
+            </div>
+          )}
           
           <div>
             <label className="block text-sm font-medium mb-1">Description</label>
@@ -275,6 +477,7 @@ export default function ProcessForm() {
               onChange={handleChange}
               className="w-full p-2 border border-gray-600 rounded-lg bg-gray-800 text-white"
               rows="2"
+              placeholder="Process description (optional)"
             />
           </div>
           
@@ -286,6 +489,7 @@ export default function ProcessForm() {
               onChange={handleChange}
               className="w-full p-2 border border-gray-600 rounded-lg bg-gray-800 text-white"
               rows="2"
+              placeholder="Additional comments (optional)"
             />
           </div>
 
@@ -331,16 +535,25 @@ export default function ProcessForm() {
                 </button>
               </div>
               {smvHistory.length > 0 ? (
-                <div className="space-y-2">
-                  {smvHistory.map((history, index) => (
-                    <div key={index} className="bg-gray-700 p-3 rounded-lg">
-                      <div className="flex justify-between">
-                        <span className="font-medium">SMV: {history.smv}</span>
-                        <span className="text-sm text-gray-300">Version: {history.smvVersion}</span>
+                <div className="space-y-3">
+                  {smvHistory.slice().reverse().map((history, index) => (
+                    <div key={index} className="bg-gray-700 p-4 rounded-lg border-l-4 border-blue-500">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <span className="font-medium text-lg">SMV: {history.smv}</span>
+                          <span className="ml-3 text-sm bg-blue-600 px-2 py-1 rounded">
+                            Version: {history.smvVersion}
+                          </span>
+                        </div>
+                        <span className="text-sm text-gray-300">
+                          {new Date(history.updatedAt).toLocaleString()}
+                        </span>
                       </div>
-                      <div className="text-sm text-gray-400">
-                        Updated: {new Date(history.updatedAt).toLocaleString()}
-                      </div>
+                      {history.comment && (
+                        <div className="text-sm text-gray-300 mt-1">
+                          <strong>Note:</strong> {history.comment}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -370,6 +583,8 @@ export default function ProcessForm() {
                     <th className="border border-gray-600 px-4 py-2 text-left">SMV Version</th>
                     <th className="border border-gray-600 px-4 py-2 text-left">Previous SMV</th>
                     <th className="border border-gray-600 px-4 py-2 text-left">Status</th>
+                    <th className="border border-gray-600 px-4 py-2 text-left">Assessment</th>
+                    <th className="border border-gray-600 px-4 py-2 text-left">Last Updated</th>
                     <th className="border border-gray-600 px-4 py-2 text-left">Actions</th>
                   </tr>
                 </thead>
@@ -379,13 +594,25 @@ export default function ProcessForm() {
                       <td className="border border-gray-600 px-4 py-2">{index + 1}</td>
                       <td className="border border-gray-600 px-4 py-2 font-mono">{process.code}</td>
                       <td className="border border-gray-600 px-4 py-2">{process.name}</td>
-                      <td className="border border-gray-600 px-4 py-2 text-right">{process.smv}</td>
-                      <td className="border border-gray-600 px-4 py-2 text-center">{process.smvVersion}</td>
-                      <td className="border border-gray-600 px-4 py-2 text-right">
+                      <td className="border border-gray-600 px-4 py-2 text-right font-medium">
+                        {process.smv}
+                      </td>
+                      <td className="border border-gray-600 px-4 py-2 text-center">
+                        <span className="bg-blue-600 px-2 py-1 rounded text-xs">
+                          v{process.smvVersion}
+                        </span>
+                      </td>
+                      <td className="border border-gray-600 px-4 py-2 text-right text-gray-400">
                         {process.previousSmv ? `${process.previousSmv} (v${process.previousSmvVersion})` : '-'}
                       </td>
                       <td className="border border-gray-600 px-4 py-2">
                         {getStatusBadge(process.processStatus)}
+                      </td>
+                      <td className="border border-gray-600 px-4 py-2">
+                        {getAssessmentBadge(process.isAssessment)}
+                      </td>
+                      <td className="border border-gray-600 px-4 py-2 text-sm text-gray-400">
+                        {new Date(process.updatedAt).toLocaleDateString()}
                       </td>
                       <td className="border border-gray-600 px-4 py-2">
                         <button

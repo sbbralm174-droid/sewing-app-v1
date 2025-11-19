@@ -6,6 +6,22 @@ export default function MainAssessment({ onAssessmentComplete }) {
   const [currentView, setCurrentView] = useState('data-entry')
   const [assessmentData, setAssessmentData] = useState(null)
   const [operatorName, setOperatorName] = useState('')
+  const [processesList, setProcessesList] = useState([]) // API থেকে প্রসেস লিস্ট
+
+  // API থেকে প্রসেস ডেটা লোড করা
+  useEffect(() => {
+    fetchProcesses()
+  }, [])
+
+  const fetchProcesses = async () => {
+    try {
+      const response = await fetch('/api/processes')
+      const data = await response.json()
+      setProcessesList(data)
+    } catch (error) {
+      console.error('Error fetching processes:', error)
+    }
+  }
 
   // localStorage থেকে ডেটা লোড করা
   useEffect(() => {
@@ -50,6 +66,7 @@ export default function MainAssessment({ onAssessmentComplete }) {
       }
 
       const processCapacity = calculateProcessCapacity(calculatedResults.processes)
+      
       
       // Parent component-এ পাঠানোর জন্য ডেটা প্রস্তুত করা
       const assessmentResult = {
@@ -137,6 +154,7 @@ export default function MainAssessment({ onAssessmentComplete }) {
             initialData={assessmentData}
             operatorName={operatorName}
             setOperatorName={setOperatorName}
+            processesList={processesList}
           />
         ) : (
           <AssessmentResults 
@@ -150,8 +168,8 @@ export default function MainAssessment({ onAssessmentComplete }) {
   )
 }
 
-// Data Entry Component - Updated
-function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorName }) {
+// Data Entry Component - Updated with API integration
+function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorName, processesList }) {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     operatorName: operatorName || 'Most. Rahima Khatun',
@@ -162,20 +180,11 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
     processes: [
       {
         machineType: 'SNLS/DNLS',
-        processName: 'Main Lavel Attach',
-        dop: 'Basic',
-        smv: 0.3,
-        cycleTimes: [22, 23, 25, 22, 23],
+        processName: '',
+        dop: '',
+        smv: 0,
+        cycleTimes: [0, 0, 0, 0, 0],
         qualityStatus: 'No Defect',
-        remarks: ''
-      },
-      {
-        machineType: 'Flat Lock',
-        processName: 'Body Hem',
-        dop: 'Critical',
-        smv: 0.33,
-        cycleTimes: [28, 27, 26, 25, 24],
-        qualityStatus: '',
         remarks: ''
       }
     ]
@@ -188,6 +197,22 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
       setOperatorName(initialData.operatorName)
     }
   }, [initialData, setOperatorName])
+
+  // Process select করলে DOP এবং SMV auto-fill করা
+  const handleProcessSelect = (index, selectedProcessName) => {
+    const selectedProcess = processesList.find(process => process.name === selectedProcessName)
+    
+    if (selectedProcess) {
+      const updatedProcesses = [...formData.processes]
+      updatedProcesses[index] = {
+        ...updatedProcesses[index],
+        processName: selectedProcess.name,
+        dop: selectedProcess.processStatus, // API তে processStatus, UI তে DOP
+        smv: selectedProcess.smv // API তে smv, UI তেও smv
+      }
+      setFormData({ ...formData, processes: updatedProcesses })
+    }
+  }
 
   const updateProcess = (index, field, value) => {
     const updatedProcesses = [...formData.processes]
@@ -233,6 +258,9 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
     e.preventDefault()
     onSave(formData)
   }
+
+  // শুধুমাত্র isAssessment: true আছে এমন processes ফিল্টার করুন
+  const assessmentProcesses = processesList.filter(process => process.isAssessment === true)
 
   return (
     <form onSubmit={handleSubmit} className="bg-white shadow-md rounded-lg p-6">
@@ -327,7 +355,7 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
                   <th key={num} className="px-4 py-2 border">{num}st Cycle Time</th>
                 ))}
                 <th className="px-4 py-2 border">Quality Status</th>
-                <th className="px-4 py-2 border">Remarks</th>
+                
                 <th className="px-4 py-2 border">Actions</th>
               </tr>
             </thead>
@@ -353,33 +381,34 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
                     </select>
                   </td>
                   <td className="px-4 py-2 border">
-                    <input
-                      type="text"
-                      value={process.processName}
-                      onChange={(e) => updateProcess(index, 'processName', e.target.value)}
-                      className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      placeholder="Enter process name"
-                    />
-                  </td>
-                  <td className="px-4 py-2 border">
                     <select
-                      value={process.dop}
-                      onChange={(e) => updateProcess(index, 'dop', e.target.value)}
+                      value={process.processName}
+                      onChange={(e) => handleProcessSelect(index, e.target.value)}
                       className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                     >
-                      <option value="">Select</option>
-                      <option value="Basic">Basic</option>
-                      <option value="Semi Critical">Semi Critical</option>
-                      <option value="Critical">Critical</option>
+                      <option value="">Select Process</option>
+                      {assessmentProcesses.map((processItem) => (
+                        <option key={processItem._id} value={processItem.name}>
+                          {processItem.name}
+                        </option>
+                      ))}
                     </select>
+                  </td>
+                  <td className="px-4 py-2 border">
+                    <input
+                      type="text"
+                      value={process.dop}
+                      readOnly
+                      className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100"
+                    />
                   </td>
                   <td className="px-4 py-2 border">
                     <input
                       type="number"
                       step="0.01"
                       value={process.smv}
-                      onChange={(e) => updateProcess(index, 'smv', parseFloat(e.target.value))}
-                      className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      readOnly
+                      className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100"
                     />
                   </td>
                   {process.cycleTimes.map((time, cycleIndex) => (
@@ -408,14 +437,7 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
                       <option value="5 Operation Defect">5 Operation Defect</option>
                     </select>
                   </td>
-                  <td className="px-4 py-2 border">
-                    <input
-                      type="text"
-                      value={process.remarks}
-                      onChange={(e) => updateProcess(index, 'remarks', e.target.value)}
-                      className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                  </td>
+                  
                   <td className="px-4 py-2 border text-center">
                     <button
                       type="button"
@@ -722,25 +744,33 @@ function calculateResults(data) {
 
   // Education Score Calculation - UPDATED
   const educationScoreMap = {
-    'Eight Above': 5,
-    'Five Above': 3,
-    'Below Five': 2
+    'Eight Above': 100,
+    'Five Above': 50,
+    'Below Five': 30
   }
-  const educationScore = educationScoreMap[data.educationalStatus] || 0
-
+  const educationScoreCalculate = educationScoreMap[data.educationalStatus] || 0
+   const educationScore = educationScoreCalculate * 0.05
   // Attitude Score Calculation - UPDATED
   const attitudeScoreMap = {
-    'Good': 5,
-    'Normal': 3,
-    'Bad': 2
+    'Good': 100,
+    'Normal': 50,
+    'Bad': 30
   }
-  const attitudeScore = attitudeScoreMap[data.attitude] || 0
+  const attitudeScoreCalculate = attitudeScoreMap[data.attitude] || 0
+  const attitudeScore = attitudeScoreCalculate * 0.05
 
   // Total Score Calculation - UPDATED (now out of 100)
   const totalScore = finalMachineScore + dopScore + practicalScore + averageQualityScore + educationScore + attitudeScore
 
+
+console.log('averageQualityScore Score:', averageQualityScore);
+ let grade, level, designation
+if ((5 > averageQualityScore)) {
+  grade = 'Unskill'; level = 'Unskill'; designation = 'Asst.Operator'
+}else {
+
   // Final Assessment
-  let grade, level, designation
+ 
   if (totalScore >= 90) {
     grade = 'A++'; level = 'Multiskill'; designation = 'Jr.Operator'
   } else if (totalScore >= 80) {
@@ -751,10 +781,10 @@ function calculateResults(data) {
     grade = 'B+'; level = 'Medium'; designation = 'Jr.Operator'
   } else if (totalScore >= 50) {
     grade = 'B'; level = 'Average'; designation = 'Gen.Operator'
-  } else {
+  }else {
     grade = 'Unskill'; level = 'Unskill'; designation = 'Asst.Operator'
   }
-
+}
   return {
     processes: processesWithCalculations,
     scores: {

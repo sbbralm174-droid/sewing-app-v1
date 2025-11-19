@@ -158,79 +158,77 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setErrorMessage('');
-    setSuccessMessage('');
+  e.preventDefault();
+  setErrorMessage('');
+  setSuccessMessage('');
 
-    if (!candidateInfo) {
-      setErrorMessage('Please search and select a candidate first');
-      return;
+  if (!candidateInfo) {
+    setErrorMessage('Please search and select a candidate first');
+    return;
+  }
+
+  // Validate required fields
+  if (!formData.interviewDate || !formData.interviewer || !formData.department) {
+    setErrorMessage('Interview date, interviewer, and department are required');
+    return;
+  }
+
+  try {
+    setSubmitting(true);
+
+    // Upload videos
+    let uploadedVideos = formData.videos;
+    if (formData.videos.some(video => video.file)) {
+      const uploadedUrls = await uploadAllFiles();
+      uploadedVideos = uploadedUrls.videos;
     }
 
-    // Validate required fields
-    if (!formData.interviewDate || !formData.interviewer || !formData.department) {
-      setErrorMessage('Interview date, interviewer, and department are required');
-      return;
+    // Prepare process scores with validation
+    const processScores = {
+      machineScore: Math.min(10000, Math.max(0, parseInt(formData.processAndScore.machineScore) || 0)),
+      dopScore: Math.min(10000, Math.max(0, parseInt(formData.processAndScore.dopScore) || 0)),
+      practicalScore: Math.min(10000, Math.max(0, parseInt(formData.processAndScore.practicalScore) || 0)),
+      qualityScore: Math.min(10000, Math.max(0, parseInt(formData.processAndScore.qualityScore) || 0)),
+      educationScore: Math.min(10000, Math.max(0, parseInt(formData.processAndScore.educationScore) || 0)),
+      totalScore: Math.min(10000, Math.max(0, parseInt(formData.processAndScore.totalScore) || 0))
+    };
+
+    // Prepare submission data with processCapacity
+    const submissionData = {
+      candidateId: candidateInfo.candidateId,
+      ...formData,
+      videos: uploadedVideos,
+      processAndScore: processScores,
+      grade: formData.grade,
+      assessmentData: assessmentData, // Include full assessment data
+      processCapacity: assessmentData?.processCapacity || {} // Add processCapacity here
+    };
+
+    console.log('Submitting data with processCapacity:', submissionData);
+
+    const response = await fetch('/api/iep-interview/step-two', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(submissionData),
+    });
+
+    const result = await response.json();
+
+    if (response.ok) {
+      setSuccessMessage('✅ Interview completed successfully!');
+      
+      
+      
+    } else {
+      setErrorMessage(`❌ ${result.error || 'Failed to complete interview'}`);
     }
-
-    try {
-      setSubmitting(true);
-
-      // Upload videos
-      let uploadedVideos = formData.videos;
-      if (formData.videos.some(video => video.file)) {
-        const uploadedUrls = await uploadAllFiles();
-        uploadedVideos = uploadedUrls.videos;
-      }
-
-      // Prepare process scores with validation
-      const processScores = {
-        machineScore: Math.min(10000, Math.max(0, parseInt(formData.processAndScore.machineScore) || 0)),
-        dopScore: Math.min(10000, Math.max(0, parseInt(formData.processAndScore.dopScore) || 0)),
-        practicalScore: Math.min(10000, Math.max(0, parseInt(formData.processAndScore.practicalScore) || 0)),
-        qualityScore: Math.min(10000, Math.max(0, parseInt(formData.processAndScore.qualityScore) || 0)),
-        educationScore: Math.min(10000, Math.max(0, parseInt(formData.processAndScore.educationScore) || 0)),
-        totalScore: Math.min(10000, Math.max(0, parseInt(formData.processAndScore.totalScore) || 0))
-      };
-
-      // Submit interview details
-      const submissionData = {
-        candidateId: candidateInfo.candidateId,
-        ...formData,
-        videos: uploadedVideos,
-        processAndScore: processScores,
-        grade: formData.grade,
-        assessmentData: assessmentData // Include full assessment data if needed
-      };
-
-      console.log('Submitting data:', submissionData);
-
-      const response = await fetch('/api/iep-interview/step-two', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(submissionData),
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        setSuccessMessage('✅ Interview completed successfully!');
-        
-        // Reset form and redirect after 2 seconds
-        setTimeout(() => {
-          router.push('/admin/viva-interview/step2-list');
-        }, 2000);
-        
-      } else {
-        setErrorMessage(`❌ ${result.error || 'Failed to complete interview'}`);
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      setErrorMessage('❌ ' + error.message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  } catch (error) {
+    console.error('Error:', error);
+    setErrorMessage('❌ ' + error.message);
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   // Display current process scores
   const renderProcessScores = () => {
