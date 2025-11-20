@@ -33,7 +33,7 @@ const ProcessSchema = new mongoose.Schema({
       type: Date,
       default: Date.now
     },
-    comment: String // Added comment for history tracking
+    comment: String
   }],
   comments: {
     type: String,
@@ -46,7 +46,19 @@ const ProcessSchema = new mongoose.Schema({
   },
   isAssessment: {
     type: Boolean,
-    default: false, // নতুন field যোগ করা হয়েছে
+    default: false,
+  },
+  // নতুন fields যোগ করা হয়েছে
+  subProcess: {
+    type: String,
+  },
+  condition: {
+    type: String,
+    default: '',
+  },
+  workAid: {
+    type: String,
+    default: '',
   },
   createdAt: {
     type: Date,
@@ -66,7 +78,6 @@ ProcessSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   
   if (this.isModified('smv') && !this.isNew) {
-    // Save current SMV to history before updating
     this.smvHistory.push({
       smv: this.smv,
       smvVersion: this.smvVersion,
@@ -74,16 +85,12 @@ ProcessSchema.pre('save', function(next) {
       comment: `SMV updated to ${this.smv} (v${this.smvVersion})`
     });
     
-    // Keep only the last 10 history entries
     if (this.smvHistory.length > 10) {
       this.smvHistory = this.smvHistory.slice(-10);
     }
     
-    // Set previous SMV values
     this.previousSmv = this.smv;
     this.previousSmvVersion = this.smvVersion;
-    
-    // Increment SMV version
     this.smvVersion += 1;
   }
   next();
@@ -96,11 +103,9 @@ ProcessSchema.statics.updateSMV = async function(processId, newSMV, comment = ''
     throw new Error('Process not found');
   }
 
-  // Store current values before update
   const currentSMV = process.smv;
   const currentVersion = process.smvVersion;
 
-  // Update the process
   const updatedProcess = await this.findByIdAndUpdate(
     processId,
     { 

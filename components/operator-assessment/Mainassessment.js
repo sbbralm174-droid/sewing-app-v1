@@ -1,12 +1,53 @@
-// components/operator-assessment/Mainassessment.js
+// components/operator-assessment/Mainassessment.js - UPDATED
 'use client'
 import { useState, useEffect } from 'react'
 
-export default function MainAssessment({ onAssessmentComplete }) {
+export default function MainAssessment({ onAssessmentComplete, candidateInfo }) {
   const [currentView, setCurrentView] = useState('data-entry')
   const [assessmentData, setAssessmentData] = useState(null)
   const [operatorName, setOperatorName] = useState('')
   const [processesList, setProcessesList] = useState([]) // API থেকে প্রসেস লিস্ট
+
+  // candidateInfo থেকে ডেটা লোড করুন
+  useEffect(() => {
+    if (candidateInfo) {
+      // candidateInfo থেকে operator name সেট করুন
+      setOperatorName(candidateInfo.name || '');
+      
+      // localStorage থেকে existing ডেটা লোড করুন (যদি থাকে)
+      const savedData = localStorage.getItem('assessmentData');
+      if (savedData) {
+        const data = JSON.parse(savedData);
+        setAssessmentData(data);
+      } else {
+        // নতুন ডেটা initialize করুন candidateInfo দিয়ে
+        const initialData = {
+          operatorName: candidateInfo.name || '',
+          candidateId: candidateInfo.candidateId || '',
+          nid: candidateInfo.nid || '',
+          birthCertificate: candidateInfo.birthCertificate || '',
+          date: new Date().toISOString().split('T')[0],
+          fatherHusbandName: '',
+          educationalStatus: 'Eight Above',
+          attitude: 'Good',
+          sewingFloor: 'Sewing Floor',
+          processes: [
+            {
+              machineType: 'SNLS/DNLS',
+              processName: '',
+              dop: '',
+              smv: 0,
+              cycleTimes: [0, 0, 0, 0, 0],
+              qualityStatus: 'No Defect',
+              remarks: ''
+            }
+          ],
+          supplementaryMachines: []
+        };
+        setAssessmentData(initialData);
+      }
+    }
+  }, [candidateInfo]);
 
   // API থেকে প্রসেস ডেটা লোড করা
   useEffect(() => {
@@ -26,7 +67,7 @@ export default function MainAssessment({ onAssessmentComplete }) {
   // localStorage থেকে ডেটা লোড করা
   useEffect(() => {
     const savedData = localStorage.getItem('assessmentData')
-    if (savedData) {
+    if (savedData && !candidateInfo) {
       const data = JSON.parse(savedData)
       setAssessmentData(data)
       setOperatorName(data.operatorName || '')
@@ -37,7 +78,11 @@ export default function MainAssessment({ onAssessmentComplete }) {
   const handleSaveData = (data) => {
     const completeData = {
       ...data,
-      operatorName: operatorName || data.operatorName
+      operatorName: operatorName || data.operatorName,
+      // candidate info যোগ করুন
+      candidateId: candidateInfo?.candidateId || data.candidateId,
+      nid: candidateInfo?.nid || data.nid,
+      birthCertificate: candidateInfo?.birthCertificate || data.birthCertificate
     }
     localStorage.setItem('assessmentData', JSON.stringify(completeData))
     setAssessmentData(completeData)
@@ -49,7 +94,7 @@ export default function MainAssessment({ onAssessmentComplete }) {
     setCurrentView('data-entry')
   }
 
-  // Assessment সম্পূর্ণ হলে parent component কে ডেটা পাঠানো
+  // Assessment সম্পূর্ণ হলে parent component কে ডেটা পাঠানো - UPDATED
   const handleUseAssessment = () => {
     if (assessmentData) {
       const calculatedResults = calculateResults(assessmentData)
@@ -77,8 +122,18 @@ export default function MainAssessment({ onAssessmentComplete }) {
         })
       }
       
-      // Parent component-এ পাঠানোর জন্য ডেটা প্রস্তুত করা
+      // Candidate information যোগ করুন - UPDATED
       const assessmentResult = {
+        // Candidate info from props
+        candidateInfo: candidateInfo ? {
+          name: candidateInfo.name,
+          candidateId: candidateInfo.candidateId,
+          nid: candidateInfo.nid,
+          birthCertificate: candidateInfo.birthCertificate,
+          picture: candidateInfo.picture
+        } : null,
+        
+        // Assessment results
         operatorName: assessmentData.operatorName,
         scores: {
           machineScore: calculatedResults.scores.machineScore,
@@ -99,9 +154,7 @@ export default function MainAssessment({ onAssessmentComplete }) {
         rawData: assessmentData
       }
 
-      console.log('Process Capacity Data:', processCapacity)
-      console.log('Supplementary Machines:', supplementaryMachinesData)
-      console.log('Sending assessment data to parent:', assessmentResult)
+      console.log('Assessment Result with Candidate Info:', assessmentResult)
       
       if (onAssessmentComplete) {
         onAssessmentComplete(assessmentResult)
@@ -166,12 +219,14 @@ export default function MainAssessment({ onAssessmentComplete }) {
             operatorName={operatorName}
             setOperatorName={setOperatorName}
             processesList={processesList}
+            candidateInfo={candidateInfo} // 🔥 candidateInfo পাস করুন
           />
         ) : (
           <AssessmentResults 
             onBackToDataEntry={handleBackToDataEntry}
             assessmentData={assessmentData}
             onUseAssessment={onAssessmentComplete ? handleUseAssessment : null}
+            candidateInfo={candidateInfo} // 🔥 candidateInfo পাস করুন
           />
         )}
       </div>
@@ -179,12 +234,12 @@ export default function MainAssessment({ onAssessmentComplete }) {
   )
 }
 
-// Data Entry Component - Updated with supplementary machines dropdown
-function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorName, processesList }) {
+// Data Entry Component - Updated with candidate info auto-fill
+function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorName, processesList, candidateInfo }) {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
-    operatorName: operatorName || 'Most. Rahima Khatun',
-    fatherHusbandName: 'Md. Afser Khan',
+    operatorName: operatorName || '',
+    fatherHusbandName: '',
     educationalStatus: 'Eight Above',
     attitude: 'Good',
     sewingFloor: 'Sewing Floor',
@@ -208,18 +263,44 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
     'Kansai', 'BH', 'BS', 'BTK', 'F/Sleamer'
   ]
 
-  // initialData থাকলে সেট করা
+  // candidateInfo থেকে initial values সেট করুন - UPDATED
   useEffect(() => {
-    if (initialData) {
-      const updatedData = {
-        ...initialData,
-        supplementaryMachines: initialData.supplementaryMachines || supplementaryMachineOptions.map(name => ({
+    if (candidateInfo) {
+      setOperatorName(candidateInfo.name || '');
+      
+      const initialFormData = {
+        date: new Date().toISOString().split('T')[0],
+        operatorName: candidateInfo.name || '',
+        candidateId: candidateInfo.candidateId || '',
+        nid: candidateInfo.nid || '',
+        birthCertificate: candidateInfo.birthCertificate || '',
+        fatherHusbandName: '',
+        educationalStatus: 'Eight Above',
+        attitude: 'Good',
+        sewingFloor: 'Sewing Floor',
+        processes: [
+          {
+            machineType: 'SNLS/DNLS',
+            processName: '',
+            dop: '',
+            smv: 0,
+            cycleTimes: [0, 0, 0, 0, 0],
+            qualityStatus: 'No Defect',
+            remarks: ''
+          }
+        ],
+        supplementaryMachines: supplementaryMachineOptions.map(name => ({
           name,
           checked: false
         }))
+      };
+
+      // যদি আগের saved data থাকে, সেটা ব্যবহার করুন
+      if (initialData) {
+        setFormData(prev => ({ ...prev, ...initialData }));
+      } else {
+        setFormData(initialFormData);
       }
-      setFormData(updatedData)
-      setOperatorName(initialData.operatorName)
     } else {
       // Initialize supplementary machines
       setFormData(prev => ({
@@ -230,7 +311,7 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
         }))
       }))
     }
-  }, [initialData])
+  }, [candidateInfo, initialData])
 
   // Process select করলে DOP এবং SMV auto-fill করা
   const handleProcessSelect = (index, selectedProcessName) => {
@@ -308,6 +389,35 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
 
   return (
     <form onSubmit={handleSubmit} className="bg-white shadow-md rounded-lg p-6">
+      {/* Candidate Information Display - NEW SECTION */}
+      {candidateInfo && (
+        <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <h3 className="text-lg font-semibold text-blue-900 mb-3">Candidate Information</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div>
+              <p><strong>Name:</strong> {candidateInfo.name || 'N/A'}</p>
+              <p><strong>Candidate ID:</strong> {candidateInfo.candidateId || 'N/A'}</p>
+            </div>
+            <div>
+              <p><strong>NID:</strong> {candidateInfo.nid || 'N/A'}</p>
+              <p><strong>Birth Certificate:</strong> {candidateInfo.birthCertificate || 'N/A'}</p>
+            </div>
+            {candidateInfo.picture && (
+              <div className="flex justify-center">
+                <img 
+                  src={candidateInfo.picture} 
+                  alt={candidateInfo.name || 'Candidate'}
+                  className="w-16 h-16 object-cover rounded-md"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Operator Information */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div>
@@ -337,6 +447,9 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             required
           />
+          <p className="text-xs text-gray-500 mt-1">
+            Auto-filled from candidate information
+          </p>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Father's/Husband's Name</label>
@@ -540,8 +653,8 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
   )
 }
 
-// Assessment Results Component - Updated with supplementary machines
-function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment }) {
+// Assessment Results Component - Updated with candidate info
+function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment, candidateInfo }) {
   const [calculatedResults, setCalculatedResults] = useState(null)
 
   useEffect(() => {
@@ -564,6 +677,27 @@ function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment 
 
   return (
     <div>
+      {/* Candidate Info Card - NEW SECTION */}
+      {candidateInfo && (
+        <div className="bg-blue-50 shadow-md rounded-lg p-6 mb-6 border border-blue-200">
+          <h2 className="text-lg font-semibold text-blue-900 mb-4">Candidate Information</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-600">Name</label>
+              <p className="text-gray-900 font-medium">{candidateInfo.name}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">Candidate ID</label>
+              <p className="text-gray-900">{candidateInfo.candidateId}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-600">NID/Birth Certificate</label>
+              <p className="text-gray-900">{candidateInfo.nid || candidateInfo.birthCertificate || 'N/A'}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Operator Info Card */}
       <div className="bg-white shadow-md rounded-lg p-6 mb-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Operator Information</h2>
@@ -704,19 +838,7 @@ function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment 
           </div>
         </div>
 
-        {/* Process Capacity Summary */}
-        <div className="mt-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">Process Capacity Summary</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {calculatedResults.processes.map((process, index) => (
-              <div key={index} className="bg-blue-50 p-3 rounded-lg">
-                <div className="text-sm font-medium text-gray-700 truncate">{process.processName}</div>
-                <div className="text-lg font-bold text-blue-600">{Math.round(process.capacity)} pcs</div>
-                <div className="text-xs text-gray-500">per hour</div>
-              </div>
-            ))}
-          </div>
-        </div>
+        
       </div>
 
       {/* Action Buttons */}
@@ -809,7 +931,7 @@ const machineScore = calculateMachineScore(data.processes);
 
   const finalMachineScore = machineScore * 0.3;
 
-  // DOP Score Calculation
+  // DOP Score Calculation (process status)
   const dopScores = processesWithCalculations.map(process => {
     const dopPoints = {
       'Basic': 30,
@@ -871,10 +993,8 @@ const machineScore = calculateMachineScore(data.processes);
 
   // Total Score Calculation - UPDATED (now out of 100)
   const totalScore = finalMachineScore + dopScore + practicalScore + averageQualityScore + educationScore + attitudeScore
-//ekhan kar sokol data database e jabe ebong console log e dekhabe
 
-console.log('averageQualityScore Score:', averageQualityScore);
- let grade, level, designation
+  let grade, level, designation
 if ((5 > averageQualityScore)) {
   grade = 'Unskill'; level = 'Unskill'; designation = 'Asst.Operator'
 }else {

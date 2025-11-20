@@ -11,11 +11,12 @@ export default function ProcessForm() {
     comments: '',
     processStatus: 'Critical',
     isAssessment: false,
-    subProcesses: '',
-    condition: '',
-    workEight: ''
+    subProcess: '', // নতুন field
+    condition: '', // নতুন field
+    workAid: '' // নতুন field - workEight থেকে workAid তে পরিবর্তন
   });
   const [processes, setProcesses] = useState([]);
+  const [filteredProcesses, setFilteredProcesses] = useState([]);
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(true);
   const [editingProcess, setEditingProcess] = useState(null);
@@ -24,16 +25,46 @@ export default function ProcessForm() {
   const [showHistory, setShowHistory] = useState(false);
   const [smvChangeComment, setSmvChangeComment] = useState('');
   const [autoGenerateCode, setAutoGenerateCode] = useState(true);
+  const [searchTerm, setSearchTerm] = useState(''); // Search term state
 
   useEffect(() => {
     fetchProcesses();
   }, []);
+
+  // Search functionality
+  useEffect(() => {
+    if (searchTerm.trim() === '') {
+      setFilteredProcesses(processes);
+    } else {
+      const filtered = processes.filter(process => {
+        const searchWords = searchTerm.toLowerCase().split('');
+        const processText = (
+          process.name + 
+          process.code + 
+          process.subProcess + 
+          process.condition + 
+          process.workAid
+        ).toLowerCase();
+        
+        let searchIndex = 0;
+        for (let i = 0; i < processText.length && searchIndex < searchWords.length; i++) {
+          if (processText[i] === searchWords[searchIndex]) {
+            searchIndex++;
+          }
+        }
+        
+        return searchIndex === searchWords.length;
+      });
+      setFilteredProcesses(filtered);
+    }
+  }, [searchTerm, processes]);
 
   const fetchProcesses = async () => {
     try {
       const res = await fetch('/api/processes');
       const data = await res.json();
       setProcesses(data);
+      setFilteredProcesses(data);
       setLoading(false);
     } catch (err) {
       console.error(err);
@@ -200,6 +231,9 @@ export default function ProcessForm() {
           comments: '',
           processStatus: 'Critical',
           isAssessment: false,
+          subProcess: '', // reset
+          condition: '', // reset
+          workAid: '' // reset
 
         });
         fetchProcesses();
@@ -214,24 +248,24 @@ export default function ProcessForm() {
   };
 
   const handleEdit = (process) => {
-    setEditingProcess(process);
-    setFormData({
-      name: process.name,
-      description: process.description || '',
-      code: process.code,
-      smv: process.smv.toString(),
-      comments: process.comments || '',
-      processStatus: process.processStatus,
-      isAssessment: process.isAssessment || false,
-      subProcess: process.subProcess || '',
-      condition: process.condition || '',
-      workEight: process.workEight || ''
-    });
-    setAutoGenerateCode(false); // Editing mode-তে auto-generate off
-    setSmvChangeComment('');
-    setError('');
-    setSuccess('');
-  };
+  setEditingProcess(process);
+  setFormData({
+    name: process.name,
+    description: process.description || '',
+    code: process.code,
+    smv: process.smv.toString(),
+    comments: process.comments || '',
+    processStatus: process.processStatus,
+    isAssessment: process.isAssessment || false,
+    subProcess: process.subProcess || '', // এই line ঠিক করুন
+    condition: process.condition || '', // এই line ঠিক করুন
+    workAid: process.workAid || '' // এই line ঠিক করুন - workEight নয়
+  });
+  setAutoGenerateCode(false);
+  setSmvChangeComment('');
+  setError('');
+  setSuccess('');
+};
 
   const handleUpdate = async (e) => {
     e.preventDefault();
@@ -274,7 +308,10 @@ export default function ProcessForm() {
           smv: '',
           comments: '',
           processStatus: 'Critical',
-          isAssessment: false
+          isAssessment: false,
+          subProcess: '', // reset
+          condition: '', // reset
+          workAid: '' // reset
         });
         setAutoGenerateCode(true); // Reset to auto-generate for new entries
         setSmvChangeComment('');
@@ -355,7 +392,7 @@ export default function ProcessForm() {
         <form onSubmit={editingProcess ? handleUpdate : handleSubmit} className="space-y-4 mb-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Name *</label>
+              <label className="block text-sm font-medium mb-1">Process Name *</label>
               <input
                 type="text"
                 name="name"
@@ -396,7 +433,7 @@ export default function ProcessForm() {
               <input
                 type="text"
                 name="workAid"
-                value={formData.workEight}
+                value={formData.workAid}
                 onChange={handleChange}
                 className="w-full p-2 border border-gray-600 rounded-lg bg-gray-800 text-white"
                 placeholder="Enter work Aid"
@@ -415,34 +452,9 @@ export default function ProcessForm() {
                   placeholder="Process code"
                   maxLength={10}
                 />
-                {/* {!editingProcess && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const generatedCode = generateProcessCode(formData.name, formData.processStatus);
-                      setFormData(prev => ({ ...prev, code: generatedCode }));
-                    }}
-                    className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-medium whitespace-nowrap"
-                    disabled={!formData.name}
-                  >
-                    Generate
-                  </button>
-                )} */}
+                
               </div>
-              {/* {!editingProcess && (
-                <div className="flex items-center space-x-2 mt-2">
-                  <input
-                    type="checkbox"
-                    id="autoGenerate"
-                    checked={autoGenerateCode}
-                    onChange={handleAutoGenerateToggle}
-                    className="w-4 h-4 text-blue-600 bg-gray-800 border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
-                  />
-                  <label htmlFor="autoGenerate" className="text-sm text-gray-300">
-                    Auto-generate code from name and status
-                  </label>
-                </div>
-              )} */}
+              
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
@@ -525,14 +537,14 @@ export default function ProcessForm() {
           </div>
           
           <div>
-            <label className="block text-sm font-medium mb-1">Comments</label>
+            <label className="block text-sm font-medium mb-1">Remarks</label>
             <textarea
               name="comments"
               value={formData.comments}
               onChange={handleChange}
               className="w-full p-2 border border-gray-600 rounded-lg bg-gray-800 text-white"
               rows="2"
-              placeholder="Additional comments (optional)"
+              placeholder="Additional remarks (optional)"
             />
           </div>
 
@@ -609,11 +621,26 @@ export default function ProcessForm() {
 
         {/* Processes Table */}
         <div className="bg-gray-800 rounded-lg p-6">
-          <h2 className="text-2xl font-bold mb-4">Process List</h2>
+          <div className=" justify items-center mb-4">
+            <h2 className="text-2xl font-bold">Process List</h2>
+            <div className="w-64">
+              <input
+                type="text"
+                placeholder="Search processes..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full p-2 border border-gray-600 rounded-lg bg-gray-700 text-white"
+              />
+              
+            </div>
+          </div>
+          
           {loading ? (
             <div className="text-center py-4">Loading...</div>
-          ) : processes.length === 0 ? (
-            <div className="text-center py-4 text-gray-400">No processes found.</div>
+          ) : filteredProcesses.length === 0 ? (
+            <div className="text-center py-4 text-gray-400">
+              {searchTerm ? 'No processes found matching your search.' : 'No processes found.'}
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
@@ -622,9 +649,11 @@ export default function ProcessForm() {
                     <th className="border border-gray-600 px-4 py-2 text-left">#</th>
                     <th className="border border-gray-600 px-4 py-2 text-left">Code</th>
                     <th className="border border-gray-600 px-4 py-2 text-left">Name</th>
+                    <th className="border border-gray-600 px-4 py-2 text-left">Sub Process</th>
+                    <th className="border border-gray-600 px-4 py-2 text-left">Condition</th>
+                    <th className="border border-gray-600 px-4 py-2 text-left">Work Aid</th>
                     <th className="border border-gray-600 px-4 py-2 text-left">SMV</th>
                     <th className="border border-gray-600 px-4 py-2 text-left">SMV Version</th>
-                    <th className="border border-gray-600 px-4 py-2 text-left">Description</th>
                     <th className="border border-gray-600 px-4 py-2 text-left">Status</th>
                     <th className="border border-gray-600 px-4 py-2 text-left">Assessment</th>
                     <th className="border border-gray-600 px-4 py-2 text-left">Last Updated</th>
@@ -632,11 +661,14 @@ export default function ProcessForm() {
                   </tr>
                 </thead>
                 <tbody>
-                  {processes.map((process, index) => (
+                  {filteredProcesses.map((process, index) => (
                     <tr key={process._id} className="hover:bg-gray-750">
                       <td className="border border-gray-600 px-4 py-2">{index + 1}</td>
                       <td className="border border-gray-600 px-4 py-2 font-mono">{process.code}</td>
                       <td className="border border-gray-600 px-4 py-2">{process.name}</td>
+                      <td className="border border-gray-600 px-4 py-2">{process.subProcess || '-'}</td>
+                      <td className="border border-gray-600 px-4 py-2">{process.condition || '-'}</td>
+                      <td className="border border-gray-600 px-4 py-2">{process.workAid || '-'}</td>
                       <td className="border border-gray-600 px-4 py-2 text-right font-medium">
                         {process.smv}
                       </td>
@@ -644,10 +676,6 @@ export default function ProcessForm() {
                         <span className="bg-blue-600 px-2 py-1 rounded text-xs">
                           v{process.smvVersion}
                         </span>
-                      </td>
-                      <td className="border border-gray-600 px-4 py-2 text-xs text-white text-gray-400">
-                        {getStatusBadge(process.description)}
-                        {/* {process.previousSmv ? `${process.previousSmv} (v${process.previousSmvVersion})` : '-'} */}
                       </td>
                       <td className="border border-gray-600 px-4 py-2">
                         {getStatusBadge(process.processStatus)}

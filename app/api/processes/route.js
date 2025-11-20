@@ -8,9 +8,23 @@ export async function POST(req) {
     await connectDB();
     const body = await req.json();
 
-    // case-insensitive check
+    // Extract all fields including new ones
+    const {
+      name,
+      description,
+      code,
+      smv,
+      comments,
+      processStatus,
+      isAssessment,
+      subProcess,
+      condition,
+      workAid
+    } = body;
+
+    // case-insensitive check for name
     const exists = await Process.findOne({
-      name: { $regex: `^${body.name}$`, $options: "i" }
+      name: { $regex: `^${name}$`, $options: "i" }
     });
 
     if (exists) {
@@ -20,7 +34,28 @@ export async function POST(req) {
       );
     }
 
-    const process = await Process.create(body);
+    // Check for duplicate code
+    const codeExists = await Process.findOne({ code });
+    if (codeExists) {
+      return NextResponse.json(
+        { error: "Process code already exists" },
+        { status: 400 }
+      );
+    }
+
+    const process = await Process.create({
+      name,
+      description,
+      code,
+      smv: parseFloat(smv) || 0,
+      comments,
+      processStatus,
+      isAssessment: Boolean(isAssessment),
+      subProcess,
+      condition,
+      workAid
+    });
+    
     return NextResponse.json(process, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
@@ -31,7 +66,10 @@ export async function POST(req) {
 export async function GET() {
   try {
     await connectDB();
-    const processes = await Process.find({}).sort({ createdAt: -1 });
+    const processes = await Process.find({})
+      .select('name description code smv smvVersion previousSmv previousSmvVersion comments processStatus isAssessment subProcess condition workAid createdAt updatedAt')
+      .sort({ createdAt: -1 });
+    
     return NextResponse.json(processes, { status: 200 });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -75,55 +113,69 @@ export async function PUT(req) {
       }
     }
 
-    // Special handling for SMV updates
-    if (updateData.smv && updateData.smv !== existingProcess.smv) {
-      // Use the static method for SMV updates
-      const smvComment = updateData.smvChangeComment || `SMV updated from ${existingProcess.smv} to ${updateData.smv}`;
-      
-      // Remove SMV-related fields from updateData as they're handled separately
-      const { smv, smvChangeComment, ...otherUpdates } = updateData;
-      
-      // First update SMV with version tracking
-      const processWithUpdatedSMV = await Process.findByIdAndUpdate(
-        _id,
-        {
-          $set: {
-            smv: updateData.smv,
-            previousSmv: existingProcess.smv,
-            previousSmvVersion: existingProcess.smvVersion,
-            smvVersion: existingProcess.smvVersion + 1
-          },
-          $push: {
-            smvHistory: {
-              smv: existingProcess.smv,
-              smvVersion: existingProcess.smvVersion,
-              updatedAt: new Date(),
-              comment: smvComment
-            }
-          }
-        },
-        { new: true, runValidators: true }
-      );
+    // If code is being updated, check for duplicate
+    if (updateData.code && updateData.code !== existingProcess.code) {
+      const codeDuplicate = await Process.findOne({
+        code: updateData.code,
+        _id: { $ne: _id }
+      });
 
-      // Apply other updates if any
-      if (Object.keys(otherUpdates).length > 0) {
-        await Process.findByIdAndUpdate(_id, otherUpdates);
+      if (codeDuplicate) {
+        return NextResponse.json(
+          { error: "Process code already exists" },
+          { status: 400 }
+        );
       }
-
-      // Fetch the fully updated process
-      const fullyUpdatedProcess = await Process.findById(_id);
-      return NextResponse.json(fullyUpdatedProcess, { status: 200 });
     }
 
-    // Regular update for non-SMV changes
+    // Prepare update object with all fields
+    const updateObject = {
+      name: updateData.name,
+      description: updateData.description,
+      code: updateData.code,
+      comments: updateData.comments,
+      processStatus: updateData.processStatus,
+      isAssessment: Boolean(updateData.isAssessment),
+      subProcess: updateData.subProcess,
+      condition: updateData.condition,
+      workAid: updateData.workAid,
+      updatedAt: new Date()
+    };
+
+    // Special handling for SMV updates
+    if (updateData.smv && parseFloat(updateData.smv) !== existingProcess.smv) {
+      const newSMV = parseFloat(updateData.smv);
+      const smvComment = updateData.smvChangeComment || `SMV updated from ${existingProcess.smv} to ${newSMV}`;
+
+      // Add SMV history and version tracking
+      updateObject.smv = newSMV;
+      updateObject.previousSmv = existingProcess.smv;
+      updateObject.previousSmvVersion = existingProcess.smvVersion;
+      updateObject.smvVersion = existingProcess.smvVersion + 1;
+      
+      // Add to SMV history
+      updateObject.$push = {
+        smvHistory: {
+          smv: existingProcess.smv,
+          smvVersion: existingProcess.smvVersion,
+          updatedAt: new Date(),
+          comment: smvComment
+        }
+      };
+    } else {
+      updateObject.smv = parseFloat(updateData.smv) || existingProcess.smv;
+    }
+
+    // Update the process
     const updatedProcess = await Process.findByIdAndUpdate(
       _id,
-      updateData,
+      updateObject,
       { new: true, runValidators: true }
     );
 
     return NextResponse.json(updatedProcess, { status: 200 });
   } catch (error) {
+    console.error('Error updating process:', error);
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 }
@@ -141,7 +193,8 @@ export async function PATCH(req) {
       );
     }
 
-    const process = await Process.findById(_id).select('smvHistory previousSmv previousSmvVersion smv smvVersion');
+    const process = await Process.findById(_id)
+      .select('smvHistory previousSmv previousSmvVersion smv smvVersion name code');
     
     if (!process) {
       return NextResponse.json(
@@ -155,7 +208,9 @@ export async function PATCH(req) {
       currentSmvVersion: process.smvVersion,
       previousSmv: process.previousSmv,
       previousSmvVersion: process.previousSmvVersion,
-      smvHistory: process.smvHistory
+      smvHistory: process.smvHistory,
+      name: process.name,
+      code: process.code
     }, { status: 200 });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
