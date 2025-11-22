@@ -8,7 +8,7 @@ export async function POST(req) {
     await connectDB();
     const body = await req.json();
 
-    // Extract all fields including new ones
+    // Extract all fields including machineType
     const {
       name,
       description,
@@ -19,20 +19,9 @@ export async function POST(req) {
       isAssessment,
       subProcess,
       condition,
-      workAid
+      workAid,
+      machineType
     } = body;
-
-    // case-insensitive check for name
-    const exists = await Process.findOne({
-      name: { $regex: `^${name}$`, $options: "i" }
-    });
-
-    if (exists) {
-      return NextResponse.json(
-        { error: "Process already exists (case-insensitive)" },
-        { status: 400 }
-      );
-    }
 
     // Check for duplicate code
     const codeExists = await Process.findOne({ code });
@@ -53,7 +42,8 @@ export async function POST(req) {
       isAssessment: Boolean(isAssessment),
       subProcess,
       condition,
-      workAid
+      workAid,
+      machineType
     });
     
     return NextResponse.json(process, { status: 201 });
@@ -67,7 +57,7 @@ export async function GET() {
   try {
     await connectDB();
     const processes = await Process.find({})
-      .select('name description code smv smvVersion previousSmv previousSmvVersion comments processStatus isAssessment subProcess condition workAid createdAt updatedAt')
+      .select('name description code smv smvVersion previousSmv previousSmvVersion comments processStatus isAssessment subProcess condition workAid machineType createdAt updatedAt')
       .sort({ createdAt: -1 });
     
     return NextResponse.json(processes, { status: 200 });
@@ -139,6 +129,7 @@ export async function PUT(req) {
       subProcess: updateData.subProcess,
       condition: updateData.condition,
       workAid: updateData.workAid,
+      machineType: updateData.machineType,
       updatedAt: new Date()
     };
 
@@ -194,7 +185,7 @@ export async function PATCH(req) {
     }
 
     const process = await Process.findById(_id)
-      .select('smvHistory previousSmv previousSmvVersion smv smvVersion name code');
+      .select('smvHistory previousSmv previousSmvVersion smv smvVersion name code machineType');
     
     if (!process) {
       return NextResponse.json(
@@ -210,7 +201,8 @@ export async function PATCH(req) {
       previousSmvVersion: process.previousSmvVersion,
       smvHistory: process.smvHistory,
       name: process.name,
-      code: process.code
+      code: process.code,
+      machineType: process.machineType
     }, { status: 200 });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });

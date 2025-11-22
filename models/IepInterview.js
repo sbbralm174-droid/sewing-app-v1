@@ -1,6 +1,4 @@
 // models/IepInterview.js
-
-
 import mongoose from "mongoose";
 import Counter from "./Counter.js";
 
@@ -8,7 +6,7 @@ const VivaInterviewSchema = new mongoose.Schema(
   {
     candidateId: {
       type: String,
-      unique: true, // এইটা অবশ্যই থাকবে
+      unique: true,
     },
     name: {
       type: String,
@@ -49,12 +47,17 @@ const VivaInterviewSchema = new mongoose.Schema(
     },
     vivaDetails: [
       {
-        question: { type: String, },
-        answer: { type: String,  },
+        question: { type: String },
+        answer: { type: String },
         remark: { type: String },
       },
     ],
     processAndScore: {
+      type: Map,
+      of: Number,
+      default: {},
+    },
+    processCapacity: {
       type: Map,
       of: Number,
       default: {},
@@ -66,18 +69,36 @@ const VivaInterviewSchema = new mongoose.Schema(
     },
     result: {
       type: String,
-      enum: ["PENDING", "PASSED", "FAILED",],
+      enum: ["PENDING", "PASSED", "FAILED"],
       default: "PASSED",
     },
     remarks: { type: String },
     promotedToAdmin: { type: Boolean, default: false },
     canceledReason: { type: String },
+    assessmentData: { type: mongoose.Schema.Types.Mixed }, // Store full assessment data
+    supplementaryMachines: { type: Map, of: Boolean, default: {} } // Store supplementary machines
   },
   { timestamps: true }
 );
 
 // ✅ Auto-generate candidateId before save
-
+VivaInterviewSchema.pre('save', async function(next) {
+  if (!this.candidateId) {
+    try {
+      const counter = await Counter.findByIdAndUpdate(
+        { _id: 'candidateId' },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true }
+      );
+      this.candidateId = `CAN${counter.seq.toString().padStart(5, '0')}`;
+      next();
+    } catch (error) {
+      next(error);
+    }
+  } else {
+    next();
+  }
+});
 
 export default mongoose.models.VivaInterview ||
   mongoose.model("VivaInterview", VivaInterviewSchema);

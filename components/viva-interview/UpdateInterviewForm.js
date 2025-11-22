@@ -1,4 +1,4 @@
-// components/viva-interview/InterviewForm.js - UPDATED
+// components/viva-interview/InterviewForm.js
 'use client'
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -52,6 +52,84 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
 
     fetchProcesses();
   }, []);
+
+  // Existing assessment data লোড করার ফাংশন
+  const loadExistingAssessment = async () => {
+    if (!candidateInfo?.candidateId) return;
+    
+    try {
+      const response = await fetch(`/api/iep-interview/update-iep-interview-ass-calculator/candidate?candidateId=${candidateInfo.candidateId}`);
+      const result = await response.json();
+
+      if (response.ok && result.data?.assessmentData) {
+        console.log('📥 Existing assessment data loaded:', result.data);
+        
+        // Assessment data সেট করুন
+        setAssessmentData(result.data.assessmentData);
+        
+        // Process scores সেট করুন
+        const processScores = {
+          machineScore: result.data.assessmentData.scores?.machineScore || 0,
+          dopScore: result.data.assessmentData.scores?.dopScore || 0,
+          practicalScore: result.data.assessmentData.scores?.practicalScore || 0,
+          qualityScore: result.data.assessmentData.scores?.averageQualityScore || 0,
+          educationScore: result.data.assessmentData.scores?.educationScore || 0,
+          attitudeScore: result.data.assessmentData.scores?.attitudeScore || 0,
+          totalScore: result.data.assessmentData.scores?.totalScore || 0
+        };
+        
+        setFormData(prev => ({
+          ...prev,
+          processAndScore: processScores,
+          grade: result.data.grade || 'C',
+          supplementaryMachines: result.data.supplementaryMachines || {}
+        }));
+        
+        setSuccessMessage('✅ Existing assessment data loaded successfully');
+      }
+    } catch (error) {
+      console.error('❌ Error loading assessment data:', error);
+    }
+  };
+
+  // Candidate info change হলে automatically assessment data লোড করুন
+  useEffect(() => {
+    if (candidateInfo?.candidateId) {
+      loadExistingAssessment();
+    }
+  }, [candidateInfo?.candidateId]);
+
+  // Assessment data আপডেট করার ফাংশন
+  const updateAssessmentData = async (assessmentResult) => {
+    try {
+      const response = await fetch('/api/iep-interview/update-iep-interview-ass-calculator', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          candidateId: candidateInfo.candidateId,
+          assessmentData: assessmentResult,
+          processCapacity: assessmentResult.processCapacity,
+          supplementaryMachines: assessmentResult.supplementaryMachines,
+          grade: assessmentResult.finalAssessment.grade
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        console.log('✅ Assessment data updated successfully');
+        return true;
+      } else {
+        console.error('❌ Failed to update assessment:', result.error);
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Error updating assessment:', error);
+      return false;
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -129,39 +207,42 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
     }
   };
 
-  // Handle assessment data from MainAssessment component - UPDATED
-  const handleAssessmentData = (data) => {
-    console.log('Received assessment data with candidate info:', data);
+  // Handle assessment data from MainAssessment component
+  const handleAssessmentData = async (data) => {
+    console.log('Received assessment data:', data);
     setAssessmentData(data);
     setShowAssessment(false);
     
-    // Map assessment data to process scores
-    if (data && data.scores) {
-      const processScores = {
-        machineScore: data.scores.machineScore || 0,
-        dopScore: data.scores.dopScore || 0,
-        practicalScore: data.scores.practicalScore || 0,
-        qualityScore: data.scores.averageQualityScore || 0,
-        educationScore: data.scores.educationScore || 0,
-        attitudeScore: data.scores.attitudeScore || 0,
-        totalScore: data.scores.totalScore || 0
-      };
-      
-      // Update grade from assessment
-      const grade = data.finalAssessment?.grade || 'C';
-      
-      setFormData(prev => ({
-        ...prev,
-        processAndScore: processScores,
-        grade: grade,
-        // Assessment থেকে প্রাপ্ত supplementary machines যোগ করুন
-        supplementaryMachines: data.supplementaryMachines || {}
-      }));
-    }
-
-    // Candidate information আপডেট করুন
-    if (data.candidateInfo) {
-      console.log('Candidate info in assessment:', data.candidateInfo);
+    // Assessment data ডাটাবেসে সেভ করুন
+    const updateSuccess = await updateAssessmentData(data);
+    
+    if (updateSuccess) {
+      // Map assessment data to process scores
+      if (data && data.scores) {
+        const processScores = {
+          machineScore: data.scores.machineScore || 0,
+          dopScore: data.scores.dopScore || 0,
+          practicalScore: data.scores.practicalScore || 0,
+          qualityScore: data.scores.averageQualityScore || 0,
+          educationScore: data.scores.educationScore || 0,
+          attitudeScore: data.scores.attitudeScore || 0,
+          totalScore: data.scores.totalScore || 0
+        };
+        
+        // Update grade from assessment
+        const grade = data.finalAssessment?.grade || 'C';
+        
+        setFormData(prev => ({
+          ...prev,
+          processAndScore: processScores,
+          grade: grade,
+          supplementaryMachines: data.supplementaryMachines || {}
+        }));
+        
+        setSuccessMessage('✅ Assessment data updated successfully');
+      }
+    } else {
+      setErrorMessage('❌ Assessment data save failed');
     }
   };
 
@@ -249,13 +330,6 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
       return null;
     }
 
-    /////////////////////update assessment calculation/////////////////////
-    
-
-
-
-
-
     return (
       <div className="bg-white shadow-md rounded-lg p-6 mb-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Process Scores from Assessment</h2>
@@ -300,7 +374,8 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
       {showAssessment ? (
         <MainAssessment 
           onAssessmentComplete={handleAssessmentData} 
-          candidateInfo={candidateInfo} // 🔥 candidateInfo পাস করুন
+          candidateInfo={candidateInfo}
+          existingAssessmentData={assessmentData}
         />
       ) : (
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -353,11 +428,11 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
           {/* Process Score Section */}
           {renderProcessScores()}
 
-          {/* Assessment Integration Button */}
+          {/* Assessment Integration Section */}
           <div className="bg-white shadow-md rounded-lg p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Operator Assessment</h2>
             <div className="flex items-center justify-between">
-              <div>
+              <div className="flex-1">
                 <p className="text-gray-600 mb-2">
                   {assessmentData 
                     ? `Assessment completed - Grade: ${formData.grade}, Total Score: ${formData.processAndScore.totalScore || 0}`
@@ -365,21 +440,58 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
                   }
                 </p>
                 {assessmentData && (
-                  <p className="text-sm text-green-600">
-                    Machine: {formData.processAndScore.machineScore || 0} | 
-                    DOP: {formData.processAndScore.dopScore || 0} | 
-                    Practical: {formData.processAndScore.practicalScore || 0}
-                  </p>
+                  <div className="text-sm text-green-600 grid grid-cols-2 md:grid-cols-3 gap-2">
+                    <span>Machine: {formData.processAndScore.machineScore || 0}</span>
+                    <span>DOP: {formData.processAndScore.dopScore || 0}</span>
+                    <span>Practical: {formData.processAndScore.practicalScore || 0}</span>
+                    <span>Quality: {formData.processAndScore.qualityScore || 0}</span>
+                    <span>Education: {formData.processAndScore.educationScore || 0}</span>
+                    <span>Attitude: {formData.processAndScore.attitudeScore || 0}</span>
+                  </div>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={() => setShowAssessment(true)}
-                className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-md shadow-sm font-medium transition-colors"
-              >
-                {assessmentData ? 'Update Assessment' : 'Calculate Assessment'}
-              </button>
+              <div className="flex space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAssessment(true)}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md shadow-sm font-medium transition-colors"
+                >
+                  {assessmentData ? 'Update Assessment' : 'Calculate Assessment'}
+                </button>
+                {assessmentData && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAssessmentData(null);
+                      setFormData(prev => ({
+                        ...prev,
+                        processAndScore: {},
+                        grade: 'C',
+                        supplementaryMachines: {}
+                      }));
+                    }}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md shadow-sm font-medium transition-colors"
+                    title="Clear assessment data"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
             </div>
+            
+            {/* Assessment Status */}
+            {assessmentData && (
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-blue-700">
+                    Last updated: {new Date().toLocaleString()}
+                  </span>
+                  <span className="text-sm font-medium text-blue-800">
+                    Status: {assessmentData ? 'Saved to Database' : 'Not Saved'}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Result Section */}

@@ -1919,9 +1919,11 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
 
 
 
+ager calculation gulor pore kono operator jodi grade kom pay tahole nicher condition gulo check korbe.
 
+jodi process "Neck join", 0.35 smv ebong 150 er upore capacity thake tahole Grade thakbe A+, capacity 120 - 149  thakle  grade A, capacity 100 - 119 hole B+
 
-
+abar process "Bottom Hem", 0.35 smv ebong 220 er upore capacity thake tahole Grade thakbe A+, capacity 200 - 219  thakle  grade A, capacity 180 - 199 hole B+.
 
 
 

@@ -1,34 +1,30 @@
-// components/operator-assessment/Mainassessment.js 
+// components/operator-assessment/Mainassessment.js
 'use client'
 import { useState, useEffect } from 'react'
 
-export default function MainAssessment({ onAssessmentComplete, candidateInfo }) {
+export default function MainAssessment({ onAssessmentComplete, candidateInfo, existingAssessmentData }) {
   const [currentView, setCurrentView] = useState('data-entry')
   const [assessmentData, setAssessmentData] = useState(null)
   const [operatorName, setOperatorName] = useState('')
-  const [processesList, setProcessesList] = useState([]) // API থেকে প্রসেস লিস্ট
+  const [processesList, setProcessesList] = useState([])
+  const [isEditing, setIsEditing] = useState(false)
 
-  // candidateInfo থেকে ডেটা লোড করুন
+  // Existing assessment data থাকলে লোড করুন
   useEffect(() => {
-    if (candidateInfo) {
-      // candidateInfo থেকে operator name সেট করুন
-      setOperatorName(candidateInfo.name || '');
+    if (existingAssessmentData) {
+      console.log('📥 Loading existing assessment data:', existingAssessmentData);
       
-      // localStorage থেকে existing ডেটা লোড করুন (যদি থাকে)
-      const savedData = localStorage.getItem('assessmentData');
-      if (savedData) {
-        try {
-          const data = JSON.parse(savedData);
-          setAssessmentData(data);
-        } catch (error) {
-          console.error('Error parsing saved data:', error);
-          initializeNewData();
-        }
-      } else {
-        initializeNewData();
+      // Raw data থেকে assessment data সেট করুন
+      if (existingAssessmentData.rawData) {
+        setAssessmentData(existingAssessmentData.rawData);
+        setOperatorName(existingAssessmentData.rawData.operatorName || '');
+        setIsEditing(true);
+        setCurrentView('results');
       }
+    } else if (candidateInfo) {
+      initializeNewData();
     }
-  }, [candidateInfo]);
+  }, [existingAssessmentData, candidateInfo]);
 
   // নতুন ডেটা ইনিশিয়ালাইজ করার ফাংশন
   const initializeNewData = () => {
@@ -77,7 +73,7 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
 
   // localStorage থেকে ডেটা লোড করা (candidateInfo না থাকলে)
   useEffect(() => {
-    if (!candidateInfo) {
+    if (!candidateInfo && !existingAssessmentData) {
       const savedData = localStorage.getItem('assessmentData')
       if (savedData) {
         try {
@@ -89,18 +85,16 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
         }
       }
     }
-  }, [candidateInfo])
+  }, [candidateInfo, existingAssessmentData])
 
-  // ডেটা সেভ করার ফাংশন - localStorage এ সেভ করবে
+  // ডেটা সেভ করার ফাংশন
   const handleSaveData = (data) => {
     const completeData = {
       ...data,
       operatorName: operatorName || data.operatorName,
-      // candidate info যোগ করুন
       candidateId: candidateInfo?.candidateId || data.candidateId,
       nid: candidateInfo?.nid || data.nid,
       birthCertificate: candidateInfo?.birthCertificate || data.birthCertificate,
-      // timestamp যোগ করুন
       lastSaved: new Date().toISOString()
     }
     
@@ -109,11 +103,16 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
     setAssessmentData(completeData)
     setCurrentView('results')
     
-    console.log('Data saved to localStorage:', completeData)
+    console.log('Data saved:', completeData)
   }
 
-  // ডেটা এন্ট্রিতে ফিরে যাওয়ার ফাংশন - ডেটা হারাবে না
+  // ডেটা এন্ট্রিতে ফিরে যাওয়ার ফাংশন
   const handleBackToDataEntry = () => {
+    setCurrentView('data-entry')
+  }
+
+  // ডেটা এডিট করার ফাংশন
+  const handleEditData = () => {
     setCurrentView('data-entry')
   }
 
@@ -122,17 +121,18 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
     localStorage.removeItem('assessmentData')
     setAssessmentData(null)
     setOperatorName('')
+    setIsEditing(false)
     if (candidateInfo) {
       initializeNewData()
     }
   }
 
-  // Assessment সম্পূর্ণ হলে parent component কে ডেটা পাঠানো - UPDATED
+  // Assessment সম্পূর্ণ হলে parent component কে ডেটা পাঠানো
   const handleUseAssessment = () => {
     if (assessmentData) {
       const calculatedResults = calculateResults(assessmentData)
       
-      // Process capacity calculation - সংশোধিত
+      // Process capacity calculation
       const calculateProcessCapacity = (processes) => {
         const capacityData = {}
         processes.forEach(process => {
@@ -155,9 +155,8 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
         })
       }
       
-      // Candidate information যোগ করুন - UPDATED
+      // Candidate information সহ assessment result তৈরি করুন
       const assessmentResult = {
-        // Candidate info from props
         candidateInfo: candidateInfo ? {
           name: candidateInfo.name,
           candidateId: candidateInfo.candidateId,
@@ -166,7 +165,6 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
           picture: candidateInfo.picture
         } : null,
         
-        // Assessment results
         operatorName: assessmentData.operatorName,
         scores: {
           machineScore: calculatedResults.scores.machineScore,
@@ -187,7 +185,7 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
         rawData: assessmentData
       }
 
-      console.log('Assessment Result with Candidate Info:', assessmentResult)
+      console.log('Assessment Result:', assessmentResult)
       
       if (onAssessmentComplete) {
         onAssessmentComplete(assessmentResult)
@@ -263,6 +261,7 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
             processesList={processesList}
             candidateInfo={candidateInfo}
             onClearData={handleClearData}
+            isEditing={isEditing}
           />
         ) : (
           <AssessmentResults 
@@ -270,6 +269,7 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
             assessmentData={assessmentData}
             onUseAssessment={onAssessmentComplete ? handleUseAssessment : null}
             candidateInfo={candidateInfo}
+            onEditData={handleEditData}
           />
         )}
       </div>
@@ -277,8 +277,8 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
   )
 }
 
-// Data Entry Component - Updated with better localStorage handling
-function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorName, processesList, candidateInfo, onClearData }) {
+// Data Entry Component
+function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorName, processesList, candidateInfo, onClearData, isEditing = false }) {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     operatorName: operatorName || '',
@@ -302,11 +302,10 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
 
   // Supplementary machines list
   const supplementaryMachineOptions = [
-     'Eyelet', 'FOA', 
-    'Kansai', 'BH', 'BS', 'BTK', 'F/Sleamer'
+    'Eyelet', 'FOA', 'Kansai', 'BH', 'BS', 'BTK', 'F/Sleamer'
   ]
 
-  // candidateInfo থেকে initial values সেট করুন - UPDATED
+  // candidateInfo থেকে initial values সেট করুন
   useEffect(() => {
     if (candidateInfo) {
       setOperatorName(candidateInfo.name || '');
@@ -344,7 +343,6 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
         setFormData(prev => ({ 
           ...initialFormData, 
           ...initialData,
-          // processes array properly merge করুন
           processes: initialData.processes && initialData.processes.length > 0 
             ? initialData.processes 
             : initialFormData.processes,
@@ -450,10 +448,35 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
 
   return (
     <form onSubmit={handleSubmit} className="bg-white shadow-md rounded-lg p-6">
-      
-      
+      {/* Header with Edit Mode Indicator */}
+      <div className="mb-6 pb-4 border-b border-gray-200">
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-bold text-gray-900">
+            Operator Skill Assessment
+            {isEditing && (
+              <span className="ml-3 px-3 py-1 bg-yellow-100 text-yellow-800 text-sm font-medium rounded-full">
+                Editing Existing Assessment
+              </span>
+            )}
+          </h2>
+          {isEditing && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+            >
+              Back to Results
+            </button>
+          )}
+        </div>
+        {isEditing && (
+          <p className="text-sm text-yellow-600 mt-2">
+            You are editing an existing assessment. Changes will be saved when you click "Update Results".
+          </p>
+        )}
+      </div>
 
-      {/* Candidate Information Display - NEW SECTION */}
+      {/* Candidate Information Display */}
       {candidateInfo && (
         <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
           <h3 className="text-lg font-semibold text-blue-900 mb-3">Candidate Information</h3>
@@ -699,20 +722,19 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
 
       {/* Submit Button */}
       <div className="flex justify-end items-center pt-6 border-t border-gray-200">
-        
         <div className="flex space-x-4">
           <button
             type="button"
             onClick={onCancel}
             className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
           >
-            Cancel
+            {isEditing ? 'Cancel' : 'Back'}
           </button>
           <button
             type="submit"
             className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
           >
-            Calculate Results
+            {isEditing ? 'Update Results' : 'Calculate Results'}
           </button>
         </div>
       </div>
@@ -720,8 +742,8 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
   )
 }
 
-// Assessment Results Component - Updated with candidate info
-function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment, candidateInfo }) {
+// Assessment Results Component
+function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment, candidateInfo, onEditData }) {
   const [calculatedResults, setCalculatedResults] = useState(null)
 
   useEffect(() => {
@@ -744,7 +766,7 @@ function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment,
 
   return (
     <div>
-      {/* Candidate Info Card - NEW SECTION */}
+      {/* Candidate Info Card */}
       {candidateInfo && (
         <div className="bg-blue-50 shadow-md rounded-lg p-6 mb-6 border border-blue-200">
           <h2 className="text-lg font-semibold text-blue-900 mb-4">Candidate Information</h2>
@@ -909,13 +931,23 @@ function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment,
       </div>
 
       {/* Action Buttons */}
-      <div className="flex justify-end space-x-4 mt-6">
-        <button
-          onClick={onBackToDataEntry}
-          className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
-        >
-          Back to Data Entry
-        </button>
+      <div className="flex justify-between space-x-4 mt-6">
+        <div className="flex space-x-4">
+          <button
+            onClick={onBackToDataEntry}
+            className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            Back to Data Entry
+          </button>
+          
+          {/* Edit Button */}
+          <button
+            onClick={onEditData}
+            className="px-6 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors"
+          >
+            Edit Assessment Data
+          </button>
+        </div>
         
         {onUseAssessment && (
           <button
@@ -930,7 +962,7 @@ function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment,
   )
 }
 
-// UPDATED Helper function for calculations with MULTISKILL logic
+// Helper function for calculations with MULTISKILL logic
 function calculateResults(data) {
   const processesWithCalculations = data.processes.map(process => {
     const avgCycleTime = process.cycleTimes.reduce((a, b) => a + b, 0) / process.cycleTimes.length
@@ -955,24 +987,23 @@ function calculateResults(data) {
     }
   })
 
-  // UPDATED: Machine Score Calculation with MULTISKILL logic
+  // Machine Score Calculation with MULTISKILL logic
   const calculateMachineScore = (processes) => {
     const specialMachines = ["SNLS/DNLS", "Over Lock", "Flat Lock"];
     const semiSpecialMachines = ["F/Sleamer", "Kansai", "FOA"];
 
     const machinesUsed = [...new Set(processes.map(p => p.machineType))];
 
-    // -------- MULTISKILL CHECK --------
-    // যদি Over Lock, SNLS/DNLS, Flat Lock এই তিনটি মেশিনের সবগুলোতে পারদর্শী হয়
+    // MULTISKILL CHECK
     const hasAllThreeSpecial = specialMachines.every(machine => 
       machinesUsed.includes(machine)
     );
 
     if (hasAllThreeSpecial) {
-      return 100; // Multiskill - সর্বোচ্চ স্কোর
+      return 100;
     }
 
-    // -------- Special Machine Score --------
+    // Special Machine Score
     const specialCount = machinesUsed.filter(m => specialMachines.includes(m)).length;
 
     let specialScore = 0;
@@ -982,13 +1013,13 @@ function calculateResults(data) {
 
     let totalScore = specialScore;
 
-    // -------- Semi-Special Score --------
+    // Semi-Special Score
     if (totalScore < 100) {
       const semiCount = machinesUsed.filter(m => semiSpecialMachines.includes(m)).length;
       totalScore += semiCount * 20;
     }
 
-    // -------- Other Machines Score --------
+    // Other Machines Score
     if (totalScore < 100) {
       const otherMachines = machinesUsed.filter(
         m => !specialMachines.includes(m) && !semiSpecialMachines.includes(m)
@@ -997,14 +1028,13 @@ function calculateResults(data) {
       totalScore += otherMachines.length * 10;
     }
 
-    // -------- Cap at 100 --------
     return Math.min(totalScore, 100);
   };
 
   const machineScore = calculateMachineScore(data.processes);
   const finalMachineScore = machineScore * 0.3;
 
-  // DOP Score Calculation (process status)
+  // DOP Score Calculation
   const dopScores = processesWithCalculations.map(process => {
     const dopPoints = {
       'Basic': 30,
@@ -1065,16 +1095,16 @@ function calculateResults(data) {
   const attitudeScoreCalculate = attitudeScoreMap[data.attitude] || 0
   const attitudeScore = attitudeScoreCalculate * 0.05
 
-  // Total Score Calculation (now out of 100)
+  // Total Score Calculation
   const totalScore = finalMachineScore + dopScore + practicalScore + averageQualityScore + educationScore + attitudeScore
 
-  // UPDATED: Special process grade adjustment logic with MULTISKILL
+  // Special process grade adjustment logic with MULTISKILL
   const applySpecialProcessRules = (processes, calculatedGrade, calculatedLevel, calculatedDesignation) => {
     let finalGrade = calculatedGrade;
     let finalLevel = calculatedLevel;
     let finalDesignation = calculatedDesignation;
 
-    // MULTISKILL LEVEL CHECK - যদি তিনটি বিশেষ মেশিনে পারদর্শী হয়
+    // MULTISKILL LEVEL CHECK
     const specialMachines = ["SNLS/DNLS", "Over Lock", "Flat Lock"];
     const machinesUsed = [...new Set(processes.map(p => p.machineType))];
     const hasAllThreeSpecial = specialMachines.every(machine => 
@@ -1083,7 +1113,6 @@ function calculateResults(data) {
 
     if (hasAllThreeSpecial) {
       finalLevel = 'Multiskill';
-      // Multiskill হলে গ্রেড A++ বা A+ হলে designation Jr.Operator হবে
       if (calculatedGrade === 'A++' || calculatedGrade === 'A+') {
         finalDesignation = 'Jr.Operator';
       }
@@ -1153,7 +1182,7 @@ function calculateResults(data) {
       grade = 'Unskill'; level = 'Unskill'; designation = 'Asst.Operator';
     }
 
-    // Apply special process rules if operator got lower grade
+    // Apply special process rules
     const adjustedAssessment = applySpecialProcessRules(
       processesWithCalculations, 
       grade, 

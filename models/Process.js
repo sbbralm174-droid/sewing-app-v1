@@ -48,7 +48,6 @@ const ProcessSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
-  // নতুন fields যোগ করা হয়েছে
   subProcess: {
     type: String,
   },
@@ -59,6 +58,22 @@ const ProcessSchema = new mongoose.Schema({
   workAid: {
     type: String,
     default: '',
+  },
+  machineType: {
+    type: String,
+    enum: [
+      'Over Lock',
+      'Flat Lock', 
+      'SNLS/DNLS',
+      'Kansai',
+      'F/Sleamer',
+      'FOA',
+      'BH',
+      'BS',
+      'Eyelet',
+      'BTK'
+    ],
+    default: 'Over Lock'
   },
   createdAt: {
     type: Date,
