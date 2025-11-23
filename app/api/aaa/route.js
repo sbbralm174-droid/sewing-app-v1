@@ -1,4 +1,4 @@
-// app/api/servicing/hello
+// app/api/aaa/route.js
 
 import { connectDB } from "@/lib/db";
 import Notification from "@/models/Notification";
@@ -6,9 +6,6 @@ import ServiceHistory from "@/models/MachineServicingHistory";
 import Machine from "@/models/Machine";
 import { NextResponse } from "next/server";
 import { getIoInstance } from "@/lib/socket"; // 🟢 Socket helper import
-
-
-
 
 // Utility function to calculate the next service date based on interval
 const calculateNextServiceDate = (intervalDays) => {
@@ -139,15 +136,4 @@ export async function POST(req) {
       { status: 500 }
     );
   }
-}
-
-
-
-
-
-export async function GET() {
-  return NextResponse.json({
-    message: 'API is working',
-    timestamp: new Date().toISOString()
-  });
 }
