@@ -931,9 +931,13 @@ function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment,
 }
 
 // UPDATED Helper function for calculations with MULTISKILL logic
+// UPDATED Helper function for calculations with MULTISKILL logic and DEBUGGING
 function calculateResults(data) {
   const processesWithCalculations = data.processes.map(process => {
-    const avgCycleTime = process.cycleTimes.reduce((a, b) => a + b, 0) / process.cycleTimes.length
+    const validCycleTimes = process.cycleTimes.filter(time => time > 0);
+    const avgCycleTime = validCycleTimes.length > 0 
+      ? validCycleTimes.reduce((a, b) => a + b, 0) / validCycleTimes.length 
+      : 0;
     const target = 60 / process.smv
     const capacity = 3600 / avgCycleTime
     const performance = (capacity / target) * 100
@@ -1068,64 +1072,207 @@ function calculateResults(data) {
   // Total Score Calculation (now out of 100)
   const totalScore = finalMachineScore + dopScore + practicalScore + averageQualityScore + educationScore + attitudeScore
 
-  // UPDATED: Special process grade adjustment logic with MULTISKILL
+  // UPDATED: Special process grade adjustment logic with MULTISKILL and DEBUGGING
   const applySpecialProcessRules = (processes, calculatedGrade, calculatedLevel, calculatedDesignation) => {
+    console.log("🔍 === SPECIAL PROCESS RULES DEBUG START ===");
+    console.log("Initial Assessment:");
+    console.log("- Grade:", calculatedGrade);
+    console.log("- Level:", calculatedLevel);
+    console.log("- Designation:", calculatedDesignation);
+    console.log("- Total Score:", totalScore);
+
     let finalGrade = calculatedGrade;
     let finalLevel = calculatedLevel;
     let finalDesignation = calculatedDesignation;
 
-    // MULTISKILL LEVEL CHECK - যদি তিনটি বিশেষ মেশিনে পারদর্শী হয়
-    const specialMachines = ["SNLS/DNLS", "Over Lock", "Flat Lock"];
-    const machinesUsed = [...new Set(processes.map(p => p.machineType))];
-    const hasAllThreeSpecial = specialMachines.every(machine => 
-      machinesUsed.includes(machine)
-    );
+    // A++ এবং Multiskill লেভেলের জন্য প্রয়োজনীয় বিশেষ প্রসেসগুলির সংজ্ঞা
+    const fourProcess = [
+        { name: "Pocket join (Kangaro)", minCapacity: 90, machine: "SNLS/DNLS" },
+        { name: "Placket box", minCapacity: 120, machine: "SNLS/DNLS" },
+        { name: "Zipper join(2nd)", minCapacity: 80, machine: "SNLS/DNLS" },
+        { name: "Back neck piping & cut", minCapacity: 120, machine: "SNLS/DNLS" }
+    ];
 
-    if (hasAllThreeSpecial) {
-      finalLevel = 'Multiskill';
-      // Multiskill হলে গ্রেড A++ বা A+ হলে designation Jr.Operator হবে
-      if (calculatedGrade === 'A++' || calculatedGrade === 'A+') {
+    // ডিবাগিং: সমস্ত প্রসেস দেখানো
+    console.log("📊 All Processes:");
+    processes.forEach((p, index) => {
+      console.log(`  ${index + 1}. ${p.processName} | Machine: ${p.machineType} | Capacity: ${Math.round(p.capacity)} | SMV: ${p.smv}`);
+    });
+
+    // চেক করুন যে সমস্ত fourProcess সম্পন্ন হয়েছে কিনা (প্রসেসের নাম এবং ক্ষমতা)
+    const hasFourProcess = fourProcess.every(req => {
+      const foundProcess = processes.find(p => {
+        const processNameMatch = p.processName.toLowerCase().includes(req.name.toLowerCase().split(' ')[0]);
+        const capacityMatch = Math.round(p.capacity) >= req.minCapacity;
+        const machineMatch = p.machineType === "SNLS" || p.machineType === "DNLS" || p.machineType === "SNLS/DNLS";
+        
+        const isMatch = processNameMatch && capacityMatch && machineMatch;
+        
+        if (isMatch) {
+          console.log(`✅ Found matching process: ${p.processName} (Required: ${req.name}) - Capacity: ${Math.round(p.capacity)} >= ${req.minCapacity}`);
+        } else {
+          console.log(`❌ Missing/Not matching: ${req.name} | Looking for: ${req.name} in ${p.processName} | Capacity: ${Math.round(p.capacity)} vs ${req.minCapacity} | Machine: ${p.machineType}`);
+        }
+        
+        return isMatch;
+      });
+      
+      return !!foundProcess;
+    });
+
+    // নির্দিষ্ট মেশিন এবং প্রসেসগুলি পরীক্ষা করার জন্য সহায়ক ফাংশন  ekhane
+    const hasMachineProcess = (machine, processName, minCapacity = 0) => {
+    const found = processes.some(p => {
+        const machineMatch = p.machineType === machine || 
+                           (machine === "SNLS/DNLS" && (p.machineType === "SNLS" || p.machineType === "DNLS"));
+        const processMatch = p.processName.toLowerCase().includes(processName.toLowerCase());
+        const capacityMatch = Math.round(p.capacity) >= minCapacity;
+        const isMatch = machineMatch && processMatch && capacityMatch;
+        
+        if (isMatch) {
+          console.log(`✅ Found ${machine} + ${processName}: ${p.processName} | Capacity: ${Math.round(p.capacity)} >= ${minCapacity}`);
+        } else if (machineMatch && processMatch) {
+          console.log(`❌ ${machine} + ${processName} found but capacity ${Math.round(p.capacity)} < ${minCapacity}`);
+        }
+        
+        return isMatch;
+    });
+    
+    if (!found) {
+      console.log(`❌ Missing ${machine} + ${processName} with capacity >= ${minCapacity}`);
+    }
+    
+    return found;
+};
+
+// এখন capacity requirement সহ check করুন
+const hasNeckJoinOverLock = hasMachineProcess("Over Lock", "Neck join", 150);  // Neck join capacity 150 er upore
+const hasBodyHemFlatLock = hasMachineProcess("Flat Lock", "Body hem", 220);    // Body hem capacity 220 er upore
+
+    console.log("📋 Condition Checks:");
+    console.log("- Has Four Process:", hasFourProcess);
+    console.log("- Has Neck Join OverLock:", hasNeckJoinOverLock);
+    console.log("- Has Body Hem FlatLock:", hasBodyHemFlatLock);
+
+    // --- নতুন A++ এবং Multiskill নিয়ম ---
+
+    // 1. (fourProcess) capacity= above 90/120/80/120, "Over Lock" process "Neck join", "Flat Lock" process "Body hem"
+    if (hasFourProcess && hasNeckJoinOverLock && hasBodyHemFlatLock) {
+        console.log("🎯 Condition 1 MET: All four process + Neck Join + Body Hem");
+        finalLevel = 'Multiskill';
+        finalGrade = 'A++';
         finalDesignation = 'Jr.Operator';
-      }
+    } 
+    // 2. machine = "Over Lock" ebong process "Neck join", machine = "Flat Lock" eobng process "Body hem"
+    else if (hasNeckJoinOverLock && hasBodyHemFlatLock) {
+        console.log("🎯 Condition 2 MET: Neck Join + Body Hem");
+        finalGrade = 'A++';
+        finalLevel = 'Excellent';
+        finalDesignation = 'Jr.Operator';
+    } 
+    // 3. machine = SNLS/DNLS ebong process uporer charta (fourProcess), machine "Flat Lock" eobng process "Body hem"
+    else if (hasFourProcess && hasBodyHemFlatLock) {
+        console.log("🎯 Condition 3 MET: Four Process + Body Hem");
+        finalGrade = 'A++';
+        finalLevel = 'Excellent';
+        finalDesignation = 'Jr.Operator';
+    } 
+    // 4. machine = SNLS/DNLS ebong process uporer charta (fourProcess), machine "Over Lock" eobng process "Neck join"
+    else if (hasFourProcess && hasNeckJoinOverLock) {
+        console.log("🎯 Condition 4 MET: Four Process + Neck Join");
+        finalGrade = 'A++';
+        finalLevel = 'Excellent';
+        finalDesignation = 'Jr.Operator';
+    }else if (hasFourProcess) {
+        console.log("🎯 Condition 5 MET: Four Process");
+        finalGrade = 'A+';
+        finalLevel = 'Very Good';
+        finalDesignation = 'Jr.Operator';
+    }
+    else {
+      console.log("❌ No A++ conditions met");
     }
 
+    // --- পুরানো নিয়ম (Multiskill Level Check) ---
+    // শুধুমাত্র গ্রেড এবং লেভেল নতুন নিয়মে সেট না হলেই এই অংশটি বিবেচিত হবে。
+    
+    // যদি উপরের নতুন A++ শর্তে finalLevel 'Multiskill' সেট না হয়ে থাকে
+    if (finalLevel !== 'Multiskill') {
+        const specialMachines = ["SNLS/DNLS", "Over Lock", "Flat Lock"];
+        const machinesUsed = [...new Set(processes.map(p => p.machineType))];
+        const hasAllThreeSpecial = specialMachines.every(machine => 
+            machinesUsed.includes(machine)
+        );
+    
+        console.log("🔧 Multiskill Machine Check:");
+        console.log("- Machines Used:", machinesUsed);
+        console.log("- Has All Three Special:", hasAllThreeSpecial);
+    
+        // MULTISKILL LEVEL CHECK - যদি তিনটি বিশেষ মেশিনে পারদর্শী হয়
+        // if (hasAllThreeSpecial) {
+        //     console.log("🎯 Multiskill Condition MET: All three special machines");
+        //     finalLevel = 'Multiskill';
+        //     // Multiskill হলে গ্রেড A++ বা A+ হলে designation Jr.Operator হবে
+        //     if (finalGrade === 'A++' || finalGrade === 'A+') {
+        //         finalDesignation = 'Jr.Operator';
+        //     }
+        // }
+    }
+
+    // --- পুরানো Capacity-ভিত্তিক নিয়ম ---
+    
+    console.log("🔧 Capacity-based rules checking:");
     processes.forEach(process => {
-      const capacity = Math.round(process.capacity);
-      
-      // Neck join process rules
-      if (process.processName === "Neck join" && process.smv === 0.35) {
-        if (capacity >= 150 && calculatedGrade !== 'A++') {
-          finalGrade = 'A+';
-          if (finalLevel !== 'Multiskill') finalLevel = 'Very Good';
-          finalDesignation = 'Jr.Operator';
-        } else if (capacity >= 120 && capacity <= 149 && !['A++', 'A+'].includes(calculatedGrade)) {
-          finalGrade = 'A';
-          if (finalLevel !== 'Multiskill') finalLevel = 'Good';
-          finalDesignation = 'Jr.Operator';
-        } else if (capacity >= 100 && capacity <= 119 && !['A++', 'A+', 'A'].includes(calculatedGrade)) {
-          finalGrade = 'B+';
-          if (finalLevel !== 'Multiskill') finalLevel = 'Medium';
-          finalDesignation = 'Jr.Operator';
+        const capacity = Math.round(process.capacity);
+
+        // Neck join process rules
+        if (process.processName === "Neck join" && process.smv === 0.35 && finalGrade !== 'A++') {
+            console.log(`📊 Neck Join Check: Capacity ${capacity}, SMV ${process.smv}, Current Grade ${finalGrade}`);
+            if (capacity >= 150 && finalGrade !== 'A+') {
+                console.log("🎯 Neck Join Condition 1: Capacity >= 150");
+                finalGrade = 'A+';
+                if (finalLevel !== 'Multiskill') finalLevel = 'Very Good';
+                finalDesignation = 'Jr.Operator';
+            } else if (capacity >= 120 && capacity <= 149 && !['A++', 'A+'].includes(finalGrade)) {
+                console.log("🎯 Neck Join Condition 2: Capacity 120-149");
+                finalGrade = 'A';
+                if (finalLevel !== 'Multiskill') finalLevel = 'Good';
+                finalDesignation = 'Jr.Operator';
+            } else if (capacity >= 100 && capacity <= 119 && !['A++', 'A+', 'A'].includes(finalGrade)) {
+                console.log("🎯 Neck Join Condition 3: Capacity 100-119");
+                finalGrade = 'B+';
+                if (finalLevel !== 'Multiskill') finalLevel = 'Medium';
+                finalDesignation = 'Jr.Operator';
+            }
         }
-      }
-      
-      // Bottom Hem process rules
-      else if (process.processName === "Bottom Hem" && process.smv === 0.35) {
-        if (capacity >= 220 && calculatedGrade !== 'A++') {
-          finalGrade = 'A+';
-          if (finalLevel !== 'Multiskill') finalLevel = 'Very Good';
-          finalDesignation = 'Jr.Operator';
-        } else if (capacity >= 200 && capacity <= 219 && !['A++', 'A+'].includes(calculatedGrade)) {
-          finalGrade = 'A';
-          if (finalLevel !== 'Multiskill') finalLevel = 'Good';
-          finalDesignation = 'Jr.Operator';
-        } else if (capacity >= 180 && capacity <= 199 && !['A++', 'A+', 'A'].includes(calculatedGrade)) {
-          finalGrade = 'B+';
-          if (finalLevel !== 'Multiskill') finalLevel = 'Medium';
-          finalDesignation = 'Jr.Operator';
+        
+        // Bottom Hem process rules
+        else if (process.processName === "Bottom Hem" && process.smv === 0.35 && finalGrade !== 'A++') {
+            console.log(`📊 Bottom Hem Check: Capacity ${capacity}, SMV ${process.smv}, Current Grade ${finalGrade}`);
+            if (capacity >= 220 && finalGrade !== 'A+') {
+                console.log("🎯 Bottom Hem Condition 1: Capacity >= 220");
+                finalGrade = 'A+';
+                if (finalLevel !== 'Multiskill') finalLevel = 'Very Good';
+                finalDesignation = 'Jr.Operator';
+            } else if (capacity >= 200 && capacity <= 219 && !['A++', 'A+'].includes(finalGrade)) {
+                console.log("🎯 Bottom Hem Condition 2: Capacity 200-219");
+                finalGrade = 'A';
+                if (finalLevel !== 'Multiskill') finalLevel = 'Good';
+                finalDesignation = 'Jr.Operator';
+            } else if (capacity >= 180 && capacity <= 199 && !['A++', 'A+', 'A'].includes(finalGrade)) {
+                console.log("🎯 Bottom Hem Condition 3: Capacity 180-199");
+                finalGrade = 'B+';
+                if (finalLevel !== 'Multiskill') finalLevel = 'Medium';
+                finalDesignation = 'Jr.Operator';
+            }
         }
-      }
     });
+
+    console.log("📈 Final Assessment:");
+    console.log("- Grade:", finalGrade);
+    console.log("- Level:", finalLevel);
+    console.log("- Designation:", finalDesignation);
+    console.log("🔍 === SPECIAL PROCESS RULES DEBUG END ===");
 
     return { finalGrade, finalLevel, finalDesignation };
   };
@@ -1140,12 +1287,12 @@ function calculateResults(data) {
   } else {
     // Initial assessment based on total score
     if (totalScore >= 90) {
-      grade = 'A++'; level = 'Multiskill'; designation = 'Jr.Operator';
+      grade = 'A++'; level = 'Excellent'; designation = 'Jr.Operator';
     } else if (totalScore >= 80) {
-      grade = 'A+'; level = 'Very Good'; designation = 'Jr.Operator';
+      grade = 'A+'; level = 'Better'; designation = 'Jr.Operator';
     } else if (totalScore >= 70) {
       grade = 'A'; level = 'Good'; designation = 'Jr.Operator';
-    } else if (totalScore >= 60) {
+    } else if (totalScore >= 55) {
       grade = 'B+'; level = 'Medium'; designation = 'Jr.Operator';
     } else if (totalScore >= 50) {
       grade = 'B'; level = 'Average'; designation = 'Gen.Operator';

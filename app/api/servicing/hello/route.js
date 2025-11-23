@@ -1,4 +1,4 @@
-// app/api/servicing/complete-part/route.js
+// app/api/servicing/hello
 
 import { connectDB } from "@/lib/db";
 import Notification from "@/models/Notification";
