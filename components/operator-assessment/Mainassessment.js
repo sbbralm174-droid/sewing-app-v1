@@ -861,12 +861,12 @@ function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment,
           <div className="text-center p-4 bg-green-50 rounded-lg">
             <div className="text-2xl font-bold text-green-600">{calculatedResults.scores.dopScore.toFixed(1)}</div>
             <div className="text-sm text-gray-600">DOP Score</div>
-            <div className="text-xs text-gray-500">/30</div>
+            <div className="text-xs text-gray-500">/20</div>
           </div>
           <div className="text-center p-4 bg-yellow-50 rounded-lg">
             <div className="text-2xl font-bold text-yellow-600">{calculatedResults.scores.practicalScore.toFixed(1)}</div>
             <div className="text-sm text-gray-600">Practical Score</div>
-            <div className="text-xs text-gray-500">/20</div>
+            <div className="text-xs text-gray-500">/30</div>
           </div>
           <div className="text-center p-4 bg-red-50 rounded-lg">
             <div className="text-2xl font-bold text-red-600">{calculatedResults.scores.averageQualityScore.toFixed(1)}</div>
@@ -1020,7 +1020,7 @@ function calculateResults(data) {
 
   const dopScoreCalculate = dopScores.length > 0 ? 
     Math.min(dopScores.reduce((sum, score) => sum + score, 0) / dopScores.length) : 0
-  const dopScore = dopScoreCalculate * 0.3
+  const dopScore = dopScoreCalculate * 0.2
 
   // Practical Score Calculation
   const totalPractical = processesWithCalculations.reduce(
@@ -1029,7 +1029,7 @@ function calculateResults(data) {
   )
   const practicalCount = processesWithCalculations.length
   const practicalScore = practicalCount > 0 ? 
-    (totalPractical / practicalCount) * 0.2 : 0
+    (totalPractical / practicalCount) * 0.3 : 0
 
   // Quality Score Calculation
   const qualityScoreData = processesWithCalculations.reduce((acc, process) => {
@@ -1090,7 +1090,7 @@ function calculateResults(data) {
         { name: "Pocket join (Kangaro)", minCapacity: 90, machine: "SNLS/DNLS" },
         { name: "Placket box", minCapacity: 120, machine: "SNLS/DNLS" },
         { name: "Zipper join(2nd)", minCapacity: 80, machine: "SNLS/DNLS" },
-        { name: "Back neck piping & cut", minCapacity: 120, machine: "SNLS/DNLS" }
+        { name: "Back neck tape top stitch insert label", minCapacity: 120, machine: "SNLS/DNLS" }
     ];
 
     // ডিবাগিং: সমস্ত প্রসেস দেখানো
@@ -1193,31 +1193,7 @@ const hasBodyHemFlatLock = hasMachineProcess("Flat Lock", "Body hem", 220);    /
       console.log("❌ No A++ conditions met");
     }
 
-    // --- পুরানো নিয়ম (Multiskill Level Check) ---
-    // শুধুমাত্র গ্রেড এবং লেভেল নতুন নিয়মে সেট না হলেই এই অংশটি বিবেচিত হবে。
     
-    // যদি উপরের নতুন A++ শর্তে finalLevel 'Multiskill' সেট না হয়ে থাকে
-    if (finalLevel !== 'Multiskill') {
-        const specialMachines = ["SNLS/DNLS", "Over Lock", "Flat Lock"];
-        const machinesUsed = [...new Set(processes.map(p => p.machineType))];
-        const hasAllThreeSpecial = specialMachines.every(machine => 
-            machinesUsed.includes(machine)
-        );
-    
-        console.log("🔧 Multiskill Machine Check:");
-        console.log("- Machines Used:", machinesUsed);
-        console.log("- Has All Three Special:", hasAllThreeSpecial);
-    
-        // MULTISKILL LEVEL CHECK - যদি তিনটি বিশেষ মেশিনে পারদর্শী হয়
-        // if (hasAllThreeSpecial) {
-        //     console.log("🎯 Multiskill Condition MET: All three special machines");
-        //     finalLevel = 'Multiskill';
-        //     // Multiskill হলে গ্রেড A++ বা A+ হলে designation Jr.Operator হবে
-        //     if (finalGrade === 'A++' || finalGrade === 'A+') {
-        //         finalDesignation = 'Jr.Operator';
-        //     }
-        // }
-    }
 
     // --- পুরানো Capacity-ভিত্তিক নিয়ম ---
     
@@ -1247,7 +1223,7 @@ const hasBodyHemFlatLock = hasMachineProcess("Flat Lock", "Body hem", 220);    /
         }
         
         // Bottom Hem process rules
-        else if (process.processName === "Bottom Hem" && process.smv === 0.35 && finalGrade !== 'A++') {
+        else if (process.processName === "Body hem" && process.smv === 0.23 && finalGrade !== 'A++') {
             console.log(`📊 Bottom Hem Check: Capacity ${capacity}, SMV ${process.smv}, Current Grade ${finalGrade}`);
             if (capacity >= 220 && finalGrade !== 'A+') {
                 console.log("🎯 Bottom Hem Condition 1: Capacity >= 220");
@@ -1290,9 +1266,9 @@ const hasBodyHemFlatLock = hasMachineProcess("Flat Lock", "Body hem", 220);    /
       grade = 'A++'; level = 'Excellent'; designation = 'Jr.Operator';
     } else if (totalScore >= 80) {
       grade = 'A+'; level = 'Better'; designation = 'Jr.Operator';
-    } else if (totalScore >= 70) {
+    } else if (totalScore >= 75) {
       grade = 'A'; level = 'Good'; designation = 'Jr.Operator';
-    } else if (totalScore >= 55) {
+    } else if (totalScore >= 60) {
       grade = 'B+'; level = 'Medium'; designation = 'Jr.Operator';
     } else if (totalScore >= 50) {
       grade = 'B'; level = 'Average'; designation = 'Gen.Operator';
