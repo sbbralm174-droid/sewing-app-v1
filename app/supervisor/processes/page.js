@@ -151,6 +151,7 @@ export default function ProcessForm() {
       setLoading(false);
     }
   };
+  console.log('Filtered Processes:', processes);
 
   const handleColumnSearchChange = (column, value) => {
     setColumnSearch(prev => ({
@@ -952,7 +953,7 @@ export default function ProcessForm() {
                         className="w-full p-1 text-xs border border-gray-500 rounded bg-gray-700 text-white placeholder-gray-400 mt-1"
                       />
                     </th>
-                    <th className="border border-gray-600 px-4 py-2 text-left">
+                    {/* <th className="border border-gray-600 px-4 py-2 text-left">
                       <div>Condition</div>
                       <input
                         type="text"
@@ -961,8 +962,8 @@ export default function ProcessForm() {
                         onChange={(e) => handleColumnSearchChange('condition', e.target.value)}
                         className="w-full p-1 text-xs border border-gray-500 rounded bg-gray-700 text-white placeholder-gray-400 mt-1"
                       />
-                    </th>
-                    <th className="border border-gray-600 px-4 py-2 text-left">
+                    </th> */}
+                    {/* <th className="border border-gray-600 px-4 py-2 text-left">
                       <div>Work Aid</div>
                       <input
                         type="text"
@@ -971,7 +972,7 @@ export default function ProcessForm() {
                         onChange={(e) => handleColumnSearchChange('workAid', e.target.value)}
                         className="w-full p-1 text-xs border border-gray-500 rounded bg-gray-700 text-white placeholder-gray-400 mt-1"
                       />
-                    </th>
+                    </th> */}
                     <th className="border border-gray-600 px-4 py-2 text-left">
                       <div>SMV</div>
                       <input
@@ -995,6 +996,16 @@ export default function ProcessForm() {
                     </th>
                     
                     <th className="border border-gray-600 px-4 py-2 text-left">Last Updated</th>
+                    <th className="border border-gray-600 px-4 py-2 text-left">
+                      <div>assessment</div>
+                      <input
+                        type="text"
+                        placeholder="Search assessment..."
+                        value={columnSearch.isAssessment}
+                        onChange={(e) => handleColumnSearchChange('isAssessment', e.target.value)}
+                        className="w-full p-1 text-xs border border-gray-500 rounded bg-gray-700 text-white placeholder-gray-400 mt-1"
+                      />
+                    </th>
                     <th className="border border-gray-600 px-4 py-2 text-left">Actions</th>
                   </tr>
                 </thead>
@@ -1008,8 +1019,8 @@ export default function ProcessForm() {
                       <td className="border border-gray-600 px-4 py-2">
                         {getMachineBadge(process.machineType)}
                       </td>
-                      <td className="border border-gray-600 px-4 py-2">{process.condition || '-'}</td>
-                      <td className="border border-gray-600 px-4 py-2">{process.workAid || '-'}</td>
+                      {/* <td className="border border-gray-600 px-4 py-2">{process.condition || '-'}</td> */}
+                      {/* <td className="border border-gray-600 px-4 py-2">{process.workAid || '-'}</td> */}
                       <td className="border border-gray-600 px-4 py-2 text-right font-medium">
                         {process.smv}
                       </td>
@@ -1021,10 +1032,11 @@ export default function ProcessForm() {
                       <td className="border border-gray-600 px-4 py-2">
                         {getStatusBadge(process.processStatus)}
                       </td>
-                      
+                      {/* isAssessment */}
                       <td className="border border-gray-600 px-4 py-2 text-sm text-gray-400">
                         {new Date(process.updatedAt).toLocaleDateString()}
                       </td>
+                      <td className="border border-gray-600 px-4 py-2">{process.isAssessment.toString() || '-'}</td>
                       <td className="border border-gray-600 px-4 py-2">
                         <button
                           onClick={() => handleEdit(process)}

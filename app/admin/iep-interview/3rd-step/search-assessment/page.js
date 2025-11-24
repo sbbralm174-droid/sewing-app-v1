@@ -47,17 +47,35 @@ export default function CandidateSearch() {
 
   const handleSelectCandidate = (candidate) => {
     setSelectedCandidate(candidate)
+    
+    // Direct assessment এর জন্য localStorage এ candidate info সেভ করুন
+    if (candidate) {
+      localStorage.setItem('selectedCandidateForAssessment', JSON.stringify({
+        candidateId: candidate.candidateId,
+        name: candidate.name,
+        nid: candidate.nid,
+        birthCertificate: candidate.birthCertificate,
+        picture: candidate.picture
+      }))
+    }
   }
 
   const handleProceedToInterview = () => {
     if (selectedCandidate) {
-      // Interview form page এ navigate করুন selected candidate সহ
       router.push(`/admin/iep-interview/3rd-step/form?candidateId=${selectedCandidate.candidateId}`)
     }
   }
 
   const handleViewAllCandidates = () => {
     router.push('/admin/iep-interview')
+  }
+
+  const handleDirectAssessment = () => {
+    if (selectedCandidate) {
+      router.push('/operator-assessment')
+    } else {
+      alert('Please select a candidate first')
+    }
   }
 
   return (
@@ -195,6 +213,12 @@ export default function CandidateSearch() {
                       Change Selection
                     </button>
                     <button
+                      onClick={handleDirectAssessment}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+                    >
+                      Direct Assessment
+                    </button>
+                    <button
                       onClick={handleProceedToInterview}
                       className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
                     >
@@ -210,7 +234,7 @@ export default function CandidateSearch() {
         {/* Quick Actions */}
         <div className="bg-white shadow-md rounded-lg p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <button
               onClick={handleViewAllCandidates}
               className="p-4 border border-gray-200 rounded-lg text-left hover:bg-gray-50 transition-colors"
@@ -228,6 +252,16 @@ export default function CandidateSearch() {
               <h3 className="font-semibold text-gray-900">Start New Interview</h3>
               <p className="text-sm text-gray-600 mt-1">
                 Create a new interview without searching
+              </p>
+            </button>
+
+            <button
+              onClick={() => router.push('/admin/operator-assessment')}
+              className="p-4 border border-gray-200 rounded-lg text-left hover:bg-gray-50 transition-colors"
+            >
+              <h3 className="font-semibold text-gray-900">Direct Assessment</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Go directly to operator assessment
               </p>
             </button>
           </div>

@@ -6,38 +6,88 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
   const [currentView, setCurrentView] = useState('data-entry')
   const [assessmentData, setAssessmentData] = useState(null)
   const [operatorName, setOperatorName] = useState('')
-  const [processesList, setProcessesList] = useState([]) // API থেকে প্রসেস লিস্ট
+  const [processesList, setProcessesList] = useState([])
+  const [searchCandidateId, setSearchCandidateId] = useState('')
+  const [searchResults, setSearchResults] = useState(null)
+  const [isSearching, setIsSearching] = useState(false)
 
   // candidateInfo থেকে ডেটা লোড করুন
   useEffect(() => {
     if (candidateInfo) {
-      // candidateInfo থেকে operator name সেট করুন
       setOperatorName(candidateInfo.name || '');
-      
-      // localStorage থেকে existing ডেটা লোড করুন (যদি থাকে)
-      const savedData = localStorage.getItem('assessmentData');
-      if (savedData) {
-        try {
-          const data = JSON.parse(savedData);
-          setAssessmentData(data);
-        } catch (error) {
-          console.error('Error parsing saved data:', error);
-          initializeNewData();
-        }
-      } else {
-        initializeNewData();
-      }
+      initializeNewData();
     }
-  }, [candidateInfo]);
+  }, [candidateInfo])
+
+  // API থেকে প্রসেস ডেটা লোড করা
+  useEffect(() => {
+    fetchProcesses()
+  }, [])
+
+  const fetchProcesses = async () => {
+    try {
+      const response = await fetch('/api/processes')
+      const data = await response.json()
+      setProcessesList(data)
+    } catch (error) {
+      console.error('Error fetching processes:', error)
+    }
+  }
+
+  // Candidate ID দিয়ে সার্চ করার ফাংশন - UPDATED
+  const handleSearchCandidate = async () => {
+    if (!searchCandidateId.trim()) {
+      alert('Please enter a Candidate ID')
+      return
+    }
+
+    setIsSearching(true)
+    try {
+      const response = await fetch(`/api/iep-interview/update-iep-interview-ass-calculator/candidate?candidateId=${searchCandidateId}`)
+      
+      if (!response.ok) {
+        throw new Error('Candidate not found')
+      }
+      
+      const result = await response.json()
+      
+      if (result.success && result.data && result.data.length > 0) {
+        const candidateData = result.data[0]
+        setSearchResults(candidateData)
+        
+        // API থেকে পাওয়া assessmentData ব্যবহার করে ফর্ম অটো ফিল করুন
+        if (candidateData.assessmentData) {
+          setOperatorName(candidateData.assessmentData.operatorName || candidateData.name)
+          setAssessmentData(candidateData.assessmentData.rawData)
+        } else {
+          // যদি assessmentData না থাকে, শুধু candidate info দিয়ে initialize করুন
+          setOperatorName(candidateData.name || '')
+          initializeNewData(candidateData)
+        }
+        
+        console.log('Loaded assessment data from API:', candidateData.assessmentData?.rawData)
+      } else {
+        throw new Error('Candidate not found')
+      }
+      
+    } catch (error) {
+      console.error('Error searching candidate:', error)
+      alert('Candidate not found or error fetching data')
+      setSearchResults(null)
+    } finally {
+      setIsSearching(false)
+    }
+  }
 
   // নতুন ডেটা ইনিশিয়ালাইজ করার ফাংশন
-  const initializeNewData = () => {
-    if (candidateInfo) {
+  const initializeNewData = (candidateData = null) => {
+    const candidate = candidateData || candidateInfo
+    if (candidate) {
       const initialData = {
-        operatorName: candidateInfo.name || '',
-        candidateId: candidateInfo.candidateId || '',
-        nid: candidateInfo.nid || '',
-        birthCertificate: candidateInfo.birthCertificate || '',
+        operatorName: candidate.name || '',
+        candidateId: candidate.candidateId || '',
+        nid: candidate.nid || '',
+        birthCertificate: candidate.birthCertificate || '',
         date: new Date().toISOString().split('T')[0],
         fatherHusbandName: '',
         educationalStatus: 'Eight Above',
@@ -60,79 +110,56 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
     }
   }
 
-  // API থেকে প্রসেস ডেটা লোড করা
-  useEffect(() => {
-    fetchProcesses()
-  }, [])
-
-  const fetchProcesses = async () => {
-    try {
-      const response = await fetch('/api/processes')
-      const data = await response.json()
-      setProcessesList(data)
-    } catch (error) {
-      console.error('Error fetching processes:', error)
+  // সার্চ ক্লিয়ার করার ফাংশন
+  const handleClearSearch = () => {
+    setSearchCandidateId('')
+    setSearchResults(null)
+    if (candidateInfo) {
+      initializeNewData()
+    } else {
+      setAssessmentData(null)
+      setOperatorName('')
     }
   }
 
-  // localStorage থেকে ডেটা লোড করা (candidateInfo না থাকলে)
-  useEffect(() => {
-    if (!candidateInfo) {
-      const savedData = localStorage.getItem('assessmentData')
-      if (savedData) {
-        try {
-          const data = JSON.parse(savedData)
-          setAssessmentData(data)
-          setOperatorName(data.operatorName || '')
-        } catch (error) {
-          console.error('Error parsing saved data:', error);
-        }
-      }
-    }
-  }, [candidateInfo])
-
-  // ডেটা সেভ করার ফাংশন - localStorage এ সেভ করবে
+  // ডেটা সেভ করার ফাংশন
   const handleSaveData = (data) => {
     const completeData = {
       ...data,
       operatorName: operatorName || data.operatorName,
-      // candidate info যোগ করুন
-      candidateId: candidateInfo?.candidateId || data.candidateId,
-      nid: candidateInfo?.nid || data.nid,
-      birthCertificate: candidateInfo?.birthCertificate || data.birthCertificate,
-      // timestamp যোগ করুন
+      candidateId: searchResults?.candidateId || candidateInfo?.candidateId || data.candidateId,
+      nid: searchResults?.nid || candidateInfo?.nid || data.nid,
+      birthCertificate: searchResults?.birthCertificate || candidateInfo?.birthCertificate || data.birthCertificate,
       lastSaved: new Date().toISOString()
     }
     
-    // localStorage এ সেভ করুন
-    localStorage.setItem('assessmentData', JSON.stringify(completeData))
     setAssessmentData(completeData)
     setCurrentView('results')
     
-    console.log('Data saved to localStorage:', completeData)
+    console.log('Assessment data saved:', completeData)
   }
 
-  // ডেটা এন্ট্রিতে ফিরে যাওয়ার ফাংশন - ডেটা হারাবে না
+  // ডেটা এন্ট্রিতে ফিরে যাওয়ার ফাংশন
   const handleBackToDataEntry = () => {
     setCurrentView('data-entry')
   }
 
-  // localStorage থেকে ডেটা ক্লিয়ার করার ফাংশন
+  // ডেটা ক্লিয়ার করার ফাংশন
   const handleClearData = () => {
-    localStorage.removeItem('assessmentData')
     setAssessmentData(null)
     setOperatorName('')
+    setSearchResults(null)
+    setSearchCandidateId('')
     if (candidateInfo) {
       initializeNewData()
     }
   }
 
-  // Assessment সম্পূর্ণ হলে parent component কে ডেটা পাঠানো - UPDATED
+  // Assessment সম্পূর্ণ হলে parent component কে ডেটা পাঠানো
   const handleUseAssessment = () => {
     if (assessmentData) {
       const calculatedResults = calculateResults(assessmentData)
       
-      // Process capacity calculation - সংশোধিত
       const calculateProcessCapacity = (processes) => {
         const capacityData = {}
         processes.forEach(process => {
@@ -145,7 +172,6 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
 
       const processCapacity = calculateProcessCapacity(calculatedResults.processes)
       
-      // Supplementary machines যোগ করা
       const supplementaryMachinesData = {}
       if (assessmentData.supplementaryMachines) {
         assessmentData.supplementaryMachines.forEach(machine => {
@@ -155,18 +181,15 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
         })
       }
       
-      // Candidate information যোগ করুন - UPDATED
       const assessmentResult = {
-        // Candidate info from props
-        candidateInfo: candidateInfo ? {
-          name: candidateInfo.name,
-          candidateId: candidateInfo.candidateId,
-          nid: candidateInfo.nid,
-          birthCertificate: candidateInfo.birthCertificate,
-          picture: candidateInfo.picture
+        candidateInfo: searchResults || candidateInfo ? {
+          name: searchResults?.name || candidateInfo?.name,
+          candidateId: searchResults?.candidateId || candidateInfo?.candidateId,
+          nid: searchResults?.nid || candidateInfo?.nid,
+          birthCertificate: searchResults?.birthCertificate || candidateInfo?.birthCertificate,
+          picture: searchResults?.picture || candidateInfo?.picture
         } : null,
         
-        // Assessment results
         operatorName: assessmentData.operatorName,
         scores: {
           machineScore: calculatedResults.scores.machineScore,
@@ -187,7 +210,7 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
         rawData: assessmentData
       }
 
-      console.log('Assessment Result with Candidate Info:', assessmentResult)
+      console.log('Assessment Result:', assessmentResult)
       
       if (onAssessmentComplete) {
         onAssessmentComplete(assessmentResult)
@@ -241,7 +264,7 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
                 <button
                   onClick={handleClearData}
                   className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm"
-                  title="Clear all saved data"
+                  title="Clear all data"
                 >
                   Clear Data
                 </button>
@@ -261,15 +284,21 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
             operatorName={operatorName}
             setOperatorName={setOperatorName}
             processesList={processesList}
-            candidateInfo={candidateInfo}
+            candidateInfo={searchResults || candidateInfo}
             onClearData={handleClearData}
+            searchCandidateId={searchCandidateId}
+            setSearchCandidateId={setSearchCandidateId}
+            onSearchCandidate={handleSearchCandidate}
+            onClearSearch={handleClearSearch}
+            isSearching={isSearching}
+            searchResults={searchResults}
           />
         ) : (
           <AssessmentResults 
             onBackToDataEntry={handleBackToDataEntry}
             assessmentData={assessmentData}
             onUseAssessment={onAssessmentComplete ? handleUseAssessment : null}
-            candidateInfo={candidateInfo}
+            candidateInfo={searchResults || candidateInfo}
           />
         )}
       </div>
@@ -277,8 +306,23 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
   )
 }
 
-// Data Entry Component - Updated with better localStorage handling
-function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorName, processesList, candidateInfo, onClearData }) {
+// Data Entry Component - UPDATED with proper API data handling
+function DataEntry({ 
+  onSave, 
+  onCancel, 
+  initialData, 
+  operatorName, 
+  setOperatorName, 
+  processesList, 
+  candidateInfo, 
+  onClearData,
+  searchCandidateId,
+  setSearchCandidateId,
+  onSearchCandidate,
+  onClearSearch,
+  isSearching,
+  searchResults
+}) {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     operatorName: operatorName || '',
@@ -302,8 +346,7 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
 
   // Supplementary machines list
   const supplementaryMachineOptions = [
-     'Eyelet', 'FOA', 
-    'Kansai', 'BH', 'BS', 'BTK', 'F/Sleamer'
+    'Eyelet', 'FOA', 'Kansai', 'BH', 'BS', 'BTK', 'F/Sleamer'
   ]
 
   // candidateInfo থেকে initial values সেট করুন - UPDATED
@@ -338,13 +381,37 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
         }))
       };
 
-      // যদি আগের saved data থাকে, সেটা ব্যবহার করুন
-      if (initialData) {
-        console.log('Loading initial data from localStorage:', initialData);
+      // API থেকে পাওয়া assessmentData থাকলে সেটা ব্যবহার করুন
+      if (candidateInfo.assessmentData && candidateInfo.assessmentData.rawData) {
+        console.log('Loading assessment data from API:', candidateInfo.assessmentData.rawData)
+        const apiData = candidateInfo.assessmentData.rawData
+        
+        setFormData(prev => ({ 
+          ...initialFormData,
+          ...apiData,
+          // processes array properly merge করুন
+          processes: apiData.processes && apiData.processes.length > 0 
+            ? apiData.processes.map(process => ({
+                ...process,
+                cycleTimes: process.cycleTimes || [0, 0, 0, 0, 0]
+              }))
+            : initialFormData.processes,
+          supplementaryMachines: apiData.supplementaryMachines && apiData.supplementaryMachines.length > 0
+            ? apiData.supplementaryMachines
+            : initialFormData.supplementaryMachines
+        }));
+        
+        // Operator name সেট করুন
+        if (apiData.operatorName) {
+          setOperatorName(apiData.operatorName)
+        }
+      } 
+      // শুধু initialData থাকলে (manual entry এর জন্য)
+      else if (initialData) {
+        console.log('Loading initial data:', initialData);
         setFormData(prev => ({ 
           ...initialFormData, 
           ...initialData,
-          // processes array properly merge করুন
           processes: initialData.processes && initialData.processes.length > 0 
             ? initialData.processes 
             : initialFormData.processes,
@@ -365,7 +432,6 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
         }))
       }))
       
-      // candidateInfo না থাকলে localStorage থেকে ডেটা লোড করুন
       if (initialData) {
         console.log('Loading initial data without candidateInfo:', initialData);
         setFormData(prev => ({ ...prev, ...initialData }));
@@ -449,278 +515,341 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
   const assessmentProcesses = processesList.filter(process => process.isAssessment === true)
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white shadow-md rounded-lg p-6">
+    <div className="bg-white shadow-md rounded-lg p-6">
       
-      
+      {/* Candidate Search Section */}
+      <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+        <h3 className="text-lg font-semibold text-blue-900 mb-3">Search Candidate</h3>
+        <div className="flex flex-col md:flex-row gap-4 items-end">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Enter Candidate ID
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={searchCandidateId}
+                onChange={(e) => setSearchCandidateId(e.target.value)}
+                placeholder="e.g., GMST-00000073"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="button"
+                onClick={onSearchCandidate}
+                disabled={isSearching}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-blue-400"
+              >
+                {isSearching ? 'Searching...' : 'Search'}
+              </button>
+              {searchResults && (
+                <button
+                  type="button"
+                  onClick={onClearSearch}
+                  className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
 
-      {/* Candidate Information Display - NEW SECTION */}
-      {candidateInfo && (
-        <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <h3 className="text-lg font-semibold text-blue-900 mb-3">Candidate Information</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-            <div>
-              <p><strong>Name:</strong> {candidateInfo.name || 'N/A'}</p>
-              <p><strong>Candidate ID:</strong> {candidateInfo.candidateId || 'N/A'}</p>
+        {/* Search Results Display */}
+        {searchResults && (
+          <div className="mt-4 p-3 bg-green-50 rounded border border-green-200">
+            <h4 className="font-semibold text-green-800 mb-2">Candidate Found:</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+              <div>
+                <strong>Name:</strong> {searchResults.name}
+              </div>
+              <div>
+                <strong>Candidate ID:</strong> {searchResults.candidateId}
+              </div>
+              <div>
+                <strong>NID/BC:</strong> {searchResults.nid || searchResults.birthCertificate || 'N/A'}
+              </div>
             </div>
-            <div>
-              <p><strong>NID:</strong> {candidateInfo.nid || 'N/A'}</p>
-              <p><strong>Birth Certificate:</strong> {candidateInfo.birthCertificate || 'N/A'}</p>
-            </div>
-            {candidateInfo.picture && (
-              <div className="flex justify-center">
-                <img 
-                  src={candidateInfo.picture} 
-                  alt={candidateInfo.name || 'Candidate'}
-                  className="w-16 h-16 object-cover rounded-md"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                  }}
-                />
+            {searchResults.assessmentData && (
+              <div className="mt-2 text-xs text-green-600">
+                ✓ Previous assessment data loaded automatically
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Operator Information */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-          <input
-            type="date"
-            value={formData.date}
-            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Sewing Floor</label>
-          <input
-            type="text"
-            value={formData.sewingFloor}
-            onChange={(e) => setFormData({ ...formData, sewingFloor: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Operator Name *</label>
-          <input
-            type="text"
-            value={formData.operatorName}
-            onChange={handleOperatorNameChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            required
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Auto-filled from candidate information
-          </p>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Father's/Husband's Name</label>
-          <input
-            type="text"
-            value={formData.fatherHusbandName}
-            onChange={(e) => setFormData({ ...formData, fatherHusbandName: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Educational Status</label>
-          <select
-            value={formData.educationalStatus}
-            onChange={(e) => setFormData({ ...formData, educationalStatus: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="Eight Above">Eight Above</option>
-            <option value="Five Above">Five Above</option>
-            <option value="Below Five">Below Five</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Attitude</label>
-          <select
-            value={formData.attitude}
-            onChange={(e) => setFormData({ ...formData, attitude: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="Good">Excellent</option>
-            <option value="Normal">Good</option>
-            <option value="Bad">Normal</option>
-          </select>
-        </div>
+        )}
       </div>
 
-      {/* Process Table */}
-      <div className="mb-6">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Process Measurements</h3>
-          <button
-            type="button"
-            onClick={addProcess}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-          >
-            Add Process
-          </button>
+      <form onSubmit={handleSubmit}>
+        {/* Candidate Information Display */}
+        {candidateInfo && (
+          <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <h3 className="text-lg font-semibold text-blue-900 mb-3">Candidate Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <p><strong>Name:</strong> {candidateInfo.name || 'N/A'}</p>
+                <p><strong>Candidate ID:</strong> {candidateInfo.candidateId || 'N/A'}</p>
+              </div>
+              <div>
+                <p><strong>NID:</strong> {candidateInfo.nid || 'N/A'}</p>
+                <p><strong>Birth Certificate:</strong> {candidateInfo.birthCertificate || 'N/A'}</p>
+              </div>
+              {candidateInfo.picture && (
+                <div className="flex justify-center">
+                  <img 
+                    src={candidateInfo.picture} 
+                    alt={candidateInfo.name || 'Candidate'}
+                    className="w-16 h-16 object-cover rounded-md"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Operator Information */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+            <input
+              type="date"
+              value={formData.date}
+              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Sewing Floor</label>
+            <input
+              type="text"
+              value={formData.sewingFloor}
+              onChange={(e) => setFormData({ ...formData, sewingFloor: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Operator Name *</label>
+            <input
+              type="text"
+              value={formData.operatorName}
+              onChange={handleOperatorNameChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Auto-filled from candidate information
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Father's/Husband's Name</label>
+            <input
+              type="text"
+              value={formData.fatherHusbandName}
+              onChange={(e) => setFormData({ ...formData, fatherHusbandName: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Educational Status</label>
+            <select
+              value={formData.educationalStatus}
+              onChange={(e) => setFormData({ ...formData, educationalStatus: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="Eight Above">Eight Above</option>
+              <option value="Five Above">Five Above</option>
+              <option value="Below Five">Below Five</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Attitude</label>
+            <select
+              value={formData.attitude}
+              onChange={(e) => setFormData({ ...formData, attitude: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="Good">Excellent</option>
+              <option value="Normal">Good</option>
+              <option value="Bad">Normal</option>
+            </select>
+          </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full bg-white border border-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-2 border">SL</th>
-                <th className="px-4 py-2 border">Machine Types</th>
-                <th className="px-4 py-2 border">Process Name</th>
-                <th className="px-4 py-2 border">DOP</th>
-                <th className="px-4 py-2 border">SMV</th>
-                {[1, 2, 3, 4, 5].map(num => (
-                  <th key={num} className="px-4 py-2 border">{num}st Cycle Time</th>
-                ))}
-                <th className="px-4 py-2 border">Quality Status</th>
-                <th className="px-4 py-2 border">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {formData.processes.map((process, index) => (
-                <tr key={index} className="hover:bg-gray-50">
-                  <td className="px-4 py-2 border text-center">{index + 1}</td>
-                  <td className="px-4 py-2 border">
-                    <select
-                      value={process.machineType}
-                      onChange={(e) => updateProcess(index, 'machineType', e.target.value)}
-                      className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    >
-                      <option value="">Select</option>
-                      <option value="SNLS/DNLS">SNLS/DNLS</option>
-                      <option value="Flat Lock">Flat Lock</option>
-                      <option value="Over Lock">Over Lock</option>
-                      <option value="Eyelet">Eyelet</option>
-                      <option value="FOA">FOA</option>
-                      <option value="Kansai">Kansai</option>
-                      <option value="BH">BH</option>
-                      <option value="BS">BS</option>
-                      <option value="BTK">BTK</option>
-                      <option value="F/Sleamer">F/Sleamer</option>
-                    </select>
-                  </td>
-                  <td className="px-4 py-2 border">
-                    <select
-                      value={process.processName}
-                      onChange={(e) => handleProcessSelect(index, e.target.value)}
-                      className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    >
-                      <option value="">Select Process</option>
-                      {assessmentProcesses.map((processItem) => (
-                        <option key={processItem._id} value={processItem.name}>
-                          {processItem.name}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-4 py-2 border">
-                    <input
-                      type="text"
-                      value={process.dop}
-                      readOnly
-                      className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100"
-                    />
-                  </td>
-                  <td className="px-4 py-2 border">
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={process.smv}
-                      readOnly
-                      className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100"
-                    />
-                  </td>
-                  {process.cycleTimes.map((time, cycleIndex) => (
-                    <td key={cycleIndex} className="px-4 py-2 border">
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={time}
-                        onChange={(e) => updateProcess(index, `cycleTime-${cycleIndex}`, e.target.value)}
+        {/* Process Table */}
+        <div className="mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Process Measurements</h3>
+            <button
+              type="button"
+              onClick={addProcess}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Add Process
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white border border-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 border">SL</th>
+                  <th className="px-4 py-2 border">Machine Types</th>
+                  <th className="px-4 py-2 border">Process Name</th>
+                  <th className="px-4 py-2 border">DOP</th>
+                  <th className="px-4 py-2 border">SMV</th>
+                  {[1, 2, 3, 4, 5].map(num => (
+                    <th key={num} className="px-4 py-2 border">{num}st Cycle Time</th>
+                  ))}
+                  <th className="px-4 py-2 border">Quality Status</th>
+                  <th className="px-4 py-2 border">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {formData.processes.map((process, index) => (
+                  <tr key={index} className="hover:bg-gray-50">
+                    <td className="px-4 py-2 border text-center">{index + 1}</td>
+                    <td className="px-4 py-2 border">
+                      <select
+                        value={process.machineType}
+                        onChange={(e) => updateProcess(index, 'machineType', e.target.value)}
                         className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="">Select</option>
+                        <option value="SNLS/DNLS">SNLS/DNLS</option>
+                        <option value="Flat Lock">Flat Lock</option>
+                        <option value="Over Lock">Over Lock</option>
+                        <option value="Eyelet">Eyelet</option>
+                        <option value="FOA">FOA</option>
+                        <option value="Kansai">Kansai</option>
+                        <option value="BH">BH</option>
+                        <option value="BS">BS</option>
+                        <option value="BTK">BTK</option>
+                        <option value="F/Sleamer">F/Sleamer</option>
+                      </select>
+                    </td>
+                    <td className="px-4 py-2 border">
+                      <select
+                        value={process.processName}
+                        onChange={(e) => handleProcessSelect(index, e.target.value)}
+                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="">Select Process</option>
+                        {assessmentProcesses.map((processItem) => (
+                          <option key={processItem._id} value={processItem.name}>
+                            {processItem.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-4 py-2 border">
+                      <input
+                        type="text"
+                        value={process.dop}
+                        readOnly
+                        className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100"
                       />
                     </td>
-                  ))}
-                  <td className="px-4 py-2 border">
-                    <select
-                      value={process.qualityStatus}
-                      onChange={(e) => updateProcess(index, 'qualityStatus', e.target.value)}
-                      className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    >
-                      <option value="">Select</option>
-                      <option value="No Defect">No Defect</option>
-                      <option value="1 Operation Defect">1 Operation Defect</option>
-                      <option value="2 Operation Defect">2 Operation Defect</option>
-                      <option value="3 Operation Defect">3 Operation Defect</option>
-                      <option value="4 Operation Defect">4 Operation Defect</option>
-                      <option value="5 Operation Defect">5 Operation Defect</option>
-                    </select>
-                  </td>
-                  <td className="px-4 py-2 border text-center">
-                    <button
-                      type="button"
-                      onClick={() => removeProcess(index)}
-                      className="text-red-600 hover:text-red-800 text-sm font-medium"
-                    >
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    <td className="px-4 py-2 border">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={process.smv}
+                        readOnly
+                        className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100"
+                      />
+                    </td>
+                    {process.cycleTimes.map((time, cycleIndex) => (
+                      <td key={cycleIndex} className="px-4 py-2 border">
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={time}
+                          onChange={(e) => updateProcess(index, `cycleTime-${cycleIndex}`, e.target.value)}
+                          className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </td>
+                    ))}
+                    <td className="px-4 py-2 border">
+                      <select
+                        value={process.qualityStatus}
+                        onChange={(e) => updateProcess(index, 'qualityStatus', e.target.value)}
+                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="">Select</option>
+                        <option value="No Defect">No Defect</option>
+                        <option value="1 Operation Defect">1 Operation Defect</option>
+                        <option value="2 Operation Defect">2 Operation Defect</option>
+                        <option value="3 Operation Defect">3 Operation Defect</option>
+                        <option value="4 Operation Defect">4 Operation Defect</option>
+                        <option value="5 Operation Defect">5 Operation Defect</option>
+                      </select>
+                    </td>
+                    <td className="px-4 py-2 border text-center">
+                      <button
+                        type="button"
+                        onClick={() => removeProcess(index)}
+                        className="text-red-600 hover:text-red-800 text-sm font-medium"
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
 
-      {/* Supplementary Machines Section */}
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">If he/she has been able to do any other machine</h3>
-        
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-          {formData.supplementaryMachines.map((machine, index) => (
-            <div key={index} className="flex items-center space-x-2 p-2 border border-gray-200 rounded">
-              <input
-                type="checkbox"
-                id={`supplementary-${index}`}
-                checked={machine.checked}
-                onChange={(e) => handleSupplementaryMachineChange(index, e.target.checked)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label htmlFor={`supplementary-${index}`} className="text-sm text-gray-700">
-                {machine.name}
-              </label>
-            </div>
-          ))}
+        {/* Supplementary Machines Section */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">If he/she has been able to do any other machine</h3>
+          
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            {formData.supplementaryMachines.map((machine, index) => (
+              <div key={index} className="flex items-center space-x-2 p-2 border border-gray-200 rounded">
+                <input
+                  type="checkbox"
+                  id={`supplementary-${index}`}
+                  checked={machine.checked}
+                  onChange={(e) => handleSupplementaryMachineChange(index, e.target.checked)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor={`supplementary-${index}`} className="text-sm text-gray-700">
+                  {machine.name}
+                </label>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* Submit Button */}
-      <div className="flex justify-end items-center pt-6 border-t border-gray-200">
-        
-        <div className="flex space-x-4">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          >
-            Calculate Results
-          </button>
+        {/* Submit Button */}
+        <div className="flex justify-end items-center pt-6 border-t border-gray-200">
+          <div className="flex space-x-4">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Calculate Results
+            </button>
+          </div>
         </div>
-      </div>
-    </form>
+      </form>
+    </div>
   )
 }
 
-// Assessment Results Component - Updated with candidate info
+// Assessment Results Component (একই থাকে)
+
+
+// Assessment Results Component (একই থাকে)
 function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment, candidateInfo }) {
   const [calculatedResults, setCalculatedResults] = useState(null)
 
@@ -744,7 +873,7 @@ function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment,
 
   return (
     <div>
-      {/* Candidate Info Card - NEW SECTION */}
+      {/* Candidate Info Card */}
       {candidateInfo && (
         <div className="bg-blue-50 shadow-md rounded-lg p-6 mb-6 border border-blue-200">
           <h2 className="text-lg font-semibold text-blue-900 mb-4">Candidate Information</h2>
@@ -904,8 +1033,6 @@ function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment,
             <div className="text-sm text-gray-600">Proposed Designation</div>
           </div>
         </div>
-
-        
       </div>
 
       {/* Action Buttons */}
@@ -930,8 +1057,7 @@ function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment,
   )
 }
 
-// UPDATED Helper function for calculations with MULTISKILL logic
-// UPDATED Helper function for calculations with MULTISKILL logic and DEBUGGING
+// Helper function for calculations (একই থাকে)
 function calculateResults(data) {
   const processesWithCalculations = data.processes.map(process => {
     const validCycleTimes = process.cycleTimes.filter(time => time > 0);
@@ -959,40 +1085,39 @@ function calculateResults(data) {
     }
   })
 
-  // UPDATED: Machine Score Calculation with MULTISKILL logic
+  // Machine Score Calculation with MULTISKILL logic
   const calculateMachineScore = (processes) => {
     const specialMachines = ["SNLS/DNLS", "Over Lock", "Flat Lock"];
     const semiSpecialMachines = ["F/Sleamer", "Kansai", "FOA"];
 
     const machinesUsed = [...new Set(processes.map(p => p.machineType))];
 
-    // -------- MULTISKILL CHECK --------
-    // যদি Over Lock, SNLS/DNLS, Flat Lock এই তিনটি মেশিনের সবগুলোতে পারদর্শী হয়
+    // MULTISKILL CHECK
     const hasAllThreeSpecial = specialMachines.every(machine => 
       machinesUsed.includes(machine)
     );
 
     if (hasAllThreeSpecial) {
-      return 100; // Multiskill - সর্বোচ্চ স্কোর
+      return 100;
     }
 
-    // -------- Special Machine Score --------
+    // Special Machine Score
     const specialCount = machinesUsed.filter(m => specialMachines.includes(m)).length;
 
     let specialScore = 0;
-    if (specialCount === 1) specialScore = 40;
-    else if (specialCount === 2) specialScore = 70;
+    if (specialCount === 1) specialScore = 55;
+    else if (specialCount === 2) specialScore = 80;
     else if (specialCount === 3) specialScore = 100;
 
     let totalScore = specialScore;
 
-    // -------- Semi-Special Score --------
+    // Semi-Special Score
     if (totalScore < 100) {
       const semiCount = machinesUsed.filter(m => semiSpecialMachines.includes(m)).length;
       totalScore += semiCount * 20;
     }
 
-    // -------- Other Machines Score --------
+    // Other Machines Score
     if (totalScore < 100) {
       const otherMachines = machinesUsed.filter(
         m => !specialMachines.includes(m) && !semiSpecialMachines.includes(m)
@@ -1001,14 +1126,13 @@ function calculateResults(data) {
       totalScore += otherMachines.length * 10;
     }
 
-    // -------- Cap at 100 --------
     return Math.min(totalScore, 100);
   };
 
   const machineScore = calculateMachineScore(data.processes);
   const finalMachineScore = machineScore * 0.3;
 
-  // DOP Score Calculation (process status)
+  // DOP Score Calculation
   const dopScores = processesWithCalculations.map(process => {
     const dopPoints = {
       'Basic': 30,
@@ -1069,23 +1193,17 @@ function calculateResults(data) {
   const attitudeScoreCalculate = attitudeScoreMap[data.attitude] || 0
   const attitudeScore = attitudeScoreCalculate * 0.05
 
-  // Total Score Calculation (now out of 100)
+  // Total Score Calculation
   const totalScore = finalMachineScore + dopScore + practicalScore + averageQualityScore + educationScore + attitudeScore
 
-  // UPDATED: Special process grade adjustment logic with MULTISKILL and DEBUGGING
+  // Special process grade adjustment logic
   const applySpecialProcessRules = (processes, calculatedGrade, calculatedLevel, calculatedDesignation) => {
     console.log("🔍 === SPECIAL PROCESS RULES DEBUG START ===");
-    console.log("Initial Assessment:");
-    console.log("- Grade:", calculatedGrade);
-    console.log("- Level:", calculatedLevel);
-    console.log("- Designation:", calculatedDesignation);
-    console.log("- Total Score:", totalScore);
-
+    
     let finalGrade = calculatedGrade;
     let finalLevel = calculatedLevel;
     let finalDesignation = calculatedDesignation;
 
-    // A++ এবং Multiskill লেভেলের জন্য প্রয়োজনীয় বিশেষ প্রসেসগুলির সংজ্ঞা
     const fourProcess = [
         { name: "Pocket join (Kangaro)", minCapacity: 90, machine: "SNLS/DNLS" },
         { name: "Placket box", minCapacity: 120, machine: "SNLS/DNLS" },
@@ -1093,150 +1211,87 @@ function calculateResults(data) {
         { name: "Back neck tape top stitch insert label", minCapacity: 120, machine: "SNLS/DNLS" }
     ];
 
-    // ডিবাগিং: সমস্ত প্রসেস দেখানো
-    console.log("📊 All Processes:");
-    processes.forEach((p, index) => {
-      console.log(`  ${index + 1}. ${p.processName} | Machine: ${p.machineType} | Capacity: ${Math.round(p.capacity)} | SMV: ${p.smv}`);
-    });
-
-    // চেক করুন যে সমস্ত fourProcess সম্পন্ন হয়েছে কিনা (প্রসেসের নাম এবং ক্ষমতা)
     const hasFourProcess = fourProcess.every(req => {
       const foundProcess = processes.find(p => {
         const processNameMatch = p.processName.toLowerCase().includes(req.name.toLowerCase().split(' ')[0]);
         const capacityMatch = Math.round(p.capacity) >= req.minCapacity;
         const machineMatch = p.machineType === "SNLS" || p.machineType === "DNLS" || p.machineType === "SNLS/DNLS";
         
-        const isMatch = processNameMatch && capacityMatch && machineMatch;
-        
-        if (isMatch) {
-          console.log(`✅ Found matching process: ${p.processName} (Required: ${req.name}) - Capacity: ${Math.round(p.capacity)} >= ${req.minCapacity}`);
-        } else {
-          console.log(`❌ Missing/Not matching: ${req.name} | Looking for: ${req.name} in ${p.processName} | Capacity: ${Math.round(p.capacity)} vs ${req.minCapacity} | Machine: ${p.machineType}`);
-        }
-        
-        return isMatch;
+        return processNameMatch && capacityMatch && machineMatch;
       });
       
       return !!foundProcess;
     });
 
-    // নির্দিষ্ট মেশিন এবং প্রসেসগুলি পরীক্ষা করার জন্য সহায়ক ফাংশন  ekhane
     const hasMachineProcess = (machine, processName, minCapacity = 0) => {
-    const found = processes.some(p => {
+      return processes.some(p => {
         const machineMatch = p.machineType === machine || 
                            (machine === "SNLS/DNLS" && (p.machineType === "SNLS" || p.machineType === "DNLS"));
         const processMatch = p.processName.toLowerCase().includes(processName.toLowerCase());
         const capacityMatch = Math.round(p.capacity) >= minCapacity;
-        const isMatch = machineMatch && processMatch && capacityMatch;
-        
-        if (isMatch) {
-          console.log(`✅ Found ${machine} + ${processName}: ${p.processName} | Capacity: ${Math.round(p.capacity)} >= ${minCapacity}`);
-        } else if (machineMatch && processMatch) {
-          console.log(`❌ ${machine} + ${processName} found but capacity ${Math.round(p.capacity)} < ${minCapacity}`);
-        }
-        
-        return isMatch;
-    });
-    
-    if (!found) {
-      console.log(`❌ Missing ${machine} + ${processName} with capacity >= ${minCapacity}`);
-    }
-    
-    return found;
-};
+        return machineMatch && processMatch && capacityMatch;
+      });
+    };
 
-// এখন capacity requirement সহ check করুন
-const hasNeckJoinOverLock = hasMachineProcess("Over Lock", "Neck join", 150);  // Neck join capacity 150 er upore
-const hasBodyHemFlatLock = hasMachineProcess("Flat Lock", "Body hem", 220);    // Body hem capacity 220 er upore
+    const hasNeckJoinOverLock = hasMachineProcess("Over Lock", "Neck join", 150);
+    const hasBodyHemFlatLock = hasMachineProcess("Flat Lock", "Body hem", 220);
 
-    console.log("📋 Condition Checks:");
-    console.log("- Has Four Process:", hasFourProcess);
-    console.log("- Has Neck Join OverLock:", hasNeckJoinOverLock);
-    console.log("- Has Body Hem FlatLock:", hasBodyHemFlatLock);
-
-    // --- নতুন A++ এবং Multiskill নিয়ম ---
-
-    // 1. (fourProcess) capacity= above 90/120/80/120, "Over Lock" process "Neck join", "Flat Lock" process "Body hem"
+    // Special conditions for A++ and Multiskill
     if (hasFourProcess && hasNeckJoinOverLock && hasBodyHemFlatLock) {
-        console.log("🎯 Condition 1 MET: All four process + Neck Join + Body Hem");
         finalLevel = 'Multiskill';
         finalGrade = 'A++';
         finalDesignation = 'Jr.Operator';
     } 
-    // 2. machine = "Over Lock" ebong process "Neck join", machine = "Flat Lock" eobng process "Body hem"
     else if (hasNeckJoinOverLock && hasBodyHemFlatLock) {
-        console.log("🎯 Condition 2 MET: Neck Join + Body Hem");
         finalGrade = 'A++';
         finalLevel = 'Excellent';
         finalDesignation = 'Jr.Operator';
     } 
-    // 3. machine = SNLS/DNLS ebong process uporer charta (fourProcess), machine "Flat Lock" eobng process "Body hem"
     else if (hasFourProcess && hasBodyHemFlatLock) {
-        console.log("🎯 Condition 3 MET: Four Process + Body Hem");
         finalGrade = 'A++';
         finalLevel = 'Excellent';
         finalDesignation = 'Jr.Operator';
     } 
-    // 4. machine = SNLS/DNLS ebong process uporer charta (fourProcess), machine "Over Lock" eobng process "Neck join"
     else if (hasFourProcess && hasNeckJoinOverLock) {
-        console.log("🎯 Condition 4 MET: Four Process + Neck Join");
         finalGrade = 'A++';
         finalLevel = 'Excellent';
         finalDesignation = 'Jr.Operator';
-    }else if (hasFourProcess) {
-        console.log("🎯 Condition 5 MET: Four Process");
+    } else if (hasFourProcess) {
         finalGrade = 'A+';
         finalLevel = 'Very Good';
         finalDesignation = 'Jr.Operator';
     }
-    else {
-      console.log("❌ No A++ conditions met");
-    }
 
-    
-
-    // --- পুরানো Capacity-ভিত্তিক নিয়ম ---
-    
-    console.log("🔧 Capacity-based rules checking:");
+    // Capacity-based rules
     processes.forEach(process => {
         const capacity = Math.round(process.capacity);
 
-        // Neck join process rules
         if (process.processName === "Neck join" && process.smv === 0.35 && finalGrade !== 'A++') {
-            console.log(`📊 Neck Join Check: Capacity ${capacity}, SMV ${process.smv}, Current Grade ${finalGrade}`);
             if (capacity >= 150 && finalGrade !== 'A+') {
-                console.log("🎯 Neck Join Condition 1: Capacity >= 150");
                 finalGrade = 'A+';
                 if (finalLevel !== 'Multiskill') finalLevel = 'Very Good';
                 finalDesignation = 'Jr.Operator';
             } else if (capacity >= 120 && capacity <= 149 && !['A++', 'A+'].includes(finalGrade)) {
-                console.log("🎯 Neck Join Condition 2: Capacity 120-149");
                 finalGrade = 'A';
                 if (finalLevel !== 'Multiskill') finalLevel = 'Good';
                 finalDesignation = 'Jr.Operator';
             } else if (capacity >= 100 && capacity <= 119 && !['A++', 'A+', 'A'].includes(finalGrade)) {
-                console.log("🎯 Neck Join Condition 3: Capacity 100-119");
                 finalGrade = 'B+';
                 if (finalLevel !== 'Multiskill') finalLevel = 'Medium';
                 finalDesignation = 'Jr.Operator';
             }
         }
         
-        // Bottom Hem process rules
         else if (process.processName === "Body hem" && process.smv === 0.23 && finalGrade !== 'A++') {
-            console.log(`📊 Bottom Hem Check: Capacity ${capacity}, SMV ${process.smv}, Current Grade ${finalGrade}`);
             if (capacity >= 220 && finalGrade !== 'A+') {
-                console.log("🎯 Bottom Hem Condition 1: Capacity >= 220");
                 finalGrade = 'A+';
                 if (finalLevel !== 'Multiskill') finalLevel = 'Very Good';
                 finalDesignation = 'Jr.Operator';
             } else if (capacity >= 200 && capacity <= 219 && !['A++', 'A+'].includes(finalGrade)) {
-                console.log("🎯 Bottom Hem Condition 2: Capacity 200-219");
                 finalGrade = 'A';
                 if (finalLevel !== 'Multiskill') finalLevel = 'Good';
                 finalDesignation = 'Jr.Operator';
             } else if (capacity >= 180 && capacity <= 199 && !['A++', 'A+', 'A'].includes(finalGrade)) {
-                console.log("🎯 Bottom Hem Condition 3: Capacity 180-199");
                 finalGrade = 'B+';
                 if (finalLevel !== 'Multiskill') finalLevel = 'Medium';
                 finalDesignation = 'Jr.Operator';
@@ -1244,10 +1299,6 @@ const hasBodyHemFlatLock = hasMachineProcess("Flat Lock", "Body hem", 220);    /
         }
     });
 
-    console.log("📈 Final Assessment:");
-    console.log("- Grade:", finalGrade);
-    console.log("- Level:", finalLevel);
-    console.log("- Designation:", finalDesignation);
     console.log("🔍 === SPECIAL PROCESS RULES DEBUG END ===");
 
     return { finalGrade, finalLevel, finalDesignation };

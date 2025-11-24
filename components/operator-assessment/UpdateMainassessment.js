@@ -8,13 +8,33 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo, ex
   const [operatorName, setOperatorName] = useState('')
   const [processesList, setProcessesList] = useState([])
   const [isEditing, setIsEditing] = useState(false)
+  const [isLoadingPreviousData, setIsLoadingPreviousData] = useState(false)
 
-  // Existing assessment data থাকলে লোড করুন
+  // localStorage থেকে candidate info লোড করুন এবং পূর্বের ডেটা লোড করুন
   useEffect(() => {
+    // localStorage থেকে candidate info লোড করুন
+    const savedCandidateInfo = localStorage.getItem('selectedCandidateForAssessment')
+    
+    if (savedCandidateInfo && !candidateInfo) {
+      try {
+        const parsedCandidateInfo = JSON.parse(savedCandidateInfo)
+        console.log('📥 Candidate info loaded from localStorage:', parsedCandidateInfo)
+        
+        // candidateInfo prop না থাকলে localStorage থেকে ব্যবহার করুন
+        if (!candidateInfo) {
+          initializeWithCandidateInfo(parsedCandidateInfo)
+          // API call করে পূর্বের assessment data লোড করুন
+          loadPreviousAssessmentData(parsedCandidateInfo.candidateId)
+        }
+      } catch (error) {
+        console.error('Error parsing saved candidate info:', error)
+      }
+    }
+
+    // Existing assessment data থাকলে লোড করুন
     if (existingAssessmentData) {
       console.log('📥 Loading existing assessment data:', existingAssessmentData);
       
-      // Raw data থেকে assessment data সেট করুন
       if (existingAssessmentData.rawData) {
         setAssessmentData(existingAssessmentData.rawData);
         setOperatorName(existingAssessmentData.rawData.operatorName || '');
@@ -23,8 +43,55 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo, ex
       }
     } else if (candidateInfo) {
       initializeNewData();
+      // Candidate info থাকলে পূর্বের ডেটা লোড করুন
+      if (candidateInfo.candidateId) {
+        loadPreviousAssessmentData(candidateInfo.candidateId)
+      }
     }
-  }, [existingAssessmentData, candidateInfo]);
+  }, [existingAssessmentData, candidateInfo])
+
+  // API থেকে প্রসেস ডেটা লোড করা
+  useEffect(() => {
+    fetchProcesses()
+  }, [])
+
+  const fetchProcesses = async () => {
+    try {
+      const response = await fetch('/api/processes')
+      const data = await response.json()
+      setProcessesList(data)
+    } catch (error) {
+      console.error('Error fetching processes:', error)
+    }
+  }
+
+  // Candidate info দিয়ে ডেটা ইনিশিয়ালাইজ করার ফাংশন
+  const initializeWithCandidateInfo = (candidateInfo) => {
+    const initialData = {
+      operatorName: candidateInfo.name || '',
+      candidateId: candidateInfo.candidateId || '',
+      nid: candidateInfo.nid || '',
+      birthCertificate: candidateInfo.birthCertificate || '',
+      date: new Date().toISOString().split('T')[0],
+      fatherHusbandName: '',
+      educationalStatus: 'Eight Above',
+      attitude: 'Good',
+      sewingFloor: 'Sewing Floor',
+      processes: [
+        {
+          machineType: 'SNLS/DNLS',
+          processName: '',
+          dop: '',
+          smv: 0,
+          cycleTimes: [0, 0, 0, 0, 0],
+          qualityStatus: 'No Defect',
+          remarks: ''
+        }
+      ],
+      supplementaryMachines: []
+    };
+    setAssessmentData(initialData);
+  }
 
   // নতুন ডেটা ইনিশিয়ালাইজ করার ফাংশন
   const initializeNewData = () => {
@@ -56,18 +123,56 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo, ex
     }
   }
 
-  // API থেকে প্রসেস ডেটা লোড করা
-  useEffect(() => {
-    fetchProcesses()
-  }, [])
-
-  const fetchProcesses = async () => {
+  // 🔥 API call দিয়ে পূর্বের assessment data লোড করার ফাংশন
+  const loadPreviousAssessmentData = async (candidateId) => {
+    if (!candidateId) return
+    
+    setIsLoadingPreviousData(true)
     try {
-      const response = await fetch('/api/processes')
-      const data = await response.json()
-      setProcessesList(data)
+      const response = await fetch(`/api/iep-interview/update-iep-interview-ass-calculator/candidate-iep-data?candidateId=${candidateId}`)
+      const result = await response.json()
+
+      if (response.ok && result.data && result.data.processMeasurements.length > 0) {
+        const previousData = result.data
+        
+        console.log('📊 Previous assessment data loaded from API:', previousData)
+
+        // Process measurements সেট করুন
+        const updatedProcesses = previousData.processMeasurements.map(process => ({
+          machineType: process.machineType || '',
+          processName: process.processName || '',
+          dop: process.dop || '',
+          smv: process.smv || 0,
+          cycleTimes: process.cycleTimes || [0, 0, 0, 0, 0],
+          qualityStatus: process.qualityStatus || 'No Defect',
+          remarks: process.remarks || ''
+        }))
+
+        // Supplementary machines সেট করুন
+        const supplementaryMachineOptions = [
+          'Eyelet', 'FOA', 'Kansai', 'BH', 'BS', 'BTK', 'F/Sleamer'
+        ]
+        
+        const updatedSupplementaryMachines = supplementaryMachineOptions.map(name => ({
+          name,
+          checked: previousData.supplementaryMachines?.[name] || false
+        }))
+
+        // Form data update করুন
+        setAssessmentData(prev => ({
+          ...prev,
+          processes: updatedProcesses.length > 0 ? updatedProcesses : prev.processes,
+          supplementaryMachines: updatedSupplementaryMachines
+        }))
+
+        console.log('✅ Auto-filled with previous process measurements')
+      } else {
+        console.log('ℹ️ No previous assessment data found for this candidate')
+      }
     } catch (error) {
-      console.error('Error fetching processes:', error)
+      console.error('❌ Error loading previous assessment data:', error)
+    } finally {
+      setIsLoadingPreviousData(false)
     }
   }
 
@@ -262,6 +367,8 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo, ex
             candidateInfo={candidateInfo}
             onClearData={handleClearData}
             isEditing={isEditing}
+            isLoadingPreviousData={isLoadingPreviousData}
+            onLoadPreviousData={loadPreviousAssessmentData}
           />
         ) : (
           <AssessmentResults 
@@ -278,7 +385,7 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo, ex
 }
 
 // Data Entry Component
-function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorName, processesList, candidateInfo, onClearData, isEditing = false }) {
+function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorName, processesList, candidateInfo, onClearData, isEditing = false, isLoadingPreviousData, onLoadPreviousData }) {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     operatorName: operatorName || '',
@@ -300,7 +407,6 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
     supplementaryMachines: []
   })
 
-  // Supplementary machines list
   const supplementaryMachineOptions = [
     'Eyelet', 'FOA', 'Kansai', 'BH', 'BS', 'BTK', 'F/Sleamer'
   ]
@@ -370,6 +476,13 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
       }
     }
   }, [candidateInfo, initialData])
+
+  // Auto-fill বাটন যোগ করুন
+  const handleAutoFillFromPrevious = async () => {
+    if (candidateInfo?.candidateId) {
+      await onLoadPreviousData(candidateInfo.candidateId)
+    }
+  }
 
   // Process select করলে DOP এবং SMV auto-fill করা
   const handleProcessSelect = (index, selectedProcessName) => {
@@ -458,6 +571,11 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
                 Editing Existing Assessment
               </span>
             )}
+            {isLoadingPreviousData && (
+              <span className="ml-3 px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full">
+                Loading Previous Data...
+              </span>
+            )}
           </h2>
           {isEditing && (
             <button
@@ -501,6 +619,26 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
                 />
               </div>
             )}
+          </div>
+          
+          {/* Auto-fill Button in Candidate Info Section */}
+          <div className="mt-3 pt-3 border-t border-blue-200">
+            <button
+              type="button"
+              onClick={handleAutoFillFromPrevious}
+              disabled={isLoadingPreviousData}
+              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center space-x-2 text-sm"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span>
+                {isLoadingPreviousData ? 'Loading...' : 'Auto-fill from Previous Interview'}
+              </span>
+            </button>
+            <p className="text-xs text-gray-600 mt-1">
+              Automatically fill process measurements from candidate's previous assessment
+            </p>
           </div>
         </div>
       )}
@@ -577,13 +715,28 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
       <div className="mb-6">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Process Measurements</h3>
-          <button
-            type="button"
-            onClick={addProcess}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-          >
-            Add Process
-          </button>
+          <div className="flex space-x-2">
+            {candidateInfo && (
+              <button
+                type="button"
+                onClick={handleAutoFillFromPrevious}
+                disabled={isLoadingPreviousData}
+                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm flex items-center space-x-1"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>Auto-fill</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={addProcess}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm"
+            >
+              Add Process
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -742,7 +895,7 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
   )
 }
 
-// Assessment Results Component
+// Assessment Results Component (একই থাকে)
 function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment, candidateInfo, onEditData }) {
   const [calculatedResults, setCalculatedResults] = useState(null)
 
@@ -962,7 +1115,7 @@ function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment,
   )
 }
 
-// Helper function for calculations with MULTISKILL logic
+// Helper function for calculations with MULTISKILL logic (একই থাকে)
 function calculateResults(data) {
   const processesWithCalculations = data.processes.map(process => {
     const avgCycleTime = process.cycleTimes.reduce((a, b) => a + b, 0) / process.cycleTimes.length

@@ -196,6 +196,7 @@ export default function FloatingLayout() {
         { name: 'security', icon: '🎨', href: '/admin/iep-interview/1st-step'},
         { name: 'down-admin', icon: '🎨', href: '/admin/iep-interview/2nd-step'},
         { name: 'iep', icon: '🎨', href: '/admin/iep-interview/3rd-step'},
+        { name: 'update-iep-assessment', icon: '🎨', href: '/admin/iep-interview/3rd-step/search-assessment'},
         { name: 'Admin Interview', icon: '🎨', href: '/admin/iep-interview/4th-step'},
         { name: 'interview tracker', icon: '🎨', href: '/admin/iep-interview/report-table'},
         { name: 'supervisors', icon: '🎨', href: '/admin/supervisors'},
