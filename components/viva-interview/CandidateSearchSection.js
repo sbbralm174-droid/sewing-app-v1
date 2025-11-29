@@ -239,20 +239,9 @@ export default function CandidateSearchSection({ onCandidateSelect, searchError,
   return (
     <div className="mb-6 p-6 bg-white border border-gray-200 rounded-lg">
       <h2 className="text-xl font-bold text-center text-indigo-900 mb-4">
-        Search Candidate
+        Assessment Part - Step Three (IE)
       </h2>
-      <p className="text-center text-gray-600 mb-4">
-        Search for candidate by ID, Name, or NID to continue with interview details
-      </p>
       
-      {/* Info Message */}
-      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-        <p className="text-sm text-blue-700 text-center">
-          Only candidates who haven&apos;t completed Step 2 interview will be shown
-        </p>
-      </div>
-      
-      {/* Dropdown Search */}
       <div className="max-w-md mx-auto" ref={dropdownRef}>
         <div className="relative">
           <label className="block mb-2 text-sm font-medium text-gray-700">
@@ -317,43 +306,8 @@ export default function CandidateSearchSection({ onCandidateSelect, searchError,
             </div>
           )}
         </div>
-
-        {/* Manual Search Fallback */}
-        <div className="mt-4 pt-4 border-t border-gray-200">
-          <p className="text-center text-sm text-gray-500 mb-2">Or enter Candidate ID manually</p>
-          <form onSubmit={handleManualSearch} className="flex space-x-2">
-            <input
-              type="text"
-              value={manualSearchId}
-              onChange={(e) => setManualSearchId(e.target.value)}
-              placeholder="Enter Candidate ID (e.g., GMST-00000001)"
-              className="flex-1 p-3 rounded-md border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
-            />
-            <button
-              type="submit"
-              disabled={searchLoading}
-              className="bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white px-4 py-3 rounded-md font-medium transition-colors text-sm"
-            >
-              {searchLoading ? '...' : 'Search'}
-            </button>
-          </form>
-        </div>
-        
-        {searchError && (
-          <div className="mt-3 p-3 bg-red-100 text-red-700 rounded-md text-center">
-            {searchError}
-          </div>
-        )}
-      </div>
-
-      <div className="mt-6 text-center">
-        <button
-          onClick={() => router.push('/admin/viva-interview/step1')}
-          className="text-indigo-600 hover:text-indigo-800 font-medium"
-        >
-          ← Go back to Step 1 to create new candidate
-        </button>
       </div>
     </div>
   );
 }
+

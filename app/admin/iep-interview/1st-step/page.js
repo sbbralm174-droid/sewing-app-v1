@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Webcam from 'react-webcam';
-import NidOrBirthCertificateSearch from '@/components/nidOrBirthCertificate';
+import NidOrBirthCertificateSearch from '@/components/NidOrBirthCertificate';
 
 export default function VivaInterviewStep1() {
   const router = useRouter();
@@ -248,7 +248,7 @@ export default function VivaInterviewStep1() {
     <div className="min-h-screen mt-10 bg-gray-50 py-8">
       <div className="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow-lg">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-indigo-900">Basic Information</h1>
+          <h1 className="text-2xl font-bold text-indigo-900">Employe Assessment 1st Step (Security)</h1>
           <p className="text-gray-600 mt-2">Provide candidate&apos;s basic details and photo</p>
         </div>
 

@@ -228,9 +228,7 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
         setSuccessMessage('✅ Interview completed successfully!');
         
         // Redirect after success
-        setTimeout(() => {
-          router.push('/admin/iep-interview');
-        }, 2000);
+        
         
       } else {
         setErrorMessage(`❌ ${result.error || 'Failed to complete interview'}`);

@@ -1,11 +1,11 @@
-// app/admin/iep-interview/2nd-step
+// app/admin/iep-interview/2nd-step/page.js
 
 'use client';
 
 import { useState, useEffect } from 'react';
-import NidOrBirthCertificateSearch from '@/components/nidOrBirthCertificate';
+import NidOrBirthCertificateSearch from '@/components/NidOrBirthCertificate';
 
-export default function InterviewStepOne() {
+export default function InterviewStepTwo() {
   const [candidates, setCandidates] = useState([]);
   const [selectedCandidate, setSelectedCandidate] = useState('');
   const [loading, setLoading] = useState(false);
@@ -13,6 +13,20 @@ export default function InterviewStepOne() {
   const [selectedCandidateData, setSelectedCandidateData] = useState(null);
   const [failureReason, setFailureReason] = useState('');
   const [showReasonInput, setShowReasonInput] = useState(false);
+  
+  // New state for additional information
+  const [chairmanCertificate, setChairmanCertificate] = useState(false);
+  const [educationCertificate, setEducationCertificate] = useState(false);
+  const [experienceMachines, setExperienceMachines] = useState({
+    ASST_OPERATOR: false,
+    OPERATOR: false,
+  });
+  const [designation, setDesignation] = useState({
+    SNLS_DNLS: false,
+    OverLock: false,
+    FlatLock: false
+  });
+  const [otherInfo, setOtherInfo] = useState('');
   
   // Search related states
   const [showSearch, setShowSearch] = useState(false);
@@ -32,13 +46,13 @@ export default function InterviewStepOne() {
       const response = await fetch('/api/iep-interview/step-one-get');
       const stepOneData = await response.json();
 
-      console.log('Raw API response:', stepOneData); // Debugging
+      console.log('Raw API response:', stepOneData);
 
       // Validate data structure - ensure required fields exist
       const validatedCandidates = stepOneData.filter(candidate => 
         candidate && 
         candidate.candidateId && 
-        candidate.name // name must exist
+        candidate.name
       );
 
       // Log invalid candidates for debugging
@@ -62,7 +76,7 @@ export default function InterviewStepOne() {
 
       if (response.ok) {
         setCandidates(filteredCandidates);
-        console.log('Filtered candidates:', filteredCandidates); // Debugging
+        console.log('Filtered candidates:', filteredCandidates);
       } else {
         setMessage('Failed to fetch candidates');
       }
@@ -90,13 +104,41 @@ export default function InterviewStepOne() {
       }
       
       setSelectedCandidateData(candidate);
-      // Reset failure reason when candidate changes
+      // Reset all form fields when candidate changes
       setFailureReason('');
       setShowReasonInput(false);
-      setMessage(''); // Clear any previous messages
+      setChairmanCertificate(false);
+      setEducationCertificate(false);
+      setExperienceMachines({
+        SNLS_DNLS: false,
+        OverLock: false,
+        FlatLock: false
+      });
+      setDesignation({
+        ASST_OPERATOR:  false,
+        OPERATOR: false,
+      });
+      setOtherInfo('');
+      setMessage('');
     } else {
       setSelectedCandidateData(null);
     }
+  };
+
+  // Handle experience machine checkbox changes
+  const handleMachineChange = (machine) => {
+    setExperienceMachines(prev => ({
+      ...prev,
+      [machine]: !prev[machine]
+    }));
+  };
+
+  // Handle DESIGNATION checkbox changes
+  const handleDesignation = (designation) => {
+    setDesignation(prev => ({
+      ...prev,
+      [designation]: !prev[designation]
+    }));
   };
 
   // Search button click handler
@@ -149,7 +191,7 @@ export default function InterviewStepOne() {
       setLoading(true);
       setMessage('');
       
-      // Prepare validated data with fallbacks for required fields
+      // Prepare validated data with additional information
       const requestData = {
         candidateId: selectedCandidate,
         result: resultValue,
@@ -158,13 +200,18 @@ export default function InterviewStepOne() {
           name: selectedCandidateData.name || 'Unknown',
           nid: selectedCandidateData.nid || null,
           birthCertificate: selectedCandidateData.birthCertificate || null,
-          // Ensure all required fields have values
           candidateId: selectedCandidateData.candidateId || selectedCandidate
         },
+        // Additional information fields
+        chairmanCertificate,
+        educationCertificate,
+        experienceMachines,
+        designation,
+        otherInfo: otherInfo.trim(),
         failureReason: resultValue === 'FAILED' ? failureReason : null
       };
 
-      console.log("Sending validated data:", requestData);
+      console.log("Sending validated data with additional info:", requestData);
       
       const response = await fetch('/api/iep-interview/iep-interview-down-admin', {
         method: 'POST',
@@ -184,9 +231,21 @@ export default function InterviewStepOne() {
         setSelectedCandidateData(null);
         setFailureReason('');
         setShowReasonInput(false);
-        fetchCandidates(); // Refresh the list
+        // Reset additional info fields
+        setChairmanCertificate(false);
+        setEducationCertificate(false);
+        setExperienceMachines({
+          SNLS_DNLS: false,
+          OverLock: false,
+          FlatLock: false
+        });
+        setDesignation({
+          ASST_OPERATOR:  false,
+          OPERATOR: false,
+        });
+        setOtherInfo('');
+        fetchCandidates();
       } else {
-        // More detailed error message
         if (result.errors) {
           const errorDetails = Object.values(result.errors).join(', ');
           setMessage(`Validation error: ${errorDetails}`);
@@ -209,7 +268,6 @@ export default function InterviewStepOne() {
     }
     
     setShowReasonInput(true);
-    // Automatically focus on the reason input when it appears
     setTimeout(() => {
       document.getElementById('failureReason')?.focus();
     }, 100);
@@ -236,11 +294,11 @@ export default function InterviewStepOne() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gray-50 mt-10 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-white rounded-lg shadow-md p-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-6">
-            IEP Interview - Step One
+            Assessment Part - Step Two (Admin)
           </h1>
 
           {/* Candidate Selection */}
@@ -257,7 +315,6 @@ export default function InterviewStepOne() {
             >
               <option value="">Choose a candidate...</option>
               {candidates.map((candidate) => {
-                // Validate required fields before rendering
                 if (!candidate.name || !candidate.candidateId) {
                   console.warn('Invalid candidate data:', candidate);
                   return null;
@@ -329,6 +386,104 @@ export default function InterviewStepOne() {
             </div>
           )}
 
+          {/* Additional Information Section */}
+          {selectedCandidateData && (
+            <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                Additional Information
+              </h3>
+              
+              <div className="space-y-4">
+                {/* Chairman Certificate */}
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="chairmanCertificate"
+                    checked={chairmanCertificate}
+                    onChange={(e) => setChairmanCertificate(e.target.checked)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="chairmanCertificate" className="ml-2 block text-sm text-gray-900">
+                    Chairman Certificate
+                  </label>
+                </div>
+
+                {/* Education Certificate */}
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="educationCertificate"
+                    checked={educationCertificate}
+                    onChange={(e) => setEducationCertificate(e.target.checked)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="educationCertificate" className="ml-2 block text-sm text-gray-900">
+                    Education Certificate
+                  </label>
+                </div>
+
+                {/* Experience Machines */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Experience Machine Name
+                  </label>
+                  <div className="flex flex-wrap gap-4">
+                    {Object.keys(experienceMachines).map((machine) => (
+                      <div key={machine} className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id={machine}
+                          checked={experienceMachines[machine]}
+                          onChange={() => handleMachineChange(machine)}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <label htmlFor={machine} className="ml-2 block text-sm text-gray-900">
+                          {machine.replace('_', '/')}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Designation
+                  </label>
+                  <div className="flex flex-wrap gap-4">
+                    {Object.keys(designation).map((machine) => (
+                      <div key={machine} className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id={machine}
+                          checked={designation[machine]}
+                          onChange={() => handleDesignation(machine)}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <label htmlFor={machine} className="ml-2 block text-sm text-gray-900">
+                          {machine.replace('_', '/')}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Other Information */}
+                <div>
+                  <label htmlFor="otherInfo" className="block text-sm font-medium text-gray-700 mb-2">
+                    Others
+                  </label>
+                  <textarea
+                    id="otherInfo"
+                    value={otherInfo}
+                    onChange={(e) => setOtherInfo(e.target.value)}
+                    placeholder="Enter any other information..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    rows="3"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Search Component */}
           {showSearch && (
             <div className="mb-6">
@@ -340,7 +495,7 @@ export default function InterviewStepOne() {
             </div>
           )}
 
-          {/* Failure Reason Input - শুধু failed বাটন ক্লিক করলে show হবে */}
+          {/* Failure Reason Input */}
           {showReasonInput && (
             <div className="mb-4 p-4 bg-red-50 rounded-lg border border-red-200">
               <label htmlFor="failureReason" className="block text-sm font-medium text-red-700 mb-2">

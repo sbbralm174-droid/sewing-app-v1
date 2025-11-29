@@ -1,6 +1,8 @@
 // components/operator-assessment/Mainassessment.js 
 'use client'
 import { useState, useEffect } from 'react'
+import Select from "react-select";
+import ProcessSelect from "@/components/ProcessSelect";
 
 export default function MainAssessment({ onAssessmentComplete, candidateInfo }) {
   const [currentView, setCurrentView] = useState('data-entry')
@@ -10,6 +12,12 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
   const [searchCandidateId, setSearchCandidateId] = useState('')
   const [searchResults, setSearchResults] = useState(null)
   const [isSearching, setIsSearching] = useState(false)
+  const [isClient, setIsClient] = useState(false)
+
+  // Client-side detection
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
 
   // candidateInfo থেকে ডেটা লোড করুন
   useEffect(() => {
@@ -34,7 +42,38 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
     }
   }
 
-  // Candidate ID দিয়ে সার্চ করার ফাংশন - UPDATED
+  // নতুন ডেটা ইনিশিয়ালাইজ করার ফাংশন
+  const initializeNewData = (candidateData = null) => {
+    const candidate = candidateData || candidateInfo
+    if (candidate) {
+      const initialData = {
+        operatorName: candidate.name || '',
+        candidateId: candidate.candidateId || '',
+        nid: candidate.nid || '',
+        birthCertificate: candidate.birthCertificate || '',
+        date: isClient ? new Date().toISOString().split('T')[0] : '',
+        fatherHusbandName: '',
+        educationalStatus: 'Eight Above',
+        attitude: 'Good',
+        sewingFloor: 'Sewing Floor',
+        processes: [
+          {
+            machineType: 'SNLS/DNLS',
+            processName: '',
+            dop: '',
+            smv: 0,
+            cycleTimes: [0, 0, 0, 0, 0],
+            qualityStatus: 'No Defect',
+            remarks: ''
+          }
+        ],
+        supplementaryMachines: []
+      };
+      setAssessmentData(initialData);
+    }
+  }
+
+  // Candidate ID দিয়ে সার্চ করার ফাংশন
   const handleSearchCandidate = async () => {
     if (!searchCandidateId.trim()) {
       alert('Please enter a Candidate ID')
@@ -64,8 +103,6 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
           setOperatorName(candidateData.name || '')
           initializeNewData(candidateData)
         }
-        
-        console.log('Loaded assessment data from API:', candidateData.assessmentData?.rawData)
       } else {
         throw new Error('Candidate not found')
       }
@@ -76,37 +113,6 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
       setSearchResults(null)
     } finally {
       setIsSearching(false)
-    }
-  }
-
-  // নতুন ডেটা ইনিশিয়ালাইজ করার ফাংশন
-  const initializeNewData = (candidateData = null) => {
-    const candidate = candidateData || candidateInfo
-    if (candidate) {
-      const initialData = {
-        operatorName: candidate.name || '',
-        candidateId: candidate.candidateId || '',
-        nid: candidate.nid || '',
-        birthCertificate: candidate.birthCertificate || '',
-        date: new Date().toISOString().split('T')[0],
-        fatherHusbandName: '',
-        educationalStatus: 'Eight Above',
-        attitude: 'Good',
-        sewingFloor: 'Sewing Floor',
-        processes: [
-          {
-            machineType: 'SNLS/DNLS',
-            processName: '',
-            dop: '',
-            smv: 0,
-            cycleTimes: [0, 0, 0, 0, 0],
-            qualityStatus: 'No Defect',
-            remarks: ''
-          }
-        ],
-        supplementaryMachines: []
-      };
-      setAssessmentData(initialData);
     }
   }
 
@@ -135,8 +141,6 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
     
     setAssessmentData(completeData)
     setCurrentView('results')
-    
-    console.log('Assessment data saved:', completeData)
   }
 
   // ডেটা এন্ট্রিতে ফিরে যাওয়ার ফাংশন
@@ -210,12 +214,22 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
         rawData: assessmentData
       }
 
-      console.log('Assessment Result:', assessmentResult)
-      
       if (onAssessmentComplete) {
         onAssessmentComplete(assessmentResult)
       }
     }
+  }
+
+  // Show loading state until client-side rendering
+  if (!isClient) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -292,6 +306,7 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
             onClearSearch={handleClearSearch}
             isSearching={isSearching}
             searchResults={searchResults}
+            isClient={isClient}
           />
         ) : (
           <AssessmentResults 
@@ -306,7 +321,7 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
   )
 }
 
-// Data Entry Component - UPDATED with proper API data handling
+// Data Entry Component - UPDATED with hydration fix
 function DataEntry({ 
   onSave, 
   onCancel, 
@@ -321,10 +336,16 @@ function DataEntry({
   onSearchCandidate,
   onClearSearch,
   isSearching,
-  searchResults
+  searchResults,
+  isClient
 }) {
+  // Supplementary machines list
+  const supplementaryMachineOptions = [
+    'Eyelet', 'FOA', 'Kansai', 'BH', 'BS', 'BTK', 'F/Sleamer'
+  ]
+
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: '',
     operatorName: operatorName || '',
     fatherHusbandName: '',
     educationalStatus: 'Eight Above',
@@ -341,103 +362,103 @@ function DataEntry({
         remarks: ''
       }
     ],
-    supplementaryMachines: []
+    supplementaryMachines: supplementaryMachineOptions.map(name => ({
+      name,
+      checked: false
+    }))
   })
 
-  // Supplementary machines list
-  const supplementaryMachineOptions = [
-    'Eyelet', 'FOA', 'Kansai', 'BH', 'BS', 'BTK', 'F/Sleamer'
-  ]
-
-  // candidateInfo থেকে initial values সেট করুন - UPDATED
+  // Initialize form data only on client side
   useEffect(() => {
-    if (candidateInfo) {
-      setOperatorName(candidateInfo.name || '');
+    if (isClient) {
+      const today = new Date().toISOString().split('T')[0]
       
-      const initialFormData = {
-        date: new Date().toISOString().split('T')[0],
-        operatorName: candidateInfo.name || '',
-        candidateId: candidateInfo.candidateId || '',
-        nid: candidateInfo.nid || '',
-        birthCertificate: candidateInfo.birthCertificate || '',
-        fatherHusbandName: '',
-        educationalStatus: 'Eight Above',
-        attitude: 'Good',
-        sewingFloor: 'Sewing Floor',
-        processes: [
-          {
-            machineType: 'SNLS/DNLS',
-            processName: '',
-            dop: '',
-            smv: 0,
-            cycleTimes: [0, 0, 0, 0, 0],
-            qualityStatus: 'No Defect',
-            remarks: ''
-          }
-        ],
-        supplementaryMachines: supplementaryMachineOptions.map(name => ({
-          name,
-          checked: false
-        }))
-      };
+      if (candidateInfo) {
+        setOperatorName(candidateInfo.name || '');
+        
+        const initialFormData = {
+          date: today,
+          operatorName: candidateInfo.name || '',
+          candidateId: candidateInfo.candidateId || '',
+          nid: candidateInfo.nid || '',
+          birthCertificate: candidateInfo.birthCertificate || '',
+          fatherHusbandName: '',
+          educationalStatus: 'Eight Above',
+          attitude: 'Good',
+          sewingFloor: 'Sewing Floor',
+          processes: [
+            {
+              machineType: 'SNLS/DNLS',
+              processName: '',
+              dop: '',
+              smv: 0,
+              cycleTimes: [0, 0, 0, 0, 0],
+              qualityStatus: 'No Defect',
+              remarks: ''
+            }
+          ],
+          supplementaryMachines: supplementaryMachineOptions.map(name => ({
+            name,
+            checked: false
+          }))
+        };
 
-      // API থেকে পাওয়া assessmentData থাকলে সেটা ব্যবহার করুন
-      if (candidateInfo.assessmentData && candidateInfo.assessmentData.rawData) {
-        console.log('Loading assessment data from API:', candidateInfo.assessmentData.rawData)
-        const apiData = candidateInfo.assessmentData.rawData
-        
-        setFormData(prev => ({ 
-          ...initialFormData,
-          ...apiData,
-          // processes array properly merge করুন
-          processes: apiData.processes && apiData.processes.length > 0 
-            ? apiData.processes.map(process => ({
-                ...process,
-                cycleTimes: process.cycleTimes || [0, 0, 0, 0, 0]
-              }))
-            : initialFormData.processes,
-          supplementaryMachines: apiData.supplementaryMachines && apiData.supplementaryMachines.length > 0
-            ? apiData.supplementaryMachines
-            : initialFormData.supplementaryMachines
-        }));
-        
-        // Operator name সেট করুন
-        if (apiData.operatorName) {
-          setOperatorName(apiData.operatorName)
+        // API থেকে পাওয়া assessmentData থাকলে সেটা ব্যবহার করুন
+        if (candidateInfo.assessmentData && candidateInfo.assessmentData.rawData) {
+          const apiData = candidateInfo.assessmentData.rawData
+          
+          setFormData(prev => ({ 
+            ...initialFormData,
+            ...apiData,
+            // processes array properly merge করুন
+            processes: apiData.processes && apiData.processes.length > 0 
+              ? apiData.processes.map(process => ({
+                  ...process,
+                  cycleTimes: process.cycleTimes || [0, 0, 0, 0, 0]
+                }))
+              : initialFormData.processes,
+            supplementaryMachines: apiData.supplementaryMachines && apiData.supplementaryMachines.length > 0
+              ? apiData.supplementaryMachines
+              : initialFormData.supplementaryMachines
+          }));
+          
+          // Operator name সেট করুন
+          if (apiData.operatorName) {
+            setOperatorName(apiData.operatorName)
+          }
+        } 
+        // শুধু initialData থাকলে (manual entry এর জন্য)
+        else if (initialData) {
+          setFormData(prev => ({ 
+            ...initialFormData, 
+            ...initialData,
+            processes: initialData.processes && initialData.processes.length > 0 
+              ? initialData.processes 
+              : initialFormData.processes,
+            supplementaryMachines: initialData.supplementaryMachines && initialData.supplementaryMachines.length > 0
+              ? initialData.supplementaryMachines
+              : initialFormData.supplementaryMachines
+          }));
+        } else {
+          setFormData(initialFormData);
         }
-      } 
-      // শুধু initialData থাকলে (manual entry এর জন্য)
-      else if (initialData) {
-        console.log('Loading initial data:', initialData);
-        setFormData(prev => ({ 
-          ...initialFormData, 
-          ...initialData,
-          processes: initialData.processes && initialData.processes.length > 0 
-            ? initialData.processes 
-            : initialFormData.processes,
-          supplementaryMachines: initialData.supplementaryMachines && initialData.supplementaryMachines.length > 0
-            ? initialData.supplementaryMachines
-            : initialFormData.supplementaryMachines
-        }));
       } else {
-        setFormData(initialFormData);
-      }
-    } else {
-      // Initialize supplementary machines
-      setFormData(prev => ({
-        ...prev,
-        supplementaryMachines: supplementaryMachineOptions.map(name => ({
-          name,
-          checked: false
+        // No candidate info - set basic form data
+        setFormData(prev => ({
+          ...prev,
+          date: today,
+          supplementaryMachines: supplementaryMachineOptions.map(name => ({
+            name,
+            checked: false
+          }))
         }))
-      }))
-      
-      if (initialData) {
-        console.log('Loading initial data without candidateInfo:', initialData);
-        setFormData(prev => ({ ...prev, ...initialData }));
+        
+        if (initialData) {
+          setFormData(prev => ({ ...prev, ...initialData }));
+        }
       }
     }
-  }, [candidateInfo, initialData])
+  }, [candidateInfo, initialData, isClient])
 
   // Process select করলে DOP এবং SMV auto-fill করা
   const handleProcessSelect = (index, selectedProcessName) => {
@@ -507,12 +528,18 @@ function DataEntry({
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    console.log('Submitting form data:', formData);
     onSave(formData)
   }
 
   // শুধুমাত্র isAssessment: true আছে এমন processes ফিল্টার করুন
   const assessmentProcesses = processesList.filter(process => process.isAssessment === true)
+  const processOptions = assessmentProcesses.map((item) => ({
+  value: item.name,
+  label: item.name,
+}));
+
+
+
 
   return (
     <div className="bg-white shadow-md rounded-lg p-6">
@@ -642,7 +669,7 @@ function DataEntry({
             </p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Father's/Husband's Name</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Father/Husband Name</label>
             <input
               type="text"
               value={formData.fatherHusbandName}
@@ -689,7 +716,7 @@ function DataEntry({
             </button>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="">
             <table className="min-w-full bg-white border border-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -728,19 +755,19 @@ function DataEntry({
                         <option value="F/Sleamer">F/Sleamer</option>
                       </select>
                     </td>
-                    <td className="px-4 py-2 border">
-                      <select
-                        value={process.processName}
-                        onChange={(e) => handleProcessSelect(index, e.target.value)}
-                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      >
-                        <option value="">Select Process</option>
-                        {assessmentProcesses.map((processItem) => (
-                          <option key={processItem._id} value={processItem.name}>
-                            {processItem.name}
-                          </option>
-                        ))}
-                      </select>
+                    <td className="px-4 py-2 border min-w-[260px] z-10">
+                      <Select
+                        options={processOptions}
+                        value={processOptions.find(
+                          (opt) => opt.value === process.processName
+                        )}
+                        onChange={(selectedOption) =>
+                          handleProcessSelect(index, selectedOption.value)
+                        }
+                        className="w-full"
+                        classNamePrefix="select"
+                        isSearchable
+                      />
                     </td>
                     <td className="px-4 py-2 border">
                       <input
@@ -750,7 +777,7 @@ function DataEntry({
                         className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100"
                       />
                     </td>
-                    <td className="px-4 py-2 border">
+                    <td className="px-4 py-2 border min-w-[80px]">
                       <input
                         type="number"
                         step="0.01"
@@ -845,9 +872,6 @@ function DataEntry({
     </div>
   )
 }
-
-// Assessment Results Component (একই থাকে)
-
 
 // Assessment Results Component (একই থাকে)
 function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment, candidateInfo }) {
@@ -1057,33 +1081,167 @@ function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment,
   )
 }
 
-// Helper function for calculations (একই থাকে)
-function calculateResults(data) {
-  const processesWithCalculations = data.processes.map(process => {
-    const validCycleTimes = process.cycleTimes.filter(time => time > 0);
-    const avgCycleTime = validCycleTimes.length > 0 
-      ? validCycleTimes.reduce((a, b) => a + b, 0) / validCycleTimes.length 
-      : 0;
-    const target = 60 / process.smv
-    const capacity = 3600 / avgCycleTime
-    const performance = (capacity / target) * 100
 
-    let practicalMarks = 0
-    if (performance > 90) practicalMarks = 100
-    else if (performance >= 80) practicalMarks = 80
-    else if (performance >= 70) practicalMarks = 70
-    else if (performance >= 60) practicalMarks = 60
-    else if (performance >= 50) practicalMarks = 50
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Helper function for calculations (একই থাকে)
+
+
+
+function calculateResults(data) {
+  
+  const processesWithCalculations = data.processes.map(process => {
+    const processName = process.processName;
+    const machine = process.machineType;
+
+    const validCycleTimes = process.cycleTimes.filter(time => time > 0);
+    const avgCycleTime = validCycleTimes.length > 0
+        ? validCycleTimes.reduce((a, b) => a + b, 0) / validCycleTimes.length
+        : 0;
+
+    const target = 60 / process.smv;
+    const capacity = 3600 / avgCycleTime;
+    const performance = (capacity / target) * 100;
+
+    let practicalMarks = 0;
+
+    // SNLS special conditions list
+    const fourProcessAndMachine = [
+        { name: "Pocket-join-(Kangaro)", minCapacity: 90, machine: "SNLS/DNLS" },
+        { name: "Placket-box", minCapacity: 90, machine: "SNLS/DNLS" },
+        { name: "Zipper-join(2nd)", minCapacity: 60, machine: "SNLS/DNLS" },
+        { name: "Back-neck-tape-top-stitch-insert-label", minCapacity: 120, machine: "SNLS/DNLS" }
+    ];
+
+    // -------------------------------
+    //     SNLS/DNLS CUSTOM LOGIC
+    // -------------------------------
+    if (machine === "SNLS/DNLS") {
+        const snlsProcesses = data.processes.filter(p => p.machineType === "SNLS/DNLS");
+        let passedCount = 0;
+
+        fourProcessAndMachine.forEach(fp => {
+            const match = snlsProcesses.find(p => p.processName === fp.name);
+            if (match) {
+                const validCT = match.cycleTimes.filter(t => t > 0);
+                const avgCT = validCT.reduce((a, b) => a + b, 0) / validCT.length;
+                const cap = 3600 / avgCT;
+
+                if (cap >= fp.minCapacity) passedCount++;
+            }
+        });
+
+        if (passedCount === 4) practicalMarks = 100;
+        else if (passedCount === 3) practicalMarks = 80;
+        else if (passedCount === 2) practicalMarks = 60;
+        else if (passedCount === 1) practicalMarks = 50;
+        else practicalMarks = 30;
+    }
+
+    // -------------------------------
+    //     NEW: OverLock CONDITION
+    // -------------------------------
+    else if (machine === "Over Lock") {
+
+        // CASE 1: process === "Neck-join"
+        if (processName.toLowerCase() === "neck-join" || processName.toLowerCase() === "neck join") {
+
+            if (capacity > 150) practicalMarks = 100;
+            else if (capacity >= 120) practicalMarks = 80;
+            else if (capacity >= 100) practicalMarks = 60;
+            else if (capacity >= 80) practicalMarks = 50;
+            else practicalMarks = 0;
+        }
+
+        // CASE 2: Other Process (except Neck-join)
+        else {
+            if (capacity > 80) practicalMarks = 80;
+            else if (capacity >= 70) practicalMarks = 60;
+            else if (capacity >= 60) practicalMarks = 50;
+            else practicalMarks = 0;
+        }
+    }
+
+    // -------------------------------
+    //     NEW: Flat Lock CONDITION
+    // -------------------------------
+    else if (machine === "Flat Lock") {
+
+        // CASE 3: Bottom-hem Process
+        if (processName.toLowerCase() === "bottom-hem" || processName.toLowerCase() === "bottom hem") {
+
+            if (capacity > 220) practicalMarks = 100;
+            else if (capacity >= 200) practicalMarks = 80;
+            else if (capacity >= 180) practicalMarks = 60;
+            else if (capacity >= 160) practicalMarks = 50;
+            else practicalMarks = 0;
+        }
+
+        // CASE 4: Other Process (except Bottom-hem)
+        else {
+            if (capacity > 120) practicalMarks = 80;
+            else if (capacity >= 100) practicalMarks = 60;
+            else if (capacity >= 90) practicalMarks = 50;
+            else practicalMarks = 0;
+        }
+    }
+
+    // -------------------------------
+    //     DEFAULT PERFORMANCE SYSTEM
+    // (Only used when above rules do NOT match)
+    // -------------------------------
+    else {
+        if (performance > 90) practicalMarks = 85;
+        else if (performance >= 80) practicalMarks = 80;
+        else if (performance >= 70) practicalMarks = 70;
+        else if (performance >= 60) practicalMarks = 60;
+        else if (performance >= 50) practicalMarks = 50;
+        else practicalMarks = 0;
+    }
 
     return {
-      ...process,
-      avgCycleTime,
-      target,
-      capacity,
-      performance,
-      practicalMarks
-    }
-  })
+        ...process,
+        avgCycleTime,
+        target,
+        capacity,
+        performance,
+        practicalMarks
+    };
+});
+
 
   // Machine Score Calculation with MULTISKILL logic
   const calculateMachineScore = (processes) => {
@@ -1105,7 +1263,7 @@ function calculateResults(data) {
     const specialCount = machinesUsed.filter(m => specialMachines.includes(m)).length;
 
     let specialScore = 0;
-    if (specialCount === 1) specialScore = 55;
+    if (specialCount === 1) specialScore =  55;
     else if (specialCount === 2) specialScore = 80;
     else if (specialCount === 3) specialScore = 100;
 
@@ -1144,7 +1302,7 @@ function calculateResults(data) {
 
   const dopScoreCalculate = dopScores.length > 0 ? 
     Math.min(dopScores.reduce((sum, score) => sum + score, 0) / dopScores.length) : 0
-  const dopScore = dopScoreCalculate * 0.2
+  const dopScore = dopScoreCalculate * 0.20
 
   // Practical Score Calculation
   const totalPractical = processesWithCalculations.reduce(
@@ -1153,7 +1311,7 @@ function calculateResults(data) {
   )
   const practicalCount = processesWithCalculations.length
   const practicalScore = practicalCount > 0 ? 
-    (totalPractical / practicalCount) * 0.3 : 0
+    (totalPractical / practicalCount) * 0.30 : 0
 
   // Quality Score Calculation
   const qualityScoreData = processesWithCalculations.reduce((acc, process) => {
@@ -1198,17 +1356,15 @@ function calculateResults(data) {
 
   // Special process grade adjustment logic
   const applySpecialProcessRules = (processes, calculatedGrade, calculatedLevel, calculatedDesignation) => {
-    console.log("🔍 === SPECIAL PROCESS RULES DEBUG START ===");
-    
     let finalGrade = calculatedGrade;
     let finalLevel = calculatedLevel;
     let finalDesignation = calculatedDesignation;
 
     const fourProcess = [
-        { name: "Pocket join (Kangaro)", minCapacity: 90, machine: "SNLS/DNLS" },
-        { name: "Placket box", minCapacity: 120, machine: "SNLS/DNLS" },
-        { name: "Zipper join(2nd)", minCapacity: 80, machine: "SNLS/DNLS" },
-        { name: "Back neck tape top stitch insert label", minCapacity: 120, machine: "SNLS/DNLS" }
+        { name: "Pocket-join-(Kangaro)", minCapacity: 90, machine: "SNLS/DNLS" },
+        { name: "Placket-box", minCapacity: 90, machine: "SNLS/DNLS" },
+        { name: "Zipper-join(2nd)", minCapacity: 60, machine: "SNLS/DNLS" },
+        { name: "Back-neck-tape-top-stitch-insert-label", minCapacity: 120, machine: "SNLS/DNLS" }
     ];
 
     const hasFourProcess = fourProcess.every(req => {
@@ -1233,33 +1389,37 @@ function calculateResults(data) {
       });
     };
 
-    const hasNeckJoinOverLock = hasMachineProcess("Over Lock", "Neck join", 150);
-    const hasBodyHemFlatLock = hasMachineProcess("Flat Lock", "Body hem", 220);
+    const hasNeckJoinOverLock = hasMachineProcess("Over Lock", "Neck-join", 150);
+    const hasBodyHemFlatLock = hasMachineProcess("Flat Lock", "Bottom-hem", 220);
 
-    // Special conditions for A++ and Multiskill
     if (hasFourProcess && hasNeckJoinOverLock && hasBodyHemFlatLock) {
         finalLevel = 'Multiskill';
         finalGrade = 'A++';
         finalDesignation = 'Jr.Operator';
+        console.log("Multiskill Achieved");
     } 
     else if (hasNeckJoinOverLock && hasBodyHemFlatLock) {
         finalGrade = 'A++';
         finalLevel = 'Excellent';
         finalDesignation = 'Jr.Operator';
+        console.log("Both Over Lock and Flat Lock conditions met");
     } 
     else if (hasFourProcess && hasBodyHemFlatLock) {
         finalGrade = 'A++';
         finalLevel = 'Excellent';
         finalDesignation = 'Jr.Operator';
+        console.log("Both Four Process and Flat Lock conditions met");
     } 
     else if (hasFourProcess && hasNeckJoinOverLock) {
         finalGrade = 'A++';
         finalLevel = 'Excellent';
         finalDesignation = 'Jr.Operator';
+        console.log("Both Four Process and Over Lock conditions met");
     } else if (hasFourProcess) {
         finalGrade = 'A+';
         finalLevel = 'Very Good';
         finalDesignation = 'Jr.Operator';
+        console.log("Only Four Process condition met");
     }
 
     // Capacity-based rules
@@ -1282,7 +1442,7 @@ function calculateResults(data) {
             }
         }
         
-        else if (process.processName === "Body hem" && process.smv === 0.23 && finalGrade !== 'A++') {
+        else if (process.processName === "Bottom hem" && process.smv === 0.23 && finalGrade !== 'A++') {
             if (capacity >= 220 && finalGrade !== 'A+') {
                 finalGrade = 'A+';
                 if (finalLevel !== 'Multiskill') finalLevel = 'Very Good';
@@ -1298,8 +1458,6 @@ function calculateResults(data) {
             }
         }
     });
-
-    console.log("🔍 === SPECIAL PROCESS RULES DEBUG END ===");
 
     return { finalGrade, finalLevel, finalDesignation };
   };
@@ -1319,7 +1477,7 @@ function calculateResults(data) {
       grade = 'A+'; level = 'Better'; designation = 'Jr.Operator';
     } else if (totalScore >= 75) {
       grade = 'A'; level = 'Good'; designation = 'Jr.Operator';
-    } else if (totalScore >= 60) {
+    } else if (totalScore >= 65) {
       grade = 'B+'; level = 'Medium'; designation = 'Jr.Operator';
     } else if (totalScore >= 50) {
       grade = 'B'; level = 'Average'; designation = 'Gen.Operator';

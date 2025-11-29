@@ -1,6 +1,6 @@
 // app/machines/page.js
 import React from 'react';
-
+export const dynamic = "force-dynamic";
 async function getMachines() {
   try {
     const res = await fetch('http://localhost:3000/api/machines', {

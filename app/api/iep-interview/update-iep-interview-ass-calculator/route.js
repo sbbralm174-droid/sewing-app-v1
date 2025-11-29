@@ -1,88 +1,55 @@
-// app/api/iep-interview/assessment/route.js
-import { connectDB } from '@/lib/db';
-import VivaInterview from '@/models/IepInterview';
+// app/api/iep-interview/update-iep-interview-ass-calculator/route.js
+import { NextResponse } from 'next/server'
+import { connectDB } from '@/lib/db'
+import VivaInterview from '@/models/IepInterview'
 
-export async function GET(req) {
+export async function PUT(request) {
   try {
-    await connectDB();
+    await connectDB()
 
-    const { searchParams } = new URL(req.url);
-    const candidateId = searchParams.get('candidateId');
+    const { candidateId, assessmentData } = await request.json()
 
     if (!candidateId) {
-      return new Response(JSON.stringify({ error: 'Candidate ID is required' }), {
-        status: 400,
-      });
+      return NextResponse.json(
+        { success: false, message: 'Candidate ID is required' },
+        { status: 400 }
+      )
     }
 
-    const candidate = await VivaInterview.findOne({ candidateId })
-      .select('assessmentData processCapacity supplementaryMachines grade candidateId name')
-      .lean();
-
-    if (!candidate) {
-      return new Response(JSON.stringify({ error: 'Candidate not found' }), {
-        status: 404,
-      });
-    }
-
-    return new Response(JSON.stringify({
-      success: true,
-      data: candidate
-    }), { status: 200 });
-
-  } catch (error) {
-    console.error('Assessment fetch error:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
-      status: 500,
-    });
-  }
-}
-
-
-
-export async function PUT(req) {
-  try {
-    await connectDB();
-
-    const body = await req.json();
-    const { candidateId, assessmentData, processCapacity, supplementaryMachines, grade } = body;
-
-    if (!candidateId) {
-      return new Response(JSON.stringify({ error: 'Candidate ID is required' }), {
-        status: 400,
-      });
-    }
-
+    // Find and update the candidate
     const updatedCandidate = await VivaInterview.findOneAndUpdate(
       { candidateId },
-      {
-        $set: {
+      { 
+        $set: { 
           assessmentData,
-          processCapacity,
-          supplementaryMachines,
-          grade,
-          updatedAt: new Date()
+          // Additional fields you might want to update
+          processCapacity: assessmentData.processCapacity || {},
+          supplementaryMachines: assessmentData.supplementaryMachines || {},
+          grade: assessmentData.finalAssessment?.grade || 'C',
+          result: 'PASSED' // Or calculate based on assessment
         }
       },
       { new: true, runValidators: true }
-    );
+    )
 
     if (!updatedCandidate) {
-      return new Response(JSON.stringify({ error: 'Candidate not found' }), {
-        status: 404,
-      });
+      return NextResponse.json(
+        { success: false, message: 'Candidate not found' },
+        { status: 404 }
+      )
     }
 
-    return new Response(JSON.stringify({
+    return NextResponse.json({
       success: true,
       message: 'Assessment data updated successfully',
       data: updatedCandidate
-    }), { status: 200 });
+    })
 
   } catch (error) {
-    console.error('Assessment update error:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
-      status: 500,
-    });
+    console.error('Error updating assessment data:', error)
+    return NextResponse.json(
+      { success: false, message: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }

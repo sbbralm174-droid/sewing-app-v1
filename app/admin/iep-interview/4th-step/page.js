@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react';
 import SidebarNavLayout from '@/components/SidebarNavLayout';
-import NidOrBirthCertificateSearch from '@/components/nidOrBirthCertificate';
+import NidOrBirthCertificateSearch from '@/components/NidOrBirthCertificate';
 
 export default function AdminInterviewForm() {
   const [formData, setFormData] = useState({

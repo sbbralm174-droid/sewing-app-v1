@@ -1928,3 +1928,59 @@ abar process "Bottom Hem", 0.35 smv ebong 220 er upore capacity thake tahole Gra
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+{
+    "experienceMachines": {
+      "SNLS_DNLS": true,
+      "OverLock": true,
+      "FlatLock": true
+    },
+    "designation": {
+      "ASST_OPERATOR": false,
+      "OPERATOR": false
+    },
+    "_id": "69267f35a20d4cff9b635f6f",
+    "name": "dfg",
+    "nid": "3453",
+    "picture": "/uploads/photos/a5be1cfa-64c8-4101-98c9-5629d8c6a494.PNG",
+    "birthCertificate": "",
+    "stepCompleted": 1,
+    "candidateId": "GMST-00000116",
+    "status": "passed",
+    "result": "PASSED",
+    "chairmanCertificate": true,
+    "educationCertificate": true,
+    "otherInfo": "",
+    "failureReason": "",
+    "interviewData": {
+      "_id": "69267f24a20d4cff9b635f62",
+      "name": "dfg",
+      "nid": "3453",
+      "picture": "/uploads/photos/a5be1cfa-64c8-4101-98c9-5629d8c6a494.PNG",
+      "stepCompleted": 1,
+      "result": "PASSED",
+      "createdAt": "2025-11-26T04:16:36.671Z",
+      "updatedAt": "2025-11-26T04:16:36.671Z",
+      "candidateId": "GMST-00000116",
+      "__v": 0,
+      "birthCertificate": null
+    },
+    "createdAt": "2025-11-26T04:16:53.256Z",
+    "updatedAt": "2025-11-26T04:16:53.256Z",
+    "__v": 0,
+    "formattedCreatedAt": "11/26/2025",
+    "id": "69267f35a20d4cff9b635f6f"
+  }
+]
+
+

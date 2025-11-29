@@ -589,7 +589,7 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
         </div>
         {isEditing && (
           <p className="text-sm text-yellow-600 mt-2">
-            You are editing an existing assessment. Changes will be saved when you click "Update Results".
+            You are editing an existing assessment. Changes will be saved when you click Update Results.
           </p>
         )}
       </div>
@@ -637,7 +637,7 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
               </span>
             </button>
             <p className="text-xs text-gray-600 mt-1">
-              Automatically fill process measurements from candidate's previous assessment
+              Automatically fill process measurements from candidates previous assessment
             </p>
           </div>
         </div>
@@ -677,7 +677,7 @@ function DataEntry({ onSave, onCancel, initialData, operatorName, setOperatorNam
           </p>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Father's/Husband's Name</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Fathers/Husbands Name</label>
           <input
             type="text"
             value={formData.fatherHusbandName}
