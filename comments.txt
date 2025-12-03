@@ -758,6 +758,177 @@ ekhon ekhane scanner system toiri korte hobe. operator er qr code scan korle ope
 
 tahole prothome to amader operator ebong machine er jonno qr code toiri korte hobe. qr code gulo kemon hobe. ebong vitore ki ki totho rakhte hobe. jeno sohojei detect korte pare eta machine er jonno qr code, r  eta operator er jonno qr code.
 
+next js app router, tailwind, js.
+
+
+/api/operators
+[ 
+{
+    "_id": "69258b775e6458462523106f",
+    "name": "Sabbir Ahmed",
+    "operatorId": "TGS-01105233",
+    "joiningDate": "2025-11-25T00:00:00.000Z",
+    "nid": "1997208723487",
+    "picture": "/uploads/photos/9aafe80a-a4fc-42f2-bb9e-a908222c269d.jpg",
+    "videos": [],
+    "designation": "OPERATOR",
+    "grade": "A++",
+    "allowedProcesses": {
+      "Bottom hem": 248,
+      "Neck join": 206,
+      "Zipper join(2nd)": 65
+    },
+    "occurrenceReports": [],
+    "resignationHistory": [],
+    "previousProcessScores": [],
+    "createdAt": "2025-11-25T10:56:55.268Z",
+    "updatedAt": "2025-11-25T10:56:55.268Z",
+    "__v": 0
+  }
+]
+
+/api/machines
+
+[
+  {
+    "_id": "68a990fd36f3b4854012713b",
+    "uniqueId": "LOCK STITCH-01",
+    "machineType": {
+      "_id": "68a9908d36f3b48540127130",
+      "name": "LOCK STITCH",
+      "description": "",
+      "createdAt": "2025-08-23T09:57:33.547Z",
+      "__v": 0
+    },
+    "currentStatus": "idle",
+    "createdAt": "2025-08-23T09:59:25.378Z",
+    "__v": 0,
+    "servicingConfig": {
+      "customInterval": 2,
+      "isNotificationActive": true,
+      "lastServiced": "2025-10-16T00:00:00.000Z",
+      "nextServiceDate": "2025-10-18T00:00:00.000Z",
+      "defaultInterval": 15
+    },
+    "parts": [
+      {
+        "partName": "Oil Filter",
+        "uniquePartId": "LOCK STITCH-01-Oil Filter",
+        "defaultIntervalDays": 5,
+        "customIntervalDays": 2,
+        "lastServicedDate": "2025-10-21T05:59:39.405Z",
+        "nextServiceDate": "2025-10-21T18:00:00.000Z",
+        "isNotificationActive": true,
+        "createdAt": "2025-10-20T08:09:46.882Z"
+      },
+      {
+        "partName": "neddle-guard",
+        "uniquePartId": "LOCK STITCH-01-neddle-guard",
+        "defaultIntervalDays": 15,
+        "customIntervalDays": 4,
+        "lastServicedDate": "2025-11-23T09:24:19.892Z",
+        "nextServiceDate": "2025-11-27T00:00:00.000Z",
+        "isNotificationActive": true,
+        "createdAt": "2025-10-21T07:38:19.460Z"
+      },
+      {
+        "partName": "ghdf",
+        "uniquePartId": "LOCK STITCH-01-ghdf",
+        "defaultIntervalDays": 15,
+        "customIntervalDays": null,
+        "lastServicedDate": "2025-10-22T06:15:18.153Z",
+        "nextServiceDate": "2025-10-22T18:00:00.000Z",
+        "isNotificationActive": true,
+        "createdAt": "2025-10-21T13:04:08.970Z"
+      },
+      {
+        "partName": "gd4dfg",
+        "uniquePartId": "LOCK STITCH-01-gd4dfg",
+        "defaultIntervalDays": 15,
+        "customIntervalDays": null,
+        "lastServicedDate": "2025-10-22T06:18:07.965Z",
+        "nextServiceDate": "2025-10-22T18:00:00.000Z",
+        "isNotificationActive": true,
+        "createdAt": "2025-10-21T13:04:21.000Z"
+      },
+      {
+        "partName": "dg45t5",
+        "uniquePartId": "LOCK STITCH-01-dg45t5",
+        "defaultIntervalDays": 15,
+        "customIntervalDays": 4,
+        "lastServicedDate": "2025-11-23T06:05:13.012Z",
+        "nextServiceDate": "2025-11-26T18:00:00.000Z",
+        "isNotificationActive": true,
+        "createdAt": "2025-10-21T13:04:30.965Z"
+      },
+      {
+        "partName": "ddfg465hf",
+        "uniquePartId": "LOCK STITCH-01-ddfg465hf",
+        "defaultIntervalDays": 15,
+        "customIntervalDays": 7,
+        "lastServicedDate": "2025-11-23T08:59:32.230Z",
+        "nextServiceDate": "2025-11-29T18:00:00.000Z",
+        "isNotificationActive": true,
+        "createdAt": "2025-10-21T13:04:42.207Z"
+      },
+      {
+        "partName": "fhf78",
+        "uniquePartId": "LOCK STITCH-01-fhf78",
+        "defaultIntervalDays": 15,
+        "customIntervalDays": null,
+        "lastServicedDate": null,
+        "nextServiceDate": "2025-10-18T18:00:00.000Z",
+        "isNotificationActive": true,
+        "createdAt": "2025-10-21T13:04:53.134Z"
+      },
+      {
+        "partName": "dfgdf78gh",
+        "uniquePartId": "LOCK STITCH-01-dfgdf78gh",
+        "defaultIntervalDays": 15,
+        "customIntervalDays": null,
+        "lastServicedDate": null,
+        "nextServiceDate": "2025-10-18T18:00:00.000Z",
+        "isNotificationActive": true,
+        "createdAt": "2025-10-21T13:05:13.124Z"
+      },
+      {
+        "partName": "fgh676gh",
+        "uniquePartId": "LOCK STITCH-01-fgh676gh",
+        "defaultIntervalDays": 15,
+        "customIntervalDays": null,
+        "lastServicedDate": "2025-10-22T05:19:39.829Z",
+        "nextServiceDate": "2025-10-21T18:00:00.000Z",
+        "isNotificationActive": true,
+        "createdAt": "2025-10-21T13:05:25.517Z"
+      },
+      {
+        "partName": "fghu67bjy",
+        "uniquePartId": "LOCK STITCH-01-fghu67bjy",
+        "defaultIntervalDays": 15,
+        "customIntervalDays": null,
+        "lastServicedDate": "2025-10-22T05:08:53.477Z",
+        "nextServiceDate": "2025-10-21T18:00:00.000Z",
+        "isNotificationActive": true,
+        "createdAt": "2025-10-21T13:05:36.543Z"
+      }
+    ],
+    "lastLocation": {
+      "date": "2025-11-08T04:38:57.116Z",
+      "line": "N/A",
+      "supervisor": "N/A",
+      "floor": "N/A",
+      "updatedAt": "2025-11-08T04:38:57.116Z"
+    }
+  }
+
+
+
+
+
+
+
+
+
 
 const mongoose = require('mongoose');
 

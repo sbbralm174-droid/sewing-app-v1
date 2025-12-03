@@ -1188,7 +1188,7 @@ function calculateResults(data) {
 
         // CASE 2: Other Process (except Neck-join)
         else {
-            if (capacity > 80) practicalMarks = 80;
+            if (capacity > 80) practicalMarks = 90;
             else if (capacity >= 70) practicalMarks = 60;
             else if (capacity >= 60) practicalMarks = 50;
             else practicalMarks = 0;
@@ -1201,7 +1201,7 @@ function calculateResults(data) {
     else if (machine === "Flat Lock") {
 
         // CASE 3: Bottom-hem Process
-        if (processName.toLowerCase() === "bottom-hem" || processName.toLowerCase() === "bottom hem") {
+        if (processName.toLowerCase() === "bottom-hem" || processName.toLowerCase() === "bottom-hem") {
 
             if (capacity > 220) practicalMarks = 100;
             else if (capacity >= 200) practicalMarks = 80;
@@ -1426,7 +1426,7 @@ function calculateResults(data) {
     processes.forEach(process => {
         const capacity = Math.round(process.capacity);
 
-        if (process.processName === "Neck join" && process.smv === 0.35 && finalGrade !== 'A++') {
+        if (process.processName === "Neck-join" && process.smv === 0.35 && finalGrade !== 'A++') {
             if (capacity >= 150 && finalGrade !== 'A+') {
                 finalGrade = 'A+';
                 if (finalLevel !== 'Multiskill') finalLevel = 'Very Good';
@@ -1442,7 +1442,7 @@ function calculateResults(data) {
             }
         }
         
-        else if (process.processName === "Bottom hem" && process.smv === 0.23 && finalGrade !== 'A++') {
+        else if (process.processName === "Bottom-hem" && process.smv === 0.23 && finalGrade !== 'A++') {
             if (capacity >= 220 && finalGrade !== 'A+') {
                 finalGrade = 'A+';
                 if (finalLevel !== 'Multiskill') finalLevel = 'Very Good';
