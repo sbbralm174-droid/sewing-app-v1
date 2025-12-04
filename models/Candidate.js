@@ -9,7 +9,6 @@ const candidateSchema = new mongoose.Schema({
   },
   nid: {
     type: String,
-    required: [true, 'NID is required'],
     trim: true
   },
   picture: {

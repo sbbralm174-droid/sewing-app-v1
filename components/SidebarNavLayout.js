@@ -211,7 +211,7 @@ export default function FloatingLayout() {
       href: '/supervisor',
       submenu: [
         { name: 'Add Process', icon: '👤', href: '/supervisor/processes' },
-        { name: 'Daily Production', icon: '🎭', href: '/supervisor/daily-production' },
+        { name: 'Daily Production', icon: '🎭', href: '/supervisor/daily-production-by-qrcode' },
         { name: 'hourly production entry', icon: '🔐', href: '/admin/hourly-production-entry' },
         { name: 'line completion', icon: '🔐', href: '/supervisor/line-completion' },
         { name: 'delete daily production entry', icon: '🔐', href: '/supervisor/delete-daily-production-entry' }

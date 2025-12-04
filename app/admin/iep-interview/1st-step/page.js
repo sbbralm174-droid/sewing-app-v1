@@ -220,7 +220,15 @@ export default function VivaInterviewStep1() {
           failureReason: ''
         });
         setCapturedImage(null);
-        photoFileRef.current = null;
+        if (photoFileRef.current) {
+          photoFileRef.current = null;
+        }
+
+        const fileInput = document.getElementById('fileInput');
+        if (fileInput) {
+          fileInput.value = '';
+        }
+
         
       } else {
         setErrorMessage(`❌ ${responseData.error || 'Failed to create candidate record'}`);

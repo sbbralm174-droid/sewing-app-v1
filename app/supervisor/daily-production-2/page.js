@@ -406,7 +406,7 @@ export default function DailyProductionForm() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
             });
-            
+            console.log('Response:', response);
             if (response.ok) {
                 setSuccessMessage('✅ Daily production entry submitted successfully!');
                 setTimeout(() => setSuccessMessage(''), 3000);

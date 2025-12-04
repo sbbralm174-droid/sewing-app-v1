@@ -15,8 +15,11 @@ export default function DailyProductionPage() {
   const [tableData, setTableData] = useState([]);
   const [buyers, setBuyers] = useState([]);
   const [styles, setStyles] = useState([]);
+  const [filteredStyles, setFilteredStyles] = useState([]); // নতুন state
   const [isLoading, setIsLoading] = useState(false);
   const [isHeaderComplete, setIsHeaderComplete] = useState(false);
+  const [processes, setProcesses] = useState([]);
+  const [filteredProcesses, setFilteredProcesses] = useState([]);
   
   // Scan related states
   const [scanInput, setScanInput] = useState("");
@@ -25,6 +28,27 @@ export default function DailyProductionPage() {
   
   const scanInputRef = useRef(null);
   const scanTimeoutRef = useRef(null);
+
+
+ useEffect(() => {
+  fetchProcesses();
+}, []);
+
+const fetchProcesses = async () => {
+  try {
+    const res = await fetch('/api/processes');
+    const data = await res.json();
+    setProcesses(data);
+  } catch (error) {
+    console.error("Error fetching processes:", error);
+  }
+};
+
+
+
+
+
+
 
   // Check if header is complete
   useEffect(() => {
@@ -37,6 +61,28 @@ export default function DailyProductionPage() {
       addNewRow();
     }
   }, [formData, tableData.length]);
+
+  // Buyer change হলে style filter করবে
+  useEffect(() => {
+    if (formData.buyer && styles.length > 0) {
+      const buyerSpecificStyles = styles.filter(
+        (style) => style.buyerId?._id === formData.buyer || 
+                  style.buyerId === formData.buyer ||
+                  style.buyerName === buyers.find(b => b._id === formData.buyer)?.name
+      );
+      setFilteredStyles(buyerSpecificStyles);
+      
+      // যদি selected style টা filtered list এ না থাকে, তাহলে reset করবে
+      if (formData.style && !buyerSpecificStyles.some(s => s._id === formData.style)) {
+        setFormData(prev => ({ ...prev, style: "" }));
+      }
+    } else {
+      setFilteredStyles([]);
+      if (formData.style) {
+        setFormData(prev => ({ ...prev, style: "" }));
+      }
+    }
+  }, [formData.buyer, styles, buyers, formData.style]);
 
   // Auto focus on scan input when header is complete
   useEffect(() => {
@@ -57,12 +103,15 @@ export default function DailyProductionPage() {
       // Fetch buyers
       const buyersRes = await fetch('/api/buyers');
       const buyersData = await buyersRes.json();
-      setBuyers(buyersData);
+      
+      // সঠিকভাবে data access করো
+      setBuyers(buyersData.data || []);
 
       // Fetch styles
       const stylesRes = await fetch('/api/styles');
       const stylesData = await stylesRes.json();
-      setStyles(stylesData);
+      // সঠিকভাবে data access করো
+      setStyles(stylesData.data || []);
     } catch (error) {
       console.error("Error fetching dropdown data:", error);
       Swal.fire({
@@ -529,17 +578,26 @@ export default function DailyProductionPage() {
                 required
               >
                 <option value="">Select Buyer</option>
-                  <option >
-                    vn
+                {buyers.map((buyer) => (
+                  <option key={buyer._id} value={buyer._id}>
+                    {buyer.name}
                   </option>
-                
+                ))}
               </select>
+              {isLoading && (
+                <div className="text-xs text-gray-500 mt-1">Loading buyers...</div>
+              )}
             </div>
 
-            {/* Style */}
+            {/* Style - Now shows only buyer-specific styles */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Style *
+                {formData.buyer && (
+                  <span className="text-xs text-gray-500 ml-2">
+                    ({filteredStyles.length} styles available)
+                  </span>
+                )}
               </label>
               <select
                 name="style"
@@ -547,12 +605,26 @@ export default function DailyProductionPage() {
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
+                disabled={!formData.buyer || filteredStyles.length === 0}
               >
-                <option value="">Select Style</option>
-                <option >
-                    dfg
+                <option value="">
+                  {!formData.buyer 
+                    ? "Select buyer first" 
+                    : filteredStyles.length === 0 
+                      ? "No styles found for this buyer" 
+                      : "Select Style"}
+                </option>
+                {filteredStyles.map((style) => (
+                  <option key={style._id} value={style._id}>
+                    {style.name}
                   </option>
+                ))}
               </select>
+              {formData.buyer && filteredStyles.length === 0 && !isLoading && (
+                <div className="text-xs text-red-500 mt-1">
+                  No styles found for selected buyer
+                </div>
+              )}
             </div>
 
             {/* Supervisor */}
@@ -612,11 +684,15 @@ export default function DailyProductionPage() {
                     ? "✓ Complete - Ready to scan" 
                     : "✗ Incomplete - Fill all fields"}
                 </div>
+                {formData.buyer && formData.style && (
+                  <div className="text-xs text-green-600 mt-1">
+                    ✓ Style matched with buyer
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
-
         {/* Scanner Section - Always Visible when header is complete */}
         {isHeaderComplete && (
           <div className="mb-6 bg-white rounded-lg shadow p-6">
@@ -807,30 +883,52 @@ export default function DailyProductionPage() {
                       </td>
 
                       {/* Process */}
-                      <td className="px-6 py-4">
-                        <select
-                          value={row.process}
-                          onChange={(e) =>
-                            handleRowChange(index, "process", e.target.value)
-                          }
-                          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
-                            row.operator ? 'border-gray-300' : 'border-gray-200 bg-gray-100'
-                          }`}
-                          disabled={!row.operator}
-                        >
-                          <option value="">Select Process</option>
-                          {row.operator && row.allowedProcesses && Object.keys(row.allowedProcesses).map((process) => (
-                            <option key={process} value={process}>
-                              {process}
-                            </option>
-                          ))}
-                        </select>
-                        {row.process && row.allowedProcesses && row.allowedProcesses[row.process] && (
-                          <div className="text-xs text-gray-500 mt-1">
-                            Target: {row.allowedProcesses[row.process]}
-                          </div>
-                        )}
-                      </td>
+                      {/* Process Column */}
+<td className="px-6 py-4">
+  <select
+    value={row.process}
+    onChange={(e) => handleRowChange(index, "process", e.target.value)}
+    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+      row.operator ? 'border-gray-300' : 'border-gray-200 bg-gray-100'
+    }`}
+    disabled={!row.operator}
+  >
+    <option value="">Select Process</option>
+    {/* First show allowed processes if available */}
+    {row.operator && row.allowedProcesses && Object.keys(row.allowedProcesses).length > 0 ? (
+      Object.keys(row.allowedProcesses).map((process) => (
+        <option key={process} value={process}>
+          {process}
+        </option>
+      ))
+    ) : (
+      // If no allowed processes, show all processes from API
+      processes.map((process) => (
+        <option key={process._id} value={process._id}>
+          {process.name} ({process.code})
+        </option>
+      ))
+    )}
+  </select>
+  
+  {/* Show process details if selected */}
+  {row.process && (
+    <div className="text-xs text-gray-500 mt-1">
+      {(() => {
+        const selectedProcess = processes.find(p => p._id === row.process);
+        if (selectedProcess) {
+          return (
+            <>
+              <div>SMV: {selectedProcess.smv}</div>
+              <div>Machine: {selectedProcess.machineType}</div>
+            </>
+          );
+        }
+        return null;
+      })()}
+    </div>
+  )}
+</td>
 
                       {/* Work As */}
                       <td className="px-6 py-4">

@@ -1,47 +1,60 @@
-import NextAuth from "next-auth";
-import CredentialsProvider from "next-auth/providers/credentials";
-import { connectDB } from "@/lib/db";
-import User from "@/models/User";
-import bcrypt from "bcryptjs";
+import NextAuth from 'next-auth';
+import CredentialsProvider from 'next-auth/providers/credentials';
+import { connectDB } from '@/lib/db';
+import User from '@/models/User';
+import { authConfig } from '@/lib/auth';
 
-const handler = NextAuth({
-  providers: [
-    CredentialsProvider({
-      async authorize(credentials) {
-        await connectDB();
-        const user = await User.findOne({ email: credentials.email });
-        if (!user) throw new Error("User not found");
+const credentialsProvider = CredentialsProvider({
+  name: 'credentials',
+  credentials: {
+    userId: { label: "User ID", type: "text" },
+    password: { label: "Password", type: "password" }
+  },
+  async authorize(credentials) {
+    await connectDB();
+    
+    const user = await User.findOne({ userId: credentials.userId });
+    
+    if (!user) {
+      throw new Error('User not found');
+    }
+    
+    const isPasswordValid = await user.comparePassword(credentials.password);
+    
+    if (!isPasswordValid) {
+      throw new Error('Invalid password');
+    }
+    
+    // ✅ Return user info for JWT
+    return {
+      id: user._id.toString(),
+      userId: user.userId,
+      name: user.name,
+      isAdmin: user.isAdmin,
+    };
+  }
+});
 
-        const isValid = await bcrypt.compare(credentials.password, user.password);
-        if (!isValid) throw new Error("Invalid password");
+export const handler = NextAuth({
+  ...authConfig,
+  providers: [credentialsProvider],
 
-        return {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          designation: user.designation,
-          permissions: user.permissions
-        };
-      },
-    }),
-  ],
+  // 🔑 Add callbacks for JWT and session
   callbacks: {
     async jwt({ token, user }) {
+      // first login
       if (user) {
-        token.role = user.role;
-        token.designation = user.designation;
-        token.permissions = user.permissions;
+        token.userId = user.userId;      // needed in middleware
+        token.isAdmin = user.isAdmin;    // needed in middleware
       }
       return token;
     },
     async session({ session, token }) {
-      session.user.role = token.role;
-      session.user.designation = token.designation;
-      session.user.permissions = token.permissions;
+      session.user.userId = token.userId;
+      session.user.isAdmin = token.isAdmin;
       return session;
-    },
-  },
+    }
+  }
 });
 
 export { handler as GET, handler as POST };

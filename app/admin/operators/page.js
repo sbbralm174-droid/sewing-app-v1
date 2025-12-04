@@ -134,7 +134,7 @@ export default function OperatorForm() {
   }
 
   const filteredProcesses = processes.filter(p =>
-    p.name.toLowerCase().includes(searchTerm.toLowerCase())
+    p.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (

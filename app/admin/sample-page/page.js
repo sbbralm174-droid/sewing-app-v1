@@ -10,14 +10,14 @@ export default function Home() {
   }, []);
 
   async function fetchPosts() {
-    const res = await fetch("/api/posts");
+    const res = await fetch("/api/users");
     const data = await res.json();
     setPosts(data);
   }
 
   async function createPost() {
     if (!newPost.title || !newPost.content) return;
-    await fetch("/api/posts", {
+    await fetch("/api/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newPost),
