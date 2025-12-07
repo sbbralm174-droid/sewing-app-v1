@@ -21,11 +21,7 @@ export default function ResultSection({ formData, onChange }) {
             <option value="A++">A++</option>
             <option value="B">B</option>
             <option value="B+">B+</option>
-            <option value="B++">B++</option>
-            <option value="C">C</option>
-            <option value="D">D</option>
-            <option value="E">E</option>
-            <option value="F">F</option>
+            <option value="Unskill">Unskill</option>
           </select>
         </div>
 

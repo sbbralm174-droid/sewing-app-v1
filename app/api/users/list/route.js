@@ -1,38 +1,34 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authConfig } from '@/lib/auth';
+import { getToken } from 'next-auth/jwt';
 import { connectDB } from '@/lib/db';
 import User from '@/models/User';
 
-export async function GET() {
+export async function GET(req) {
   try {
-    const session = await getServerSession(authConfig);
-    
-    if (!session?.user?.isAdmin) {
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    console.log('🔥 API token:', token);
+
+    if (!token?.isAdmin) {
       return NextResponse.json(
         { error: 'Admin access required' },
         { status: 403 }
       );
     }
-    
+
     await connectDB();
-    
-    const users = await User.find({}, 'userId name isAdmin createdAt')
-      .sort({ createdAt: -1 });
-    
+
+    const users = await User.find({}, 'userId name isAdmin createdAt').sort({ createdAt: -1 });
+
     return NextResponse.json({
-      users: users.map(user => ({
-        userId: user.userId,
-        name: user.name,
-        isAdmin: user.isAdmin,
-        createdAt: user.createdAt,
+      users: users.map(u => ({
+        userId: u.userId,
+        name: u.name,
+        isAdmin: u.isAdmin,
+        createdAt: u.createdAt,
       })),
     });
   } catch (error) {
     console.error('Get users error:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch users' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
   }
 }

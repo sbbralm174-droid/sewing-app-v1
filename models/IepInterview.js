@@ -64,8 +64,8 @@ const VivaInterviewSchema = new mongoose.Schema(
     },
     grade: {
       type: String,
-      enum: ["A", "A+", "A++", "B+", "B++", "B", "C", "D", "E", "F"],
-      default: "C",
+      enum: ["A", "A+", "A++", "B+", "B" ,"Unskill"],
+      default: "Unskill",
     },
     result: {
       type: String,

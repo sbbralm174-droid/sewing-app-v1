@@ -15,6 +15,7 @@ export async function middleware(request) {
   });
 
   const publicRoutes = [
+     
   '/auth/signin',
   '/auth/signup',
   '/api/auth',              // <<< important!
@@ -22,6 +23,7 @@ export async function middleware(request) {
   '/api/auth/callback',     // <<< login
   '/api/auth/signin',
   '/api/auth/signout',
+  '/api/users/list',
 ];
 
   if (publicRoutes.some(route => pathname.startsWith(route))) {

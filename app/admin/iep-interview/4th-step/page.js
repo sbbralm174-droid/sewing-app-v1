@@ -388,7 +388,7 @@ export default function AdminInterviewForm() {
                     <div><span className="text-gray-600">NID:</span> {selectedCandidate.nid || 'N/A'}</div>
                     <div><span className="text-gray-600">Birth Certificate:</span> {selectedCandidate.birthCertificate || 'N/A'}</div>
                     <div><span className="text-gray-600">Viva Grade:</span> {selectedCandidate.grade}</div>
-                    <div><span className="text-gray-600">Viva Result:</span> {selectedCandidate.result}</div>
+                    {/* <div><span className="text-gray-600">Viva Result:</span> {selectedCandidate.result}</div> */}
                     <div><span className="text-gray-600">Department:</span> {selectedCandidate.department}</div>
                   </div>
                   

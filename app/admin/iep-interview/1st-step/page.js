@@ -41,6 +41,62 @@ export default function VivaInterviewStep1() {
     }
   };
 
+
+
+
+
+// Extract from XML style
+function extractFromXML(input) {
+  const nidMatch = input.match(/<pin>(.*?)<\/pin>/);
+  const nameMatch = input.match(/<name>(.*?)<\/name>/);
+
+  return {
+    nid: nidMatch ? nidMatch[1].trim() : "",
+    name: nameMatch ? nameMatch[1].trim() : ""
+  };
+}
+
+// Extract from Barcode style
+function extractFromBarcode(input) {
+  let name = "";
+  let nid = "";
+
+  // Name extraction: between NM and NW
+  const nameRegex = /NM(.*?)NW/;
+  const nameMatch = input.match(nameRegex);
+  if (nameMatch) {
+    name = nameMatch[1].trim();
+  }
+
+  // Clean unwanted suffix/prefix
+  name = name.replace(/[^A-Za-z\s]/g, "");
+
+  // NID extraction: between NW and OL
+  const nidRegex = /NW(\d+)OL/;
+  const nidMatch = input.match(nidRegex);
+  if (nidMatch) {
+    nid = nidMatch[1].trim();
+  }
+
+  return { name, nid };
+}
+
+// Master extractor
+function parseScannedData(text) {
+  if (text.includes("<pin>") || text.includes("<name>")) {
+    return extractFromXML(text);
+  } else if (text.includes("NM") && text.includes("NW")) {
+    return extractFromBarcode(text);
+  }
+  return { name: "", nid: "" };
+}
+
+
+
+
+
+
+
   // Search button click handler - NID বা Birth Certificate যেকোনো একটি দিয়ে search করবে
   const handleSearch = () => {
     const nidValue = formData.nid.trim();
@@ -304,6 +360,25 @@ export default function VivaInterviewStep1() {
         <form className="space-y-6">
           {/* Name Field */}
           <div>
+          <textarea
+  rows={3}
+  className="w-full p-3 border rounded-md"
+  placeholder="Paste scanned data here..."
+  onBlur={(e) => {
+    const res = parseScannedData(e.target.value);
+
+    if (res.name) {
+      setFormData(prev => ({ ...prev, name: res.name }));
+    }
+    if (res.nid) {
+      setFormData(prev => ({ ...prev, nid: res.nid }));
+    }
+  }}
+></textarea>
+
+
+
+
             <label className="block mb-2 text-lg font-medium text-gray-700">
               Candidate Name:
               <span className="text-red-500 ml-1">*</span>
