@@ -330,8 +330,8 @@ export default function QRBulkGeneratorPage() {
           <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
             <h3 className="font-semibold text-yellow-800 mb-2">Instructions:</h3>
             <ol className="list-decimal pl-5 text-yellow-700 text-sm space-y-1">
-              <li>Click "Generate All QR Codes" to create QR codes for all operators and machines</li>
-              <li>Click "Print All" to print all QR codes for physical distribution</li>
+              <li>Click Generate All QR Codes to create QR codes for all operators and machines</li>
+              <li>Click Print All to print all QR codes for physical distribution</li>
               <li>Use a QR scanner app on your phone to test each code</li>
               <li>Click on any QR code to simulate scanning and test functionality</li>
               <li>Download individual QR codes by clicking the download button on each card</li>
@@ -483,7 +483,7 @@ export default function QRBulkGeneratorPage() {
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">No QR Codes Generated</h3>
               <p className="text-gray-500 mb-6">
-                Click the "Generate All QR Codes" button to create QR codes for all operators and machines.
+                Click the Generate All QR Codes button to create QR codes for all operators and machines.
               </p>
               <button
                 onClick={generateAllQRCodes}
@@ -500,7 +500,7 @@ export default function QRBulkGeneratorPage() {
         <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4 no-print">
           <h3 className="text-lg font-semibold text-blue-800 mb-2">Printing Instructions:</h3>
           <ul className="list-disc pl-5 text-blue-700 space-y-1">
-            <li>Click "Print All" button to print all generated QR codes</li>
+            <li>Click Print All button to print all generated QR codes</li>
             <li>For best results, use A4 paper size</li>
             <li>Each QR code is designed to be cut and pasted on machines/operator cards</li>
             <li>Test each QR code with a scanner before permanent placement</li>
