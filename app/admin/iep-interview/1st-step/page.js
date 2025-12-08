@@ -7,6 +7,8 @@ import { Html5QrcodeScanner } from 'html5-qrcode';
 import NidOrBirthCertificateSearch from '@/components/NidOrBirthCertificate';
 
 export default function VivaInterviewStep1() {
+  
+  
   const router = useRouter();
   const [formData, setFormData] = useState({
     name: '',

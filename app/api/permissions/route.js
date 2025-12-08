@@ -9,7 +9,9 @@ import User from '@/models/User';
 export async function GET(request) {
   try {
     const session = await getServerSession(authConfig);
-    
+
+    console.log('SESSION:', session);
+
     if (!session?.user?.userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },

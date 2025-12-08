@@ -41,15 +41,21 @@ export default function DailyProductionForm() {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const router = useRouter();
     const dateRef = useRef(null);
+    
+    // ✅ NEW: Scan protection state
+    const [isScanning, setIsScanning] = useState(false);
+    // ✅ NEW: Timer state for countdown
+    const [scanTimer, setScanTimer] = useState(0);
 
     // Custom styles for react-select (dark theme)
     const customSelectStyles = {
         control: (provided, state) => ({
             ...provided,
-            backgroundColor: '#1f2937',
+            backgroundColor: state.isDisabled ? '#374151' : '#1f2937',
             borderColor: state.isFocused ? '#3b82f6' : '#4b5563',
             color: 'white',
             minHeight: '48px',
+            opacity: state.isDisabled ? 0.7 : 1,
         }),
         menu: (provided) => ({
             ...provided,
@@ -60,7 +66,7 @@ export default function DailyProductionForm() {
             ...provided,
             backgroundColor: state.isFocused ? '#374151' : '#1f2937',
             color: 'white',
-            cursor: 'pointer',
+            cursor: state.isDisabled ? 'not-allowed' : 'pointer',
         }),
         singleValue: (provided) => ({
             ...provided,
@@ -83,16 +89,133 @@ export default function DailyProductionForm() {
         }),
     };
 
-    // Function to add process to operator's allowedProcesses - improved version
+    // ✅ NEW: Improved scan protection function with timer
+    const startScanProtection = async () => {
+        if (isScanning) {
+            console.log('Scanning already in progress, please wait...');
+            return false;
+        }
+        
+        setIsScanning(true);
+        setScanTimer(0.5); // Start with 0.5 seconds
+        
+        console.log('Scanning started, protection enabled for 0.5 seconds');
+        
+        // Start countdown timer
+        const timerInterval = setInterval(() => {
+            setScanTimer(prev => {
+                const newValue = (prev - 0.1).toFixed(1);
+                if (newValue <= 0) {
+                    clearInterval(timerInterval);
+                    return 0;
+                }
+                return parseFloat(newValue);
+            });
+        }, 100);
+        
+        // 0.5 সেকেন্ড পর automatically scanning enable করবে
+        setTimeout(() => {
+            setIsScanning(false);
+            setScanTimer(0);
+            clearInterval(timerInterval);
+            console.log('Scanning protection disabled, ready for next scan');
+        }, 500); // 500ms = 0.5 seconds
+        
+        return true;
+    };
+
+    // ✅ NEW: Direct event handler for operator select with protection
+    const handleOperatorSelect = async (selected) => {
+        const canScan = await startScanProtection();
+        if (!canScan) {
+            setDuplicateError('Please wait ' + scanTimer.toFixed(1) + ' seconds before scanning again');
+            
+            // Reset to previous value
+            setFormData(prev => ({ ...prev }));
+            return;
+        }
+        
+        setDuplicateError('');
+        setFormData(prev => ({ ...prev, operator: selected, process: '' }));
+        
+        // সবসময় সব processes দেখাবে
+        setOperatorProcesses(allProcesses.map(p => p.name));
+    };
+
+    // ✅ NEW: Direct event handler for machine select with protection
+    const handleMachineSelect = async (selected) => {
+        if (formData.workAs === 'operator') {
+            const canScan = await startScanProtection();
+            if (!canScan) {
+                setDuplicateError('Please wait ' + scanTimer.toFixed(1) + ' seconds before scanning machine again');
+                
+                // Reset to previous value
+                setFormData(prev => ({ ...prev }));
+                return;
+            }
+        }
+        setFormData(prev => ({ ...prev, uniqueMachine: selected?.value || '' }));
+    };
+
+    // ✅ Modified: Handle select change
+    const handleSelectChange = (selected, actionMeta) => {
+        const { name } = actionMeta;
+        
+        // Skip if scanning is in progress for operator or machine
+        if ((name === 'operator' || name === 'uniqueMachine') && isScanning) {
+            setDuplicateError('Please wait ' + scanTimer.toFixed(1) + ' seconds before scanning again');
+            return;
+        }
+
+        setDuplicateError('');
+
+        if (name === 'operator') {
+            handleOperatorSelect(selected);
+        } else if (name === 'process') {
+            setFormData(prev => ({ ...prev, process: selected?.value || '' }));
+        } else if (name === 'supervisor') {
+            setFormData(prev => ({ ...prev, supervisor: selected }));
+        } else if (name === 'floor') {
+            setFormData(prev => ({ ...prev, floor: selected?.value || '' }));
+        } else if (name === 'line') {
+            setFormData(prev => ({ ...prev, line: selected?.value || '' }));
+        } else if (name === 'status') {
+            setFormData(prev => ({ ...prev, status: selected?.value || '' }));
+        } else if (name === 'workAs') {
+            setFormData(prev => ({ ...prev, workAs: selected?.value || 'operator' }));
+        } else if (name === 'machineType') {
+            setFormData(prev => ({ ...prev, machineType: selected?.value || '', uniqueMachine: '' }));
+        } else if (name === 'uniqueMachine') {
+            handleMachineSelect(selected);
+        } else if (name === 'buyerId') {
+            setFormData(prev => ({ ...prev, buyerId: selected?.value || '', styleId: '' }));
+        } else if (name === 'styleId') {
+            setFormData(prev => ({ ...prev, styleId: selected?.value || '' }));
+        }
+    };
+
+    // ✅ Modified: Input change with better protection
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        
+        // Check if this might be a barcode scan for operator or machine fields
+        if ((name === 'operator' || name === 'uniqueMachine') && isScanning) {
+            setDuplicateError('Scanning too fast! Please wait ' + scanTimer.toFixed(1) + ' seconds between scans.');
+            return;
+        }
+        
+        setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    // Function to add process to operator's allowedProcesses
     const addProcessToOperator = async (operator, processName) => {
         try {
             // Check if process already exists in operator's allowedProcesses
             const currentAllowedProcesses = operator.allowedProcesses || {};
             
             if (currentAllowedProcesses[processName] !== undefined) {
-                // Process already exists, no need to add
                 console.log(`Process "${processName}" already exists in operator's allowed processes`);
-                return true; // Return true indicating process already exists
+                return true;
             }
 
             // Process doesn't exist, add it with value 0
@@ -101,7 +224,6 @@ export default function DailyProductionForm() {
                 [processName]: 0
             };
 
-            // Update operator in the database
             const response = await fetch(`/api/operators/process-update-from-daily-production/${operator._id}`, {
                 method: 'PATCH',
                 headers: {
@@ -115,14 +237,12 @@ export default function DailyProductionForm() {
             if (response.ok) {
                 console.log(`Successfully added process "${processName}" to operator`);
                 
-                // Update local operators state to reflect the change
                 setOperators(prev => prev.map(op => 
                     op._id === operator._id 
                         ? { ...op, allowedProcesses: updatedProcesses }
                         : op
                 ));
                 
-                // If current operator is selected, update it too
                 if (formData.operator && formData.operator._id === operator._id) {
                     setFormData(prev => ({
                         ...prev,
@@ -292,40 +412,6 @@ export default function DailyProductionForm() {
         fetchStylesByBuyer();
     }, [formData.buyerId]);
 
-    // Handle operator selection - সবসময় সব processes দেখাবে
-    const handleSelectChange = (selected, actionMeta) => {
-        const { name } = actionMeta;
-        setDuplicateError('');
-
-        if (name === 'operator') {
-            setFormData(prev => ({ ...prev, operator: selected, process: '' }));
-            
-            // সবসময় সব processes দেখাবে
-            setOperatorProcesses(allProcesses.map(p => p.name));
-            
-        } else if (name === 'process') {
-            setFormData(prev => ({ ...prev, process: selected?.value || '' }));
-        } else if (name === 'supervisor') {
-            setFormData(prev => ({ ...prev, supervisor: selected }));
-        } else if (name === 'floor') {
-            setFormData(prev => ({ ...prev, floor: selected?.value || '' }));
-        } else if (name === 'line') {
-            setFormData(prev => ({ ...prev, line: selected?.value || '' }));
-        } else if (name === 'status') {
-            setFormData(prev => ({ ...prev, status: selected?.value || '' }));
-        } else if (name === 'workAs') {
-            setFormData(prev => ({ ...prev, workAs: selected?.value || 'operator' }));
-        } else if (name === 'machineType') {
-            setFormData(prev => ({ ...prev, machineType: selected?.value || '', uniqueMachine: '' }));
-        } else if (name === 'uniqueMachine') {
-            setFormData(prev => ({ ...prev, uniqueMachine: selected?.value || '' }));
-        } else if (name === 'buyerId') {
-            setFormData(prev => ({ ...prev, buyerId: selected?.value || '', styleId: '' }));
-        } else if (name === 'styleId') {
-            setFormData(prev => ({ ...prev, styleId: selected?.value || '' }));
-        }
-    };
-
     // Duplicate check function
     const checkDuplicateEntry = async (operatorId, uniqueMachine, date, workAs) => {
         try {
@@ -348,13 +434,7 @@ export default function DailyProductionForm() {
         }
     };
 
-    // Handle input changes
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-    };
-
-    // Handle submit - সংশোধিত version
+    // Handle submit
     const handleSubmit = async (e) => {
         e.preventDefault();
         setDuplicateError('');
@@ -406,7 +486,7 @@ export default function DailyProductionForm() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
             });
-            console.log('Response:', response);
+            
             if (response.ok) {
                 setSuccessMessage('✅ Daily production entry submitted successfully!');
                 setTimeout(() => setSuccessMessage(''), 3000);
@@ -468,8 +548,19 @@ export default function DailyProductionForm() {
     }
     
     // Prepare options
-    const operatorOptions = operators.map(op => ({ value: op.operatorId, label: `${op.name} - ${op.operatorId} (${op.designation})`, ...op }));
-    const supervisorOptions = supervisors.map(sup => ({ value: sup.supervisorId, label: `${sup.name} (${sup.supervisorId})`, ...sup }));
+    const operatorOptions = operators.map(op => ({ 
+        value: op.operatorId, 
+        label: `${op.name} - ${op.operatorId} (${op.designation})`, 
+        ...op,
+        isDisabled: isScanning 
+    }));
+    
+    const supervisorOptions = supervisors.map(sup => ({ 
+        value: sup.supervisorId, 
+        label: `${sup.name} (${sup.supervisorId})`, 
+        ...sup 
+    }));
+    
     const floorOptions = floors.map(f => ({ value: f.floorName, label: f.floorName }));
     const lineOptions = lines.map(l => ({ value: l, label: l }));
     
@@ -479,8 +570,15 @@ export default function DailyProductionForm() {
     const statusOptions = [{ value: 'present', label: 'Present' }];
     const workAsOptions = [{ value: 'operator', label: 'Operator' },  { value: 'helper', label: 'Helper' }];
     const machineTypeOptions = machineTypes.map(mt => ({ value: mt.name, label: mt.name }));
-    const uniqueMachineOptions = filteredMachines.map(m => ({ value: m.uniqueId, label: m.uniqueId }));
+    
+    const uniqueMachineOptions = filteredMachines.map(m => ({ 
+        value: m.uniqueId, 
+        label: m.uniqueId,
+        isDisabled: isScanning 
+    }));
+    
     const buyerOptions = buyers.data?.map(buyer => ({ value: buyer._id, label: buyer.name })) || [];
+    
     const styleOptions = (filteredStyles?.data?.map(style => ({ 
         value: style._id, 
         label: `${style.name}` 
@@ -490,14 +588,38 @@ export default function DailyProductionForm() {
         <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
             <SidebarNavLayout/>
             <div className="bg-gray-800 shadow-md rounded-lg pt-20 p-8 max-w-4xl w-full">
+                {/* ✅ NEW: Improved Scan Status Indicator */}
+                <div className={`mb-4 p-3 rounded-md text-center font-semibold ${
+                    isScanning 
+                    ? 'bg-yellow-900 text-yellow-300 border border-yellow-700' 
+                    : 'bg-green-900 text-green-300 border border-green-700'
+                }`}>
+                    {isScanning ? (
+                        <div className="flex items-center justify-center gap-2">
+                            <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>Scanning... Please wait {scanTimer.toFixed(1)} seconds</span>
+                        </div>
+                    ) : (
+                        <div className="flex items-center justify-center gap-2">
+                            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span>Ready to scan</span>
+                        </div>
+                    )}
+                </div>
+
                 {/* Header with Reload Icon */}
                 <div className="flex justify-between items-center mb-8">
                     <h1 className="text-3xl font-extrabold text-blue-400">Daily Production Entry 📊</h1>
                     <button
                         type="button"
                         onClick={handleReloadProcessData}
-                        disabled={isRefreshing}
-                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-md transition duration-300 ease-in-out font-semibold shadow-md"
+                        disabled={isRefreshing || isScanning}
+                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md transition duration-300 ease-in-out font-semibold shadow-md"
                         title="Reload Process Data"
                     >
                         {isRefreshing ? (
@@ -528,6 +650,7 @@ export default function DailyProductionForm() {
                                 checked={isLineDone}
                                 onChange={(e) => setIsLineDone(e.target.checked)}
                                 className="mr-2 h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                                disabled={isScanning}
                             />
                             Mark this line as complete for the day
                         </label>
@@ -538,7 +661,7 @@ export default function DailyProductionForm() {
                         <label className="block text-sm font-medium text-gray-300 mb-1">Date:</label>
                         <div
                             className="w-full p-3 border border-gray-600 rounded-md bg-gray-700 text-white cursor-pointer"
-                            onClick={() => dateRef.current?.showPicker()}
+                            onClick={() => !isScanning && dateRef.current?.showPicker()}
                         >
                             <input
                                 ref={dateRef}
@@ -548,6 +671,7 @@ export default function DailyProductionForm() {
                                 onChange={handleInputChange}
                                 className="bg-transparent outline-none w-full cursor-pointer"
                                 required
+                                disabled={isScanning}
                             />
                         </div>
                     </div>
@@ -563,6 +687,7 @@ export default function DailyProductionForm() {
                             styles={customSelectStyles}
                             isSearchable
                             required
+                            isDisabled={isScanning}
                         />
                     </div>
 
@@ -577,7 +702,7 @@ export default function DailyProductionForm() {
                             styles={customSelectStyles}
                             isSearchable
                             required
-                            isDisabled={!formData.buyerId}
+                            isDisabled={!formData.buyerId || isScanning}
                         />
                     </div>
 
@@ -591,6 +716,7 @@ export default function DailyProductionForm() {
                             onChange={handleSelectChange}
                             styles={customSelectStyles}
                             isSearchable
+                            isDisabled={isScanning}
                         />
                     </div>
 
@@ -604,6 +730,7 @@ export default function DailyProductionForm() {
                             onChange={handleSelectChange}
                             styles={customSelectStyles}
                             isSearchable
+                            isDisabled={isScanning}
                         />
                     </div>
 
@@ -617,6 +744,7 @@ export default function DailyProductionForm() {
                             onChange={handleSelectChange}
                             styles={customSelectStyles}
                             isSearchable
+                            isDisabled={isScanning}
                         />
                     </div>
 
@@ -630,6 +758,7 @@ export default function DailyProductionForm() {
                             onChange={handleSelectChange}
                             styles={customSelectStyles}
                             isSearchable
+                            isDisabled={isScanning}
                         />
                     </div>
 
@@ -643,6 +772,7 @@ export default function DailyProductionForm() {
                             onChange={handleSelectChange}
                             styles={customSelectStyles}
                             isSearchable
+                            isDisabled={isScanning}
                         />
                     </div>
 
@@ -655,6 +785,7 @@ export default function DailyProductionForm() {
                             value={{ value: formData.status, label: formData.status.charAt(0).toUpperCase() + formData.status.slice(1) }}
                             onChange={handleSelectChange}
                             styles={customSelectStyles}
+                            isDisabled={isScanning}
                         />
                     </div>
 
@@ -667,6 +798,7 @@ export default function DailyProductionForm() {
                             value={{ value: formData.workAs, label: formData.workAs.charAt(0).toUpperCase() + formData.workAs.slice(1) }}
                             onChange={handleSelectChange}
                             styles={customSelectStyles}
+                            isDisabled={isScanning}
                         />
                     </div>
 
@@ -680,7 +812,7 @@ export default function DailyProductionForm() {
                             onChange={handleSelectChange}
                             styles={customSelectStyles}
                             isSearchable
-                            isDisabled={formData.workAs !== 'operator'}
+                            isDisabled={formData.workAs !== 'operator' || isScanning}
                         />
                     </div>
 
@@ -694,7 +826,7 @@ export default function DailyProductionForm() {
                             onChange={handleSelectChange}
                             styles={customSelectStyles}
                             isSearchable
-                            isDisabled={formData.workAs !== 'operator'}
+                            isDisabled={formData.workAs !== 'operator' || isScanning}
                         />
                     </div>
 
@@ -706,9 +838,10 @@ export default function DailyProductionForm() {
                             name="target"
                             value={formData.target}
                             onChange={handleInputChange}
-                            className="w-full p-3 border border-gray-600 rounded-md bg-gray-700 text-white"
+                            className="w-full p-3 border border-gray-600 rounded-md bg-gray-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                             required={formData.workAs === 'operator'}
                             min="1"
+                            disabled={isScanning}
                         />
                     </div>
 
@@ -725,9 +858,10 @@ export default function DailyProductionForm() {
 
                     <button
                         type="submit"
-                        className="w-full bg-green-600 text-white px-6 py-3 rounded-md hover:bg-green-700 transition duration-300 ease-in-out font-semibold shadow-md"
+                        className="w-full bg-green-600 text-white px-6 py-3 rounded-md hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed transition duration-300 ease-in-out font-semibold shadow-md"
+                        disabled={isScanning}
                     >
-                        Submit Daily Production
+                        {isScanning ? `Please wait ${scanTimer.toFixed(1)}s...` : 'Submit Daily Production'}
                     </button>
                 </form>
             </div>

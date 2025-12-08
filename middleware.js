@@ -18,6 +18,7 @@ export async function middleware(request) {
      
   '/auth/signin',
   '/auth/signup',
+  '/auth/signout',
   '/api/auth',              // <<< important!
   '/api/auth/session',      // <<< internal NextAuth
   '/api/auth/callback',     // <<< login

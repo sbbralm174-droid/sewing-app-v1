@@ -34,6 +34,7 @@ export default function CandidateReport() {
       setLoading(false);
     }
   };
+  console.log("reportData",reportData);
 
   const handleDateFilter = (e) => {
     e.preventDefault();
@@ -218,6 +219,7 @@ export default function CandidateReport() {
     <div className="flex flex-col">
       <span className="text-sm font-medium text-gray-900">{candidate.candidateId}</span>
       <span className="text-sm font-medium text-gray-900">{candidate.name}</span>
+      <span className="text-sm font-medium text-gray-900">{candidate.nid}</span>
       
     </div>
   </div>
