@@ -18,15 +18,16 @@ export default function InterviewStepTwo() {
   const [chairmanCertificate, setChairmanCertificate] = useState(false);
   const [educationCertificate, setEducationCertificate] = useState(false);
   const [experienceMachines, setExperienceMachines] = useState({
-    ASST_OPERATOR: false,
-    OPERATOR: false,
-  });
-  const [designation, setDesignation] = useState({
     SNLS_DNLS: false,
     OverLock: false,
     FlatLock: false
   });
+  const [designation, setDesignation] = useState({
+    ASST_OPERATOR: false,
+    OPERATOR: false,
+  });
   const [otherInfo, setOtherInfo] = useState('');
+  const [floor, setFloor] = useState('');
   
   // Search related states
   const [showSearch, setShowSearch] = useState(false);
@@ -115,10 +116,11 @@ export default function InterviewStepTwo() {
         FlatLock: false
       });
       setDesignation({
-        ASST_OPERATOR:  false,
+        ASST_OPERATOR: false,
         OPERATOR: false,
       });
       setOtherInfo('');
+      setFloor('');
       setMessage('');
     } else {
       setSelectedCandidateData(null);
@@ -207,6 +209,7 @@ export default function InterviewStepTwo() {
         educationCertificate,
         experienceMachines,
         designation,
+        floor,
         otherInfo: otherInfo.trim(),
         failureReason: resultValue === 'FAILED' ? failureReason : null
       };
@@ -240,10 +243,11 @@ export default function InterviewStepTwo() {
           FlatLock: false
         });
         setDesignation({
-          ASST_OPERATOR:  false,
+          ASST_OPERATOR: false,
           OPERATOR: false,
         });
         setOtherInfo('');
+        setFloor('');
         fetchCandidates();
       } else {
         if (result.errors) {
@@ -444,6 +448,8 @@ export default function InterviewStepTwo() {
                     ))}
                   </div>
                 </div>
+
+                {/* Designation */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Designation
@@ -464,6 +470,25 @@ export default function InterviewStepTwo() {
                       </div>
                     ))}
                   </div>
+                </div>
+
+                {/* Floor Dropdown */}
+                <div>
+                  <label htmlFor="floor" className="block text-sm font-medium text-gray-700 mb-2">
+                    Floor
+                  </label>
+                  <select
+                    id="floor"
+                    value={floor}
+                    onChange={(e) => setFloor(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Select Floor</option>
+                    <option value="SHAPLA">Shapla</option>
+                    <option value="PODDO">Poddor</option>
+                    <option value="KODOM">Kodom</option>
+                    <option value="BELLY">Belly</option>
+                  </select>
                 </div>
 
                 {/* Other Information */}

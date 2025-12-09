@@ -49,6 +49,7 @@ export async function POST(request) {
     console.log('educationCertificate:', requestData.educationCertificate, typeof requestData.educationCertificate);
     console.log('experienceMachines:', requestData.experienceMachines, typeof requestData.experienceMachines);
     console.log('designation:', requestData.designation, typeof requestData.designation);
+    console.log('floor:', requestData.floor, typeof requestData.floor);
     
     // Prepare candidate data with PROPER nested structure
     const candidateData = {
@@ -75,6 +76,9 @@ export async function POST(request) {
         OPERATOR: Boolean(requestData.designation?.OPERATOR)
       },
       
+      // Floor information
+      floor: requestData.floor || '', // Add floor field
+      
       // Additional fields
       otherInfo: requestData.otherInfo || '',
       failureReason: requestData.failureReason || '',
@@ -97,7 +101,8 @@ export async function POST(request) {
       name: candidate.name,
       educationCertificate: candidate.educationCertificate,
       experienceMachines: candidate.experienceMachines,
-      designation: candidate.designation
+      designation: candidate.designation,
+      floor: candidate.floor // Log floor
     });
     
     return NextResponse.json({

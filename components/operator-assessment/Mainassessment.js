@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react'
 import Select from "react-select";
 import ProcessSelect from "@/components/ProcessSelect";
 
+
+
+
 export default function MainAssessment({ onAssessmentComplete, candidateInfo }) {
   const [currentView, setCurrentView] = useState('data-entry')
   const [assessmentData, setAssessmentData] = useState(null)
@@ -725,9 +728,14 @@ function DataEntry({
                   <th className="px-4 py-2 border">Process Name</th>
                   <th className="px-4 py-2 border">DOP</th>
                   <th className="px-4 py-2 border">SMV</th>
-                  {[1, 2, 3, 4, 5].map(num => (
+                  <th className="px-4 py-2 border">1st</th>
+                  <th className="px-4 py-2 border">2nd</th>
+                  <th className="px-4 py-2 border">3rd</th>
+                  <th className="px-4 py-2 border">4th</th>
+                  <th className="px-4 py-2 border">5th</th>
+                  {/* {[1, 2, 3, 4, 5].map(num => (
                     <th key={num} className="px-4 py-2 border">{num}st Cycle Time</th>
-                  ))}
+                  ))} */}
                   <th className="px-4 py-2 border">Quality Status</th>
                   <th className="px-4 py-2 border">Actions</th>
                 </tr>
@@ -1339,7 +1347,7 @@ const calculateMachineScore = (processes) => {
   const dopScores = processesWithCalculations.map(process => {
     const dopPoints = {
       'Basic': 30,
-      'Semi Critical': 50,
+      'Semi-Critical': 50,
       'Critical': 100
     }
     return dopPoints[process.dop] || 0

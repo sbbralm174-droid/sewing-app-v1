@@ -10,6 +10,7 @@ const ALL_PAGES = [
   { path: '/admin', name: 'Admin Dashboard' },
   { path: '/admin/floor', name: 'Add Floor' },
   { path: '/admin/floor-lines', name: 'Floor Lines' },
+  { path: '/admin/buyers', name: 'Buyers' },
   { path: '/admin/machine-types', name: 'Machine Types' },
   { path: '/admin/machines', name: 'Machines' },
   { path: '/admin/operators', name: 'Operators' },
@@ -23,6 +24,11 @@ const ALL_PAGES = [
   { path: '/admin/supervisors', name: 'Supervisors' },
   { path: '/admin/security-search', name: 'Security Search' },
   { path: '/admin/resign', name: 'Resign' },
+  { path: '/admin/defects/search', name: 'Defects Search' },
+  { path: '/admin/defects', name: 'Defects' },
+
+
+
   { path: '/operator-assessment', name: 'Operator Assessment' },
   { path: '/supervisor', name: 'Supervisor Dashboard' },
   { path: '/supervisor/processes', name: 'Add Process' },
@@ -84,24 +90,25 @@ export default function AccessControl() {
   };
 
   const handleUserSelect = async (userId) => {
-    setSelectedUser(userId);
-    setLoading(true);
-    
-    try {
-      const response = await fetch(`/api/permissions?userId=${userId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setUserPermissions({
-          pages: data.permissions || [],
-          apis: data.allowedApis || []
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching permissions:', error);
-    } finally {
-      setLoading(false);
+  setSelectedUser(userId);
+  setLoading(true);
+
+  try {
+    const response = await fetch(`/api/permissions?userId=${userId}`);
+    if (response.ok) {
+      const data = await response.json();
+      setUserPermissions({
+        pages: data.permissions?.map(p => p.path) || [], // ✅ normalize
+        apis: data.allowedApis || []
+      });
     }
-  };
+  } catch (error) {
+    console.error('Error fetching permissions:', error);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const togglePageAccess = (pagePath) => {
     setUserPermissions(prev => {
@@ -265,9 +272,9 @@ export default function AccessControl() {
                           <p>No pages granted yet</p>
                         ) : (
                           <ul className="space-y-1">
-                            {userPermissions.pages.slice(0, 5).map((pathObj) => (
-                              <li key={pathObj._id} className="truncate">
-                                • {ALL_PAGES.find(p => p.path === pathObj.path)?.name || pathObj.path}
+                            {userPermissions.pages.slice(0, 5).map((path) => (
+                              <li key={path} className="truncate">
+                                • {ALL_PAGES.find(p => p.path === path)?.name || path}
                               </li>
                             ))}
 

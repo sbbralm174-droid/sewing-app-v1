@@ -81,6 +81,13 @@ const candidateSchema = new mongoose.Schema({
     }
   },
   
+  // Floor information - ADD THIS FIELD
+  floor: {
+    type: String,
+    enum: ['', 'SHAPLA', 'PODDO', 'KODOM', 'BELLY'],
+    default: ''
+  },
+  
   // Additional information
   otherInfo: {
     type: String,

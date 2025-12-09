@@ -1,11 +1,31 @@
 // utils/uiApiMapping.js
 
+
+
+
 export const UI_API_MAPPING = {
   // Admin Dashboard
   '/admin': [
     { method: 'GET', path: '/api/admin/stats', description: 'Get admin statistics' },
     { method: 'GET', path: '/api/admin/dashboard', description: 'Admin dashboard data' }
   ],
+
+  // Admin buyers
+  '/admin/buyers': [
+    { method: 'GET', path: '/api/buyers', description: 'Get admin statistics' },
+    { method: 'DELETE', path: '/api/buyers/:id', description: 'delete buyers' },
+    { method: 'POST', path: '/api/buyers', description: 'delete buyers' },
+    { method: 'PUT', path: '/api/buyers/:id', description: 'delete buyers' },
+  ],
+
+  // Admin defects
+  '/admin/defects': [
+    { method: 'GET', path: '/api/defects', description: 'Get ALL DEFECTS' },
+    { method: 'DELETE', path: '/api/defects/:id', description: 'delete defects' },
+    { method: 'PUT', path: '/api/defects/:id', description: 'EDIT defects' },
+    { method: 'POST', path: '/api/defects/:id', description: 'POST defects' },
+    { method: 'POST', path: '/api/defects/search', description: 'search defects' },
+],
   
   // Floor Management
   '/admin/floor': [
