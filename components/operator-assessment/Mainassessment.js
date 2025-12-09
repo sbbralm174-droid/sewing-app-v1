@@ -1243,49 +1243,94 @@ function calculateResults(data) {
 });
 
 
-  // Machine Score Calculation with MULTISKILL logic
-  const calculateMachineScore = (processes) => {
+const processCapacitySingleNiddle = [
+    { name: "Pocket-join-(Kangaro)", minCapacity: 90, machine: "SNLS/DNLS" },
+    { name: "Placket-box", minCapacity: 90, machine: "SNLS/DNLS" },
+    { name: "Zipper-join(2nd)", minCapacity: 60, machine: "SNLS/DNLS" },
+    { name: "Back-neck-tape-top-stitch-insert-label", minCapacity: 120, machine: "SNLS/DNLS" }
+];
+
+const processCapacityOverLock = [
+    { name: "Neck-join", minCapacity: 150, machine: "Over Lock" }
+];
+
+const processCapacityFlatLock = [
+    { name: "Bottom-hem", minCapacity: 220, machine: "Flat Lock" }
+];
+
+
+// ======================================================
+// SCORE CALCULATION
+// ======================================================
+
+const calculateMachineScore = (processes) => {
     const specialMachines = ["SNLS/DNLS", "Over Lock", "Flat Lock"];
     const semiSpecialMachines = ["F/Sleamer", "Kansai", "FOA"];
 
     const machinesUsed = [...new Set(processes.map(p => p.machineType))];
 
-    // MULTISKILL CHECK
-    const hasAllThreeSpecial = specialMachines.every(machine => 
-      machinesUsed.includes(machine)
-    );
+    // ======================================================
+    // 1️⃣ CHECK CAPACITY PASSED OR NOT
+    // ======================================================
 
-    if (hasAllThreeSpecial) {
-      return 100;
+    const checkPass = (requiredList) => {
+        return requiredList.every(req => {
+            const found = processes.find(p => p.name === req.name);
+            return found && found.capacity >= req.minCapacity;
+        });
+    };
+
+    const passedSingleNeedle = checkPass(processCapacitySingleNiddle);
+    const passedOverLock     = checkPass(processCapacityOverLock);
+    const passedFlatLock     = checkPass(processCapacityFlatLock);
+
+    const passedAllThree = passedSingleNeedle && passedOverLock && passedFlatLock;
+
+    if (passedAllThree) {
+        return 100;
     }
 
-    // Special Machine Score
+    // ======================================================
+    // 2️⃣ ONLY SPECIAL MACHINES USED (FAIL CAPACITY)
+    // ======================================================
+    const onlySpecial = machinesUsed.every(m => specialMachines.includes(m));
+
+    if (onlySpecial && machinesUsed.length === 3) {
+        return 80;
+    }
+
+    // ======================================================
+    // 3️⃣ OLD SCORING CALCULATION (FALLBACK)
+    // ======================================================
+
+    // Special machine score
     const specialCount = machinesUsed.filter(m => specialMachines.includes(m)).length;
 
     let specialScore = 0;
-    if (specialCount === 1) specialScore =  55;
+    if (specialCount === 1) specialScore = 55;
     else if (specialCount === 2) specialScore = 80;
     else if (specialCount === 3) specialScore = 100;
 
     let totalScore = specialScore;
 
-    // Semi-Special Score
+    // Semi-Special
     if (totalScore < 100) {
-      const semiCount = machinesUsed.filter(m => semiSpecialMachines.includes(m)).length;
-      totalScore += semiCount * 20;
+        const semiCount = machinesUsed.filter(m => semiSpecialMachines.includes(m)).length;
+        totalScore += semiCount * 20;
     }
 
-    // Other Machines Score
+    // Other machines
     if (totalScore < 100) {
-      const otherMachines = machinesUsed.filter(
-        m => !specialMachines.includes(m) && !semiSpecialMachines.includes(m)
-      );
+        const otherMachines = machinesUsed.filter(
+            m => !specialMachines.includes(m) && !semiSpecialMachines.includes(m)
+        );
 
-      totalScore += otherMachines.length * 10;
+        totalScore += otherMachines.length * 10;
     }
 
     return Math.min(totalScore, 100);
-  };
+};
+
 
   const machineScore = calculateMachineScore(data.processes);
   const finalMachineScore = machineScore * 0.3;

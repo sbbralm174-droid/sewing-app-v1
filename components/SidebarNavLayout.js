@@ -3,12 +3,9 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import io from 'socket.io-client'; // ✅ Socket.IO Client Import
+import io from 'socket.io-client';
 
-// আপনার কাস্টম সার্ভারের URL টি দিন
-const SOCKET_SERVER_URL = "http://localhost:3000"; 
-// Production এর জন্য এটি Environment Variable (e.g., process.env.NEXT_PUBLIC_API_URL) থেকে আসা উচিত।
-
+const SOCKET_SERVER_URL = "http://localhost:3000";
 
 // --- Notifications Dropdown Component ---
 function NotificationsDropdown({ notifications, isLoading, error }) {
@@ -68,6 +65,36 @@ function NotificationsDropdown({ notifications, isLoading, error }) {
   );
 }
 
+// Helper function to group permissions by category
+const groupPermissionsByCategory = (permissions) => {
+  const grouped = {
+    admin: [],
+    supervisor: [],
+    reports: [],
+    other: []
+  };
+
+  permissions.forEach(permission => {
+    const { path, name } = permission;
+    
+    if (path.startsWith('/admin')) {
+      if (path.includes('/reports') || path.includes('/report')) {
+        grouped.reports.push(permission);
+      } else {
+        grouped.admin.push(permission);
+      }
+    } else if (path.startsWith('/supervisor')) {
+      grouped.supervisor.push(permission);
+    } else if (path.startsWith('/reports')) {
+      grouped.reports.push(permission);
+    } else {
+      grouped.other.push(permission);
+    }
+  });
+
+  return grouped;
+};
+
 // ----------------------------------------------------
 // --- Main FloatingLayout Component ---
 export default function FloatingLayout() {
@@ -77,6 +104,7 @@ export default function FloatingLayout() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   
   const [notifications, setNotifications] = useState([]);
+  const [permissions, setPermissions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -92,10 +120,28 @@ export default function FloatingLayout() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // 1. Fetch notifications from API (Initial Load)
+  // Fetch permissions from API
+  useEffect(() => {
+    console.log("🛠️ Fetching permissions...");
+    fetch("/api/permissions")
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to fetch permissions');
+        return res.json();
+      })
+      .then((data) => {
+        console.log("✅ Permissions loaded:", data.permissions);
+        setPermissions(data.permissions || []);
+      })
+      .catch((err) => {
+        console.error("❌ Failed to fetch permissions:", err);
+        setError(err.message);
+      });
+  }, []);
+
+  // Fetch notifications from API (Initial Load)
   useEffect(() => {
     console.log("🛠️ Initial fetch of notifications started.");
-    fetch("/api/socket") // যদি আপনার API Route Handler /api/socket হয়।
+    fetch("/api/socket")
       .then((res) => {
         if (!res.ok) throw new Error('Network response was not ok');
         return res.json();
@@ -113,59 +159,54 @@ export default function FloatingLayout() {
       });
   }, []);
 
-  // 2. Socket.IO Live Update Setup
+  // Socket.IO Live Update Setup
   useEffect(() => {
     let socket;
     try {
       socket = io(SOCKET_SERVER_URL);
 
       socket.on('connect', () => {
-          console.log("🟢 Socket Client Connected for Live Updates:", socket.id);
+        console.log("🟢 Socket Client Connected for Live Updates:", socket.id);
       });
       
-      // ✅ 'notifications-deleted' ইভেন্ট লিসেনার
       socket.on('notifications-deleted', (payload) => {
-          console.log("🔔 Socket Event Received: notifications-deleted");
-          console.log("Payload:", payload);
-          
-          const { uniqueId, partName } = payload;
-          
-          // নোটিফিকেশন স্টেট থেকে ডিলিট হওয়া আইটেমগুলি সরাতে হবে
-          setNotifications(prevNotifications => {
-              const newNotifications = prevNotifications.filter(n => 
-                  !(n.uniqueId === uniqueId && n.partName === partName)
-              );
-              console.log(`✨ Live Update: ${payload.deletedCount} notifications for machine ${uniqueId} part ${partName} removed from UI.`);
-              return newNotifications;
-          });
+        console.log("🔔 Socket Event Received: notifications-deleted");
+        console.log("Payload:", payload);
+        
+        const { uniqueId, partName } = payload;
+        
+        setNotifications(prevNotifications => {
+          const newNotifications = prevNotifications.filter(n => 
+            !(n.uniqueId === uniqueId && n.partName === partName)
+          );
+          console.log(`✨ Live Update: ${payload.deletedCount} notifications for machine ${uniqueId} part ${partName} removed from UI.`);
+          return newNotifications;
+        });
       });
 
-      // ঐচ্ছিক: নতুন নোটিফিকেশন যুক্ত হলে
       socket.on('new-notification', (newNotif) => {
-          console.log("🌟 Socket Event Received: new-notification", newNotif);
-          setNotifications(prev => {
-              // নিশ্চিত করুন যে এটি ডুপ্লিকেট নয় এবং প্রথমে যুক্ত করুন
-              if (prev.some(n => n._id === newNotif._id)) return prev;
-              return [newNotif, ...prev];
-          });
+        console.log("🌟 Socket Event Received: new-notification", newNotif);
+        setNotifications(prev => {
+          if (prev.some(n => n._id === newNotif._id)) return prev;
+          return [newNotif, ...prev];
+        });
       });
       
       socket.on('disconnect', () => {
-          console.log("🔴 Socket Client Disconnected.");
+        console.log("🔴 Socket Client Disconnected.");
       });
 
-      // ক্লিনআপ ফাংশন
       return () => {
-          socket.disconnect();
-          console.log("🧹 Socket client connection cleaned up on component unmount.");
+        socket.disconnect();
+        console.log("🧹 Socket client connection cleaned up on component unmount.");
       };
     } catch (error) {
-        console.error("❌ Error setting up Socket.IO connection:", error);
+      console.error("❌ Error setting up Socket.IO connection:", error);
     }
     return () => {
-        if (socket) socket.disconnect();
+      if (socket) socket.disconnect();
     };
-  }, []); // এটিও শুধুমাত্র একবার চলবে
+  }, []);
 
   // Close notifications dropdown when clicking outside
   useEffect(() => {
@@ -179,64 +220,54 @@ export default function FloatingLayout() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [notifRef]);
-  
-  // Menu Items ( unchanged )
+
+  // Group permissions for sidebar menu
+  const groupedPermissions = groupPermissionsByCategory(permissions);
+
+  // Create dynamic menu items from permissions
   const menuItems = [
-    { 
-      name: 'Admin', 
+    {
+      name: 'Admin',
       icon: '🚀',
       href: '/admin',
-      submenu: [
-        { name: 'Add floor', icon: '📁', href: '/admin/floor' },
-        { name: 'floor-lines', icon: '➕', href: '/admin/floor-lines' },
-        { name: 'machine-types', icon: '🎨', href: '/admin/machine-types' },
-        { name: 'machines', icon: '🎨', href: '/admin/machines' },
-        { name: 'operators', icon: '🎨', href: '/admin/operators' },
-        { name: 'operator update', icon: '🎨', href: '/admin/operators/update' },
-        { name: 'security', icon: '🎨', href: '/admin/iep-interview/1st-step'},
-        { name: 'down-admin', icon: '🎨', href: '/admin/iep-interview/2nd-step'},
-        { name: 'iep', icon: '🎨', href: '/admin/iep-interview/3rd-step'},
-        { name: 'update-iep-assessment', icon: '🎨', href: '/admin/iep-interview/3rd-step/search-assessment'},
-        { name: 'Admin Interview', icon: '🎨', href: '/admin/iep-interview/4th-step'},
-        { name: 'interview tracker', icon: '🎨', href: '/admin/iep-interview/report-table'},
-        { name: 'supervisors', icon: '🎨', href: '/admin/supervisors'},
-        { name: 'security search', icon: '🎨', href: '/admin/security-search'},
-        { name: 'resign', icon: '🎨', href: '/admin/resign'},
-        { name: 'operator-assessment', icon: '🎨', href: '/operator-assessment'},
-      ]
+      submenu: groupedPermissions.admin.map(perm => ({
+        name: perm.name,
+        icon: '📋',
+        href: perm.path
+      }))
     },
-    { 
-      name: 'Supervisor', 
+    {
+      name: 'Supervisor',
       icon: '👥',
       href: '/supervisor',
-      submenu: [
-        { name: 'Add Process', icon: '👤', href: '/supervisor/processes' },
-        { name: 'Daily Production', icon: '🎭', href: '/supervisor/daily-production-by-qrcode' },
-        { name: 'hourly production entry', icon: '🔐', href: '/admin/hourly-production-entry' },
-        { name: 'line completion', icon: '🔐', href: '/supervisor/line-completion' },
-        { name: 'delete daily production entry', icon: '🔐', href: '/supervisor/delete-daily-production-entry' }
-      ]
+      submenu: groupedPermissions.supervisor.map(perm => ({
+        name: perm.name,
+        icon: '👤',
+        href: perm.path
+      }))
     },
-    { 
-      name: 'Report', 
-      icon: '💬',
-      href: '/report',
-      submenu: [
-        { name: 'heighest-process-score', icon: '📤', href: '/reports/heighest-process-score' },
-        { name: 'top-process-scorer', icon: '📤', href: '/reports/top-process-scorer' },
-        { name: 'occurrence-report', icon: '📤', href: '/admin/occurrence-report/search' },
-        { name: 'line-wise-working-days', icon: '📤', href: '/reports/operator-work' },
-        { name: 'line-report', icon: '📤', href: '/reports/line-report' },
-        { name: 'machine-report', icon: '📤', href: '/reports/machine-report' },
-        { name: 'machine-last-location', icon: '📤', href: '/reports/machine-last-location-02' },
-        { name: 'search-by-process', icon: '📤', href: '/reports/search-by-process' },
-        { name: 'supervisor-report', icon: '📤', href: '/reports/supervisor-report' },
-        { name: 'breackdown-check-1', icon: '📤', href: '/reports/breackdown-check-1' },
-        { name: 'operator-pressent-absent-report', icon: '📤', href: '/reports/operator-pressent-absent-report' },
-        { name: 'floor-wise-breakdown-matching', icon: '📤', href: '/reports/floor-wise-breakdown-matching' },
-      ]
-    },
+    {
+      name: 'Reports',
+      icon: '📊',
+      href: '/reports',
+      submenu: groupedPermissions.reports.map(perm => ({
+        name: perm.name,
+        icon: '📈',
+        href: perm.path
+      }))
+    }
   ];
+
+  // Add standalone permissions (non-grouped) as individual menu items
+  const standaloneItems = groupedPermissions.other.map(perm => ({
+    name: perm.name,
+    icon: '🔗',
+    href: perm.path,
+    submenu: []
+  }));
+
+  // Combine menu items with standalone items
+  const allMenuItems = [...menuItems, ...standaloneItems];
 
   const navItems = [
     { name: 'Home', href: '/dashboard' },
@@ -261,7 +292,11 @@ export default function FloatingLayout() {
     return pathname.startsWith(href);
   };
 
-  // --- JSX রেন্ডার ---
+  // Filter out empty categories
+  const filteredMenuItems = allMenuItems.filter(item => 
+    item.submenu.length > 0 || item.href
+  );
+
   return (
     <>
       {/* Navbar - Full Width Top - No Border Radius */}
@@ -285,7 +320,6 @@ export default function FloatingLayout() {
               
               <Link href="/" className="flex items-center">
                 <div className="relative w-32 h-8 md:w-40 md:h-10">
-                  
                   <div className="hidden text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                     Your Logo
                   </div>
@@ -315,7 +349,7 @@ export default function FloatingLayout() {
                 ))}
               </div>
               
-              {/* Notification Bell Icon (LIVE UPDATE AREA) */}
+              {/* Notification Bell Icon */}
               <div className="relative" ref={notifRef}>
                 <button
                   onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
@@ -379,7 +413,7 @@ export default function FloatingLayout() {
         </div>
       </nav>
 
-      {/* Sidebar (unchanged) */}
+      {/* Dynamic Sidebar based on permissions */}
       <div className={`fixed left-0 z-40 transition-all duration-500 ease-in-out ${
         isSidebarOpen 
           ? 'translate-x-0 opacity-100 top-16' 
@@ -400,9 +434,9 @@ export default function FloatingLayout() {
 
           <div className="flex-1 overflow-y-auto">
             <nav className="p-4 space-y-1">
-              {menuItems.map((item, index) => (
-                <div key={item.name}>
-                  {item.submenu ? (
+              {filteredMenuItems.map((item, index) => (
+                <div key={`${item.name}-${index}`}>
+                  {item.submenu && item.submenu.length > 0 ? (
                     <>
                       <button
                         onClick={() => toggleSubmenu(index)}
@@ -430,7 +464,7 @@ export default function FloatingLayout() {
                         <div className="ml-8 mt-1 space-y-1 animate-fadeIn">
                           {item.submenu.map((subItem, subIndex) => (
                             <Link
-                              key={subItem.name}
+                              key={`${subItem.name}-${subIndex}`}
                               href={subItem.href}
                               className={`flex items-center space-x-3 p-2 transition-all duration-300 hover:bg-blue-50 text-sm ${
                                 isActiveLink(subItem.href) 
@@ -484,29 +518,3 @@ export default function FloatingLayout() {
     </>
   )
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

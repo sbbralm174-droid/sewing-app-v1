@@ -34,9 +34,9 @@ export default function ResultSection({ formData, onChange }) {
             className="w-full p-2 rounded-md border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent sm:text-sm"
             required
           >
-            <option value="PENDING">PENDING</option>
+            {/* <option value="PENDING">PENDING</option> */}
             <option value="PASSED">PASSED</option>
-            <option value="FAILED">FAILED</option>
+            {/* <option value="FAILED">FAILED</option> */}
           </select>
         </div>
 

@@ -34,7 +34,7 @@ export async function middleware(request) {
   if (!token) {
     return NextResponse.redirect(new URL('/auth/signin', request.url));
   }
-  console.log('Authenticated user:', token);
+ // console.log('Authenticated user:', token);
 
   if (!token.isAdmin && pathname !== '/dashboard') {
     try {

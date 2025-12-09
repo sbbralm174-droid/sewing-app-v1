@@ -1,3 +1,4 @@
+// app/api/permissions/route.js
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authConfig } from '@/lib/auth';
@@ -9,8 +10,6 @@ import User from '@/models/User';
 export async function GET(request) {
   try {
     const session = await getServerSession(authConfig);
-
-    console.log('SESSION:', session);
 
     if (!session?.user?.userId) {
       return NextResponse.json(
@@ -35,6 +34,7 @@ export async function GET(request) {
     
     return NextResponse.json({
       permissions: permission?.allowedPages || [],
+      allowedApis: permission?.allowedApis || []
     });
   } catch (error) {
     console.error('Get permissions error:', error);
@@ -59,7 +59,7 @@ export async function POST(request) {
     
     await connectDB();
     
-    const { userId, allowedPages } = await request.json();
+    const { userId, allowedPages, allowedApis } = await request.json();
     
     // Check if user exists
     const user = await User.findOne({ userId });
@@ -81,6 +81,7 @@ export async function POST(request) {
           name: page.name,
           grantedAt: new Date(),
         })),
+        allowedApis: allowedApis || [],
         updatedAt: new Date(),
       },
       { upsert: true, new: true }
@@ -89,6 +90,7 @@ export async function POST(request) {
     return NextResponse.json({
       message: 'Permissions updated successfully',
       permissions: permission.allowedPages,
+      allowedApis: permission.allowedApis
     });
   } catch (error) {
     console.error('Update permissions error:', error);

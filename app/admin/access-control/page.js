@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { UI_API_MAPPING, getApisForPage, getApisForPages } from '@/utils/uiApiMapping';
 
 // Define all available pages in the system
 const ALL_PAGES = [
@@ -48,9 +49,13 @@ export default function AccessControl() {
   const router = useRouter();
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState('');
-  const [userPermissions, setUserPermissions] = useState([]);
+  const [userPermissions, setUserPermissions] = useState({
+    pages: [],
+    apis: []
+  });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [showApiDetails, setShowApiDetails] = useState(false);
 
   // Redirect if not admin
   useEffect(() => {
@@ -86,7 +91,10 @@ export default function AccessControl() {
       const response = await fetch(`/api/permissions?userId=${userId}`);
       if (response.ok) {
         const data = await response.json();
-        setUserPermissions(data.permissions.map(p => p.path));
+        setUserPermissions({
+          pages: data.permissions || [],
+          apis: data.allowedApis || []
+        });
       }
     } catch (error) {
       console.error('Error fetching permissions:', error);
@@ -97,12 +105,54 @@ export default function AccessControl() {
 
   const togglePageAccess = (pagePath) => {
     setUserPermissions(prev => {
-      if (prev.includes(pagePath)) {
-        return prev.filter(path => path !== pagePath);
+      const pageApis = getApisForPage(pagePath);
+      const isAdding = !prev.pages.includes(pagePath);
+      
+      let newPages;
+      let newApis = [...prev.apis];
+      
+      if (isAdding) {
+        // Add page and its APIs
+        newPages = [...prev.pages, pagePath];
+        pageApis.forEach(api => {
+          const exists = newApis.some(a => 
+            a.method === api.method && a.path === api.path
+          );
+          if (!exists) {
+            newApis.push(api);
+          }
+        });
       } else {
-        return [...prev, pagePath];
+        // Remove page
+        newPages = prev.pages.filter(path => path !== pagePath);
+        
+        // Find all APIs from remaining pages
+        const remainingApis = getApisForPages(newPages);
+        newApis = remainingApis;
       }
+      
+      return {
+        pages: newPages,
+        apis: newApis
+      };
     });
+  };
+
+  const toggleAllPages = (grantAll) => {
+    if (grantAll) {
+      // Grant all pages and collect all APIs
+      const allApis = getApisForPages(ALL_PAGES.map(p => p.path));
+      setUserPermissions({
+        pages: ALL_PAGES.map(p => p.path),
+        apis: allApis
+      });
+    } else {
+      // Remove all permissions
+      setUserPermissions({
+        pages: [],
+        apis: []
+      });
+    }
   };
 
   const savePermissions = async () => {
@@ -121,10 +171,11 @@ export default function AccessControl() {
         },
         body: JSON.stringify({
           userId: selectedUser,
-          allowedPages: userPermissions.map(path => ({
+          allowedPages: userPermissions.pages.map(path => ({
             path,
             name: ALL_PAGES.find(p => p.path === path)?.name || path,
           })),
+          allowedApis: userPermissions.apis
         }),
       });
 
@@ -132,6 +183,11 @@ export default function AccessControl() {
       
       if (response.ok) {
         setMessage({ type: 'success', text: data.message });
+        
+        // Auto-hide success message
+        setTimeout(() => {
+          setMessage({ type: '', text: '' });
+        }, 3000);
       } else {
         setMessage({ type: 'error', text: data.error });
       }
@@ -162,7 +218,7 @@ export default function AccessControl() {
             Access Control Panel
           </h1>
           <p className="text-gray-600 mt-2">
-            Manage page access permissions for users
+            Manage page and API access permissions for users
           </p>
         </div>
 
@@ -199,27 +255,74 @@ export default function AccessControl() {
                 </select>
 
                 {selectedUser && (
-                  <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-                    <h3 className="font-medium text-blue-800 mb-2">
-                      Current Permissions
-                    </h3>
-                    <div className="text-sm text-blue-600">
-                      {userPermissions.length === 0 ? (
-                        <p>No pages granted yet</p>
-                      ) : (
-                        <ul className="space-y-1">
-                          {userPermissions.slice(0, 5).map(path => (
-                            <li key={path} className="truncate">
-                              • {ALL_PAGES.find(p => p.path === path)?.name || path}
-                            </li>
-                          ))}
-                          {userPermissions.length > 5 && (
-                            <li className="text-blue-500">
-                              + {userPermissions.length - 5} more...
-                            </li>
-                          )}
-                        </ul>
-                      )}
+                  <div className="mt-6 space-y-4">
+                    <div className="p-4 bg-blue-50 rounded-lg">
+                      <h3 className="font-medium text-blue-800 mb-2">
+                        Page Permissions
+                      </h3>
+                      <div className="text-sm text-blue-600">
+                        {userPermissions.pages.length === 0 ? (
+                          <p>No pages granted yet</p>
+                        ) : (
+                          <ul className="space-y-1">
+                            {userPermissions.pages.slice(0, 5).map((pathObj) => (
+                              <li key={pathObj._id} className="truncate">
+                                • {ALL_PAGES.find(p => p.path === pathObj.path)?.name || pathObj.path}
+                              </li>
+                            ))}
+
+                            {userPermissions.pages.length > 5 && (
+                              <li className="text-blue-500">
+                                + {userPermissions.pages.length - 5} more...
+                              </li>
+                            )}
+                          </ul>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-green-50 rounded-lg">
+                      <div className="flex justify-between items-center mb-2">
+                        <h3 className="font-medium text-green-800">
+                          API Permissions
+                        </h3>
+                        <button
+                          onClick={() => setShowApiDetails(!showApiDetails)}
+                          className="text-sm text-green-600 hover:text-green-800"
+                        >
+                          {showApiDetails ? 'Hide' : 'Show'} Details
+                        </button>
+                      </div>
+                      <div className="text-sm text-green-600">
+                        <p>{userPermissions.apis.length} APIs granted</p>
+                        {showApiDetails && userPermissions.apis.length > 0 && (
+                          <div className="mt-2 max-h-40 overflow-y-auto">
+                            {userPermissions.apis.map((api, index) => (
+                              <div key={index} className="mt-1 p-2 bg-green-100 rounded text-xs">
+                                <span className="font-mono bg-green-200 px-1 rounded">
+                                  {api.method}
+                                </span>
+                                <span className="ml-2">{api.path}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => toggleAllPages(true)}
+                        className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-lg text-sm font-medium transition"
+                      >
+                        Grant All
+                      </button>
+                      <button
+                        onClick={() => toggleAllPages(false)}
+                        className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 px-4 py-2 rounded-lg text-sm font-medium transition"
+                      >
+                        Revoke All
+                      </button>
                     </div>
                   </div>
                 )}
@@ -251,31 +354,72 @@ export default function AccessControl() {
                 </div>
               ) : selectedUser ? (
                 <div className="space-y-4">
-                  {ALL_PAGES.map((page) => (
-                    <div
-                      key={page.path}
-                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
-                    >
-                      <div>
-                        <h3 className="font-medium text-gray-800">
-                          {page.name}
-                        </h3>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {page.path}
-                        </p>
+                  {ALL_PAGES.map((page) => {
+                    const hasAccess = userPermissions.pages.includes(page.path);
+                    const pageApis = getApisForPage(page.path);
+                    
+                    return (
+                      <div
+                        key={page.path}
+                        className={`p-4 border rounded-lg transition ${
+                          hasAccess 
+                            ? 'border-blue-200 bg-blue-50' 
+                            : 'border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center">
+                              <h3 className="font-medium text-gray-800">
+                                {page.name}
+                              </h3>
+                              {hasAccess && (
+                                <span className="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                                  {pageApis.length} APIs
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">
+                              {page.path}
+                            </p>
+                            
+                            {hasAccess && pageApis.length > 0 && (
+                              <div className="mt-3">
+                                <p className="text-xs font-medium text-gray-500 mb-1">
+                                  Associated APIs:
+                                </p>
+                                <div className="flex flex-wrap gap-1">
+                                  {pageApis.slice(0, 3).map((api, index) => (
+                                    <span 
+                                      key={index}
+                                      className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded"
+                                    >
+                                      {api.method} {api.path.split('/')[2] || api.path}
+                                    </span>
+                                  ))}
+                                  {pageApis.length > 3 && (
+                                    <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                                      +{pageApis.length - 3} more
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <label className="relative inline-flex items-center cursor-pointer ml-4">
+                            <input
+                              type="checkbox"
+                              checked={hasAccess}
+                              onChange={() => togglePageAccess(page.path)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                          </label>
+                        </div>
                       </div>
-                      
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={userPermissions.includes(page.path)}
-                          onChange={() => togglePageAccess(page.path)}
-                          className="sr-only peer"
-                        />
-                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                      </label>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-12">
