@@ -549,9 +549,70 @@ const fetchProcesses = async () => {
   };
 
   const handleSubmit = async () => {
-    // Validation remains the same
-    // ... (keep your existing handleSubmit code)
-  };
+  const completeRows = tableData.filter(
+    row =>
+      row.operator &&
+      row.process &&
+      row.workAs &&
+      row.target &&
+      (row.workAs === 'helper' || row.uniqueMachine)
+  );
+
+  if (completeRows.length === 0) {
+    Swal.fire("Error", "No complete rows to save", "error");
+    return;
+  }
+
+  const payload = completeRows.map((row, index) => ({
+    date: new Date(),
+
+    buyerId: formData.buyer,
+    styleId: formData.style,
+    supervisor: formData.supervisor,
+    floor: formData.floor,
+    line: formData.line,
+
+    process: row.process,
+    workAs: row.workAs,
+    status: "present",
+    target: Number(row.target),
+
+    operatorId: row.operator._id,
+    operatorCode: row.operator.operatorId,
+    operatorName: row.operator.name,
+    designation: row.operator.designation || "Operator",
+
+    uniqueMachine: row.workAs === 'operator' ? row.uniqueMachine : null,
+    machineType: row.workAs === 'operator' ? row.machineType : null,
+
+    rowNo: index + 1
+  }));
+
+  console.table(payload);
+
+  try {
+    const res = await fetch("/api/daily-production", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      Swal.fire("Error", data.error || "Failed to save", "error");
+      return;
+    }
+
+    Swal.fire("Success", "Daily production saved successfully", "success");
+
+  } catch (err) {
+    console.error(err);
+    Swal.fire("Error", "Server error", "error");
+  }
+};
+
+
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">

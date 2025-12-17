@@ -1,11 +1,8 @@
 // components/operator-assessment/Mainassessment.js 
 'use client'
 import { useState, useEffect } from 'react'
-import Select from "react-select";
-import ProcessSelect from "@/components/ProcessSelect";
-
-
-
+import Select from "react-select"
+import ProcessSelect from "@/components/ProcessSelect"
 
 export default function MainAssessment({ onAssessmentComplete, candidateInfo }) {
   const [currentView, setCurrentView] = useState('data-entry')
@@ -15,6 +12,7 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
   const [searchCandidateId, setSearchCandidateId] = useState('')
   const [searchResults, setSearchResults] = useState(null)
   const [isSearching, setIsSearching] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
   const [isClient, setIsClient] = useState(false)
 
   // Client-side detection
@@ -25,8 +23,8 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
   // candidateInfo থেকে ডেটা লোড করুন
   useEffect(() => {
     if (candidateInfo) {
-      setOperatorName(candidateInfo.name || '');
-      initializeNewData();
+      setOperatorName(candidateInfo.name || '')
+      initializeNewData()
     }
   }, [candidateInfo])
 
@@ -71,8 +69,8 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
           }
         ],
         supplementaryMachines: []
-      };
-      setAssessmentData(initialData);
+      }
+      setAssessmentData(initialData)
     }
   }
 
@@ -159,6 +157,104 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
     setSearchCandidateId('')
     if (candidateInfo) {
       initializeNewData()
+    }
+  }
+
+  // Assessment আপডেট করার ফাংশন
+  const handleUpdateAssessment = async () => {
+    if (!assessmentData || !searchResults?.candidateId) {
+      alert('Please search for a candidate first and make changes to update')
+      return
+    }
+
+    const confirmUpdate = window.confirm('Are you sure you want to update this assessment? This will overwrite the existing assessment data.')
+    if (!confirmUpdate) return
+
+    setIsUpdating(true)
+    try {
+      // হিসাব করা রেজাল্ট তৈরি করুন
+      const calculatedResults = calculateResults(assessmentData)
+      
+      const calculateProcessCapacity = (processes) => {
+        const capacityData = {}
+        processes.forEach(process => {
+          if (process.processName && process.capacity) {
+            capacityData[process.processName] = Math.round(process.capacity)
+          }
+        })
+        return capacityData
+      }
+
+      const processCapacity = calculateProcessCapacity(calculatedResults.processes)
+      
+      const supplementaryMachinesData = {}
+      if (assessmentData.supplementaryMachines) {
+        assessmentData.supplementaryMachines.forEach(machine => {
+          if (machine.checked) {
+            supplementaryMachinesData[machine.name] = true
+          }
+        })
+      }
+      
+      const assessmentResult = {
+        candidateInfo: searchResults ? {
+          name: searchResults.name,
+          candidateId: searchResults.candidateId,
+          nid: searchResults.nid,
+          birthCertificate: searchResults.birthCertificate,
+          picture: searchResults.picture
+        } : null,
+        
+        operatorName: assessmentData.operatorName,
+        scores: {
+          machineScore: calculatedResults.scores.machineScore,
+          dopScore: calculatedResults.scores.dopScore,
+          practicalScore: calculatedResults.scores.practicalScore,
+          averageQualityScore: calculatedResults.scores.averageQualityScore,
+          educationScore: calculatedResults.scores.educationScore,
+          attitudeScore: calculatedResults.scores.attitudeScore,
+          totalScore: calculatedResults.scores.totalScore
+        },
+        finalAssessment: {
+          grade: calculatedResults.finalAssessment.grade,
+          level: calculatedResults.finalAssessment.level,
+          designation: calculatedResults.finalAssessment.designation
+        },
+        processCapacity: processCapacity,
+        supplementaryMachines: supplementaryMachinesData,
+        rawData: assessmentData
+      }
+
+      // API কল করুন আপডেট করার জন্য
+      const response = await fetch('/api/iep-interview/update-assessment', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          candidateId: searchResults.candidateId,
+          assessmentData: assessmentResult
+        }),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        alert('Assessment updated successfully!')
+        
+        // রিফ্রেশ করে নতুন ডেটা লোড করুন
+        await handleSearchCandidate()
+        
+        // রেজাল্ট ভিউতে যান
+        setCurrentView('results')
+      } else {
+        throw new Error(result.message || 'Failed to update')
+      }
+    } catch (error) {
+      console.error('Error updating assessment:', error)
+      alert(`Failed to update assessment: ${error.message}`)
+    } finally {
+      setIsUpdating(false)
     }
   }
 
@@ -269,6 +365,22 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
               >
                 View Results
               </button>
+              
+              {/* আপডেট বাটন - শুধুমাত্র যখন সার্চ করা candidate এর ডেটা আছে */}
+              {searchResults && assessmentData && currentView === 'data-entry' && (
+                <button
+                  onClick={handleUpdateAssessment}
+                  disabled={isUpdating}
+                  className={`px-4 py-2 rounded-md transition-colors ${
+                    isUpdating
+                      ? 'bg-yellow-500 text-white cursor-wait'
+                      : 'bg-yellow-600 text-white hover:bg-yellow-700'
+                  }`}
+                >
+                  {isUpdating ? 'Updating...' : 'Update Assessment'}
+                </button>
+              )}
+              
               {currentView === 'results' && onAssessmentComplete && (
                 <button
                   onClick={handleUseAssessment}
@@ -310,6 +422,8 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
             isSearching={isSearching}
             searchResults={searchResults}
             isClient={isClient}
+            onUpdateAssessment={handleUpdateAssessment}
+            isUpdating={isUpdating}
           />
         ) : (
           <AssessmentResults 
@@ -340,7 +454,9 @@ function DataEntry({
   onClearSearch,
   isSearching,
   searchResults,
-  isClient
+  isClient,
+  onUpdateAssessment,
+  isUpdating
 }) {
   // Supplementary machines list
   const supplementaryMachineOptions = [
@@ -537,12 +653,9 @@ function DataEntry({
   // শুধুমাত্র isAssessment: true আছে এমন processes ফিল্টার করুন
   const assessmentProcesses = processesList.filter(process => process.isAssessment === true)
   const processOptions = assessmentProcesses.map((item) => ({
-  value: item.name,
-  label: item.name,
-}));
-
-
-
+    value: item.name,
+    label: item.name,
+  }))
 
   return (
     <div className="bg-white shadow-md rounded-lg p-6">
@@ -582,6 +695,27 @@ function DataEntry({
               )}
             </div>
           </div>
+          
+          {/* Update Button in Search Section */}
+          {searchResults && (
+            <div>
+              <button
+                type="button"
+                onClick={onUpdateAssessment}
+                disabled={isUpdating}
+                className={`px-6 py-2 rounded-md transition-colors ${
+                  isUpdating
+                    ? 'bg-yellow-500 text-white cursor-wait'
+                    : 'bg-yellow-600 text-white hover:bg-yellow-700'
+                }`}
+              >
+                {isUpdating ? 'Updating...' : 'Update Assessment'}
+              </button>
+              {/* <p className="text-xs text-gray-500 mt-1">
+                Click to save changes to database
+              </p> */}
+            </div>
+          )}
         </div>
 
         {/* Search Results Display */}
@@ -604,6 +738,9 @@ function DataEntry({
                 ✓ Previous assessment data loaded automatically
               </div>
             )}
+            <div className="mt-2 text-xs text-yellow-600">
+              <strong>Note:</strong> Edit the data below and click "Update Assessment" to save changes
+            </div>
           </div>
         )}
       </div>
@@ -733,9 +870,6 @@ function DataEntry({
                   <th className="px-4 py-2 border">3rd</th>
                   <th className="px-4 py-2 border">4th</th>
                   <th className="px-4 py-2 border">5th</th>
-                  {/* {[1, 2, 3, 4, 5].map(num => (
-                    <th key={num} className="px-4 py-2 border">{num}st Cycle Time</th>
-                  ))} */}
                   <th className="px-4 py-2 border">Quality Status</th>
                   <th className="px-4 py-2 border">Actions</th>
                 </tr>
@@ -881,7 +1015,7 @@ function DataEntry({
   )
 }
 
-// Assessment Results Component (একই থাকে)
+// Assessment Results Component
 function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment, candidateInfo }) {
   const [calculatedResults, setCalculatedResults] = useState(null)
 
@@ -1125,186 +1259,217 @@ function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment,
 
 
 
-// Helper function for calculations (একই থাকে)
 
 
 
+
+// Helper function for calculations
 function calculateResults(data) {
-  
+
+
   const processesWithCalculations = data.processes.map(process => {
-    const processName = process.processName;
-    const machine = process.machineType;
+  const processName = process.processName
+  const machine = process.machineType
 
-    const validCycleTimes = process.cycleTimes.filter(time => time > 0);
-    const avgCycleTime = validCycleTimes.length > 0
-        ? validCycleTimes.reduce((a, b) => a + b, 0) / validCycleTimes.length
-        : 0;
+  const validCycleTimes = process.cycleTimes.filter(time => time > 0)
+  const avgCycleTime = validCycleTimes.length > 0
+    ? validCycleTimes.reduce((a, b) => a + b, 0) / validCycleTimes.length
+    : 0
 
-    const target = 60 / process.smv;
-    const capacity = 3600 / avgCycleTime;
-    const performance = (capacity / target) * 100;
+  const target = 60 / process.smv
+  const capacity = 3600 / avgCycleTime
+  const performance = (capacity / target) * 100
 
-    let practicalMarks = 0;
+  let practicalMarks = 0
 
-    // SNLS special conditions list
-    const fourProcessAndMachine = [
-        { name: "Pocket-join-(Kangaro)", minCapacity: 90, machine: "SNLS/DNLS" },
-        { name: "Placket-box", minCapacity: 90, machine: "SNLS/DNLS" },
-        { name: "Zipper-join(2nd)", minCapacity: 60, machine: "SNLS/DNLS" },
-        { name: "Back-neck-tape-top-stitch-insert-label", minCapacity: 120, machine: "SNLS/DNLS" }
-    ];
+  // SNLS special conditions list
+  const fourProcessAndMachine = [
+    { name: "Pocket-join-(Kangaro)", minCapacity: 85, machine: "SNLS/DNLS" },
+    { name: "Placket-box", minCapacity: 90, machine: "SNLS/DNLS" },
+    { name: "Zipper-join(2nd)", minCapacity: 60, machine: "SNLS/DNLS" },
+    { name: "Back-neck-tape-top-stitch-insert-label", minCapacity: 120, machine: "SNLS/DNLS" },
+    { name: "Placket-join", minCapacity: 86, machine: "SNLS/DNLS" },
+    { name: "Zipper-top-stitch(both-side 1/4 t/s)", minCapacity: 71, machine: "SNLS/DNLS" },
+  ]
 
-    // -------------------------------
-    //     SNLS/DNLS CUSTOM LOGIC
-    // -------------------------------
-    if (machine === "SNLS/DNLS") {
-        const snlsProcesses = data.processes.filter(p => p.machineType === "SNLS/DNLS");
-        let passedCount = 0;
+  // -------------------------------
+  //     SNLS/DNLS CUSTOM LOGIC
+  // -------------------------------
+  if (machine === "SNLS/DNLS") {
+    const snlsProcesses = data.processes.filter(p => p.machineType === "SNLS/DNLS")
+    let passedCount = 0
 
-        fourProcessAndMachine.forEach(fp => {
-            const match = snlsProcesses.find(p => p.processName === fp.name);
-            if (match) {
-                const validCT = match.cycleTimes.filter(t => t > 0);
-                const avgCT = validCT.reduce((a, b) => a + b, 0) / validCT.length;
-                const cap = 3600 / avgCT;
+    fourProcessAndMachine.forEach(fp => {
+      const match = snlsProcesses.find(p => p.processName === fp.name)
+      if (match) {
+        const validCT = match.cycleTimes.filter(t => t > 0)
+        const avgCT = validCT.reduce((a, b) => a + b, 0) / validCT.length
+        const cap = 3600 / avgCT
 
-                if (cap >= fp.minCapacity) passedCount++;
-            }
-        });
+        if (cap >= fp.minCapacity) passedCount++
+      }
+    })
 
-        if (passedCount === 4) practicalMarks = 100;
-        else if (passedCount === 3) practicalMarks = 80;
-        else if (passedCount === 2) practicalMarks = 60;
-        else if (passedCount === 1) practicalMarks = 50;
-        else practicalMarks = 30;
+    if (passedCount === 4) practicalMarks = 100
+    else if (passedCount === 3) practicalMarks = 78
+    else if (passedCount === 2) practicalMarks = 61
+    else if (passedCount === 1) practicalMarks = 60
+    else practicalMarks = 60
+  }
+
+  // -------------------------------
+  //     NEW: Over Lock CONDITION
+  // -------------------------------
+  else if (machine === "Over Lock") {
+
+    // BASE SCORING
+    if (processName.toLowerCase() === "neck-join" || processName.toLowerCase() === "neck join") {
+      if (capacity > 150) practicalMarks = 100
+      else if (capacity >= 120) practicalMarks = 80
+      else if (capacity >= 100) practicalMarks = 60
+      else if (capacity >= 80) practicalMarks = 50
+      else practicalMarks = 0
     }
-
-    // -------------------------------
-    //     NEW: OverLock CONDITION
-    // -------------------------------
-    else if (machine === "Over Lock") {
-
-        // CASE 1: process === "Neck-join"
-        if (processName.toLowerCase() === "neck-join" || processName.toLowerCase() === "neck join") {
-
-            if (capacity > 150) practicalMarks = 100;
-            else if (capacity >= 120) practicalMarks = 80;
-            else if (capacity >= 100) practicalMarks = 60;
-            else if (capacity >= 80) practicalMarks = 50;
-            else practicalMarks = 0;
-        }
-
-        // CASE 2: Other Process (except Neck-join)
-        else {
-            if (capacity > 80) practicalMarks = 90;
-            else if (capacity >= 70) practicalMarks = 60;
-            else if (capacity >= 60) practicalMarks = 50;
-            else practicalMarks = 0;
-        }
-    }
-
-    // -------------------------------
-    //     NEW: Flat Lock CONDITION
-    // -------------------------------
-    else if (machine === "Flat Lock") {
-
-        // CASE 3: Bottom-hem Process
-        if (processName.toLowerCase() === "bottom-hem" || processName.toLowerCase() === "bottom-hem") {
-
-            if (capacity > 220) practicalMarks = 100;
-            else if (capacity >= 200) practicalMarks = 80;
-            else if (capacity >= 180) practicalMarks = 60;
-            else if (capacity >= 160) practicalMarks = 50;
-            else practicalMarks = 0;
-        }
-
-        // CASE 4: Other Process (except Bottom-hem)
-        else {
-            if (capacity > 120) practicalMarks = 80;
-            else if (capacity >= 100) practicalMarks = 60;
-            else if (capacity >= 90) practicalMarks = 50;
-            else practicalMarks = 0;
-        }
-    }
-
-    // -------------------------------
-    //     DEFAULT PERFORMANCE SYSTEM
-    // (Only used when above rules do NOT match)
-    // -------------------------------
     else {
-        if (performance > 90) practicalMarks = 85;
-        else if (performance >= 80) practicalMarks = 80;
-        else if (performance >= 70) practicalMarks = 70;
-        else if (performance >= 60) practicalMarks = 60;
-        else if (performance >= 50) practicalMarks = 50;
-        else practicalMarks = 0;
+      if (capacity > 80) practicalMarks = 90
+      else if (capacity >= 70) practicalMarks = 60
+      else if (capacity >= 60) practicalMarks = 50
+      else practicalMarks = 0
     }
 
-    return {
-        ...process,
-        avgCycleTime,
-        target,
-        capacity,
-        performance,
-        practicalMarks
-    };
-});
+    // EXTRA BONUS MARKS FOR OVER LOCK MACHINES
+    const overLockProcesses = data.processes.filter(p => p.machineType === "Over Lock")
+    const extraCount = overLockProcesses.length - 2
+    
+    if (extraCount > 0) {
+      practicalMarks += extraCount * 3.3
+    }
+
+  }
+
+  // -------------------------------
+  //     NEW: Flat Lock CONDITION
+  // -------------------------------
+  else if (machine === "Flat Lock") {
+    
+    // Check for Sleeve-hem-Mora condition
+    const hasSleeveHemMora = data.processes.some(p => 
+      p.processName.toLowerCase().includes("sleeve-hem-mora") || 
+      p.processName.toLowerCase().includes("sleeve hem mora")
+    )
+    
+    // Count Flat Lock processes excluding Sleeve-hem-Mora
+    const flatLockProcesses = data.processes.filter(p => 
+      p.machineType === "Flat Lock" && 
+      !(p.processName.toLowerCase().includes("sleeve-hem-mora") || 
+        p.processName.toLowerCase().includes("sleeve hem mora"))
+    )
+    
+    // Calculate extra marks if condition meets
+    let extraMarks = 0
+    if (hasSleeveHemMora && flatLockProcesses.length > 0) {
+      extraMarks = flatLockProcesses.length * 7.5
+    }
+
+    // BASE SCORING
+    if (processName.toLowerCase() === "bottom-hem") {
+      if (capacity > 220) practicalMarks = 100
+      else if (capacity >= 200) practicalMarks = 80
+      else if (capacity >= 180) practicalMarks = 60
+      else if (capacity >= 160) practicalMarks = 50
+      else practicalMarks = 0
+    }
+    else {
+      if (capacity > 119) practicalMarks = 80
+      else if (capacity >= 100) practicalMarks = 60
+      else if (capacity >= 90) practicalMarks = 50
+      else practicalMarks = 0
+    }
+    
+    // ADD EXTRA MARKS FOR FLAT LOCK PROCESSES
+    practicalMarks += extraMarks
+  }
+
+  // -------------------------------
+  //     DEFAULT PERFORMANCE SYSTEM
+  // -------------------------------
+  else {
+    if (performance > 90) practicalMarks = 85
+    else if (performance >= 80) practicalMarks = 80
+    else if (performance >= 70) practicalMarks = 70
+    else if (performance >= 60) practicalMarks = 60
+    else if (performance >= 50) practicalMarks = 50
+    else practicalMarks = 0
+  }
+
+  // CAP LIMIT (optional)
+  if (practicalMarks > 100) practicalMarks = 100
+
+  return {
+    ...process,
+    avgCycleTime,
+    target,
+    capacity,
+    performance,
+    practicalMarks
+  }
+})
 
 
-const processCapacitySingleNiddle = [
+
+  const processCapacitySingleNiddle = [
     { name: "Pocket-join-(Kangaro)", minCapacity: 90, machine: "SNLS/DNLS" },
     { name: "Placket-box", minCapacity: 90, machine: "SNLS/DNLS" },
     { name: "Zipper-join(2nd)", minCapacity: 60, machine: "SNLS/DNLS" },
     { name: "Back-neck-tape-top-stitch-insert-label", minCapacity: 120, machine: "SNLS/DNLS" }
-];
+  ]
 
-const processCapacityOverLock = [
+  const processCapacityOverLock = [
     { name: "Neck-join", minCapacity: 150, machine: "Over Lock" }
-];
+  ]
 
-const processCapacityFlatLock = [
+  const processCapacityFlatLock = [
     { name: "Bottom-hem", minCapacity: 220, machine: "Flat Lock" }
-];
+  ]
 
+  // ======================================================
+  // SCORE CALCULATION
+  // ======================================================
 
-// ======================================================
-// SCORE CALCULATION
-// ======================================================
+  const calculateMachineScore = (processes) => {
+    const specialMachines = ["SNLS/DNLS", "Over Lock", "Flat Lock"]
+    const semiSpecialMachines = ["F/Sleamer", "Kansai", "FOA"]
 
-const calculateMachineScore = (processes) => {
-    const specialMachines = ["SNLS/DNLS", "Over Lock", "Flat Lock"];
-    const semiSpecialMachines = ["F/Sleamer", "Kansai", "FOA"];
-
-    const machinesUsed = [...new Set(processes.map(p => p.machineType))];
+    const machinesUsed = [...new Set(processes.map(p => p.machineType))]
 
     // ======================================================
     // 1️⃣ CHECK CAPACITY PASSED OR NOT
     // ======================================================
 
     const checkPass = (requiredList) => {
-        return requiredList.every(req => {
-            const found = processes.find(p => p.name === req.name);
-            return found && found.capacity >= req.minCapacity;
-        });
-    };
+      return requiredList.every(req => {
+        const found = processes.find(p => p.name === req.name)
+        return found && found.capacity >= req.minCapacity
+      })
+    }
 
-    const passedSingleNeedle = checkPass(processCapacitySingleNiddle);
-    const passedOverLock     = checkPass(processCapacityOverLock);
-    const passedFlatLock     = checkPass(processCapacityFlatLock);
+    const passedSingleNeedle = checkPass(processCapacitySingleNiddle)
+    const passedOverLock = checkPass(processCapacityOverLock)
+    const passedFlatLock = checkPass(processCapacityFlatLock)
 
-    const passedAllThree = passedSingleNeedle && passedOverLock && passedFlatLock;
+    const passedAllThree = passedSingleNeedle && passedOverLock && passedFlatLock
 
     if (passedAllThree) {
-        return 100;
+      return 100
     }
 
     // ======================================================
     // 2️⃣ ONLY SPECIAL MACHINES USED (FAIL CAPACITY)
     // ======================================================
-    const onlySpecial = machinesUsed.every(m => specialMachines.includes(m));
+    const onlySpecial = machinesUsed.every(m => specialMachines.includes(m))
 
     if (onlySpecial && machinesUsed.length === 3) {
-        return 80;
+      return 80
     }
 
     // ======================================================
@@ -1312,36 +1477,35 @@ const calculateMachineScore = (processes) => {
     // ======================================================
 
     // Special machine score
-    const specialCount = machinesUsed.filter(m => specialMachines.includes(m)).length;
+    const specialCount = machinesUsed.filter(m => specialMachines.includes(m)).length
 
-    let specialScore = 0;
-    if (specialCount === 1) specialScore = 55;
-    else if (specialCount === 2) specialScore = 80;
-    else if (specialCount === 3) specialScore = 100;
+    let specialScore = 0
+    if (specialCount === 1) specialScore = 55
+    else if (specialCount === 2) specialScore = 73.33
+    else if (specialCount === 3) specialScore = 55
 
-    let totalScore = specialScore;
+    let totalScore = specialScore
 
     // Semi-Special
     if (totalScore < 100) {
-        const semiCount = machinesUsed.filter(m => semiSpecialMachines.includes(m)).length;
-        totalScore += semiCount * 20;
+      const semiCount = machinesUsed.filter(m => semiSpecialMachines.includes(m)).length
+      totalScore += semiCount * 20
     }
 
     // Other machines
     if (totalScore < 100) {
-        const otherMachines = machinesUsed.filter(
-            m => !specialMachines.includes(m) && !semiSpecialMachines.includes(m)
-        );
+      const otherMachines = machinesUsed.filter(
+        m => !specialMachines.includes(m) && !semiSpecialMachines.includes(m)
+      )
 
-        totalScore += otherMachines.length * 10;
+      totalScore += otherMachines.length * 10
     }
 
-    return Math.min(totalScore, 100);
-};
+    return Math.min(totalScore, 100)
+  }
 
-
-  const machineScore = calculateMachineScore(data.processes);
-  const finalMachineScore = machineScore * 0.3;
+  const machineScore = calculateMachineScore(data.processes)
+  const finalMachineScore = machineScore * 0.3
 
   // DOP Score Calculation
   const dopScores = processesWithCalculations.map(process => {
@@ -1356,7 +1520,7 @@ const calculateMachineScore = (processes) => {
   const dopScoreCalculate = dopScores.length > 0 ? 
     Math.min(dopScores.reduce((sum, score) => sum + score, 0) / dopScores.length) : 0
   const dopScore = dopScoreCalculate * 0.20
-
+// console.log("DOP Score:", dopScores)
   // Practical Score Calculation
   const totalPractical = processesWithCalculations.reduce(
     (sum, process) => sum + process.practicalMarks,
@@ -1409,133 +1573,133 @@ const calculateMachineScore = (processes) => {
 
   // Special process grade adjustment logic
   const applySpecialProcessRules = (processes, calculatedGrade, calculatedLevel, calculatedDesignation) => {
-    let finalGrade = calculatedGrade;
-    let finalLevel = calculatedLevel;
-    let finalDesignation = calculatedDesignation;
+    let finalGrade = calculatedGrade
+    let finalLevel = calculatedLevel
+    let finalDesignation = calculatedDesignation
 
     const fourProcess = [
-        { name: "Pocket-join-(Kangaro)", minCapacity: 90, machine: "SNLS/DNLS" },
-        { name: "Placket-box", minCapacity: 90, machine: "SNLS/DNLS" },
-        { name: "Zipper-join(2nd)", minCapacity: 60, machine: "SNLS/DNLS" },
-        { name: "Back-neck-tape-top-stitch-insert-label", minCapacity: 120, machine: "SNLS/DNLS" }
-    ];
+      { name: "Pocket-join-(Kangaro)", minCapacity: 90, machine: "SNLS/DNLS" },
+      { name: "Placket-box", minCapacity: 90, machine: "SNLS/DNLS" },
+      { name: "Zipper-join(2nd)", minCapacity: 60, machine: "SNLS/DNLS" },
+      { name: "Back-neck-tape-top-stitch-insert-label", minCapacity: 120, machine: "SNLS/DNLS" }
+    ]
 
     const hasFourProcess = fourProcess.every(req => {
       const foundProcess = processes.find(p => {
-        const processNameMatch = p.processName.toLowerCase().includes(req.name.toLowerCase().split(' ')[0]);
-        const capacityMatch = Math.round(p.capacity) >= req.minCapacity;
-        const machineMatch = p.machineType === "SNLS" || p.machineType === "DNLS" || p.machineType === "SNLS/DNLS";
+        const processNameMatch = p.processName.toLowerCase().includes(req.name.toLowerCase().split(' ')[0])
+        const capacityMatch = Math.round(p.capacity) >= req.minCapacity
+        const machineMatch = p.machineType === "SNLS" || p.machineType === "DNLS" || p.machineType === "SNLS/DNLS"
         
-        return processNameMatch && capacityMatch && machineMatch;
-      });
+        return processNameMatch && capacityMatch && machineMatch
+      })
       
-      return !!foundProcess;
-    });
+      return !!foundProcess
+    })
 
     const hasMachineProcess = (machine, processName, minCapacity = 0) => {
       return processes.some(p => {
         const machineMatch = p.machineType === machine || 
-                           (machine === "SNLS/DNLS" && (p.machineType === "SNLS" || p.machineType === "DNLS"));
-        const processMatch = p.processName.toLowerCase().includes(processName.toLowerCase());
-        const capacityMatch = Math.round(p.capacity) >= minCapacity;
-        return machineMatch && processMatch && capacityMatch;
-      });
-    };
+          (machine === "SNLS/DNLS" && (p.machineType === "SNLS" || p.machineType === "DNLS"))
+        const processMatch = p.processName.toLowerCase().includes(processName.toLowerCase())
+        const capacityMatch = Math.round(p.capacity) >= minCapacity
+        return machineMatch && processMatch && capacityMatch
+      })
+    }
 
-    const hasNeckJoinOverLock = hasMachineProcess("Over Lock", "Neck-join", 150);
-    const hasBodyHemFlatLock = hasMachineProcess("Flat Lock", "Bottom-hem", 220);
+    const hasNeckJoinOverLock = hasMachineProcess("Over Lock", "Neck-join", 150)
+    const hasBodyHemFlatLock = hasMachineProcess("Flat Lock", "Bottom-hem", 220)
 
     if (hasFourProcess && hasNeckJoinOverLock && hasBodyHemFlatLock) {
-        finalLevel = 'Multiskill';
-        finalGrade = 'A++';
-        finalDesignation = 'Jr.Operator';
-        console.log("Multiskill Achieved");
+      finalLevel = 'Multiskill'
+      finalGrade = 'A++'
+      finalDesignation = 'Jr.Operator'
+      console.log("Multiskill Achieved")
     } 
     else if (hasNeckJoinOverLock && hasBodyHemFlatLock) {
-        finalGrade = 'A++';
-        finalLevel = 'Excellent';
-        finalDesignation = 'Jr.Operator';
-        console.log("Both Over Lock and Flat Lock conditions met");
+      finalGrade = 'A++'
+      finalLevel = 'Excellent'
+      finalDesignation = 'Jr.Operator'
+      console.log("Both Over Lock and Flat Lock conditions met")
     } 
     else if (hasFourProcess && hasBodyHemFlatLock) {
-        finalGrade = 'A++';
-        finalLevel = 'Excellent';
-        finalDesignation = 'Jr.Operator';
-        console.log("Both Four Process and Flat Lock conditions met");
+      finalGrade = 'A++'
+      finalLevel = 'Excellent'
+      finalDesignation = 'Jr.Operator'
+      console.log("Both Four Process and Flat Lock conditions met")
     } 
     else if (hasFourProcess && hasNeckJoinOverLock) {
-        finalGrade = 'A++';
-        finalLevel = 'Excellent';
-        finalDesignation = 'Jr.Operator';
-        console.log("Both Four Process and Over Lock conditions met");
+      finalGrade = 'A++'
+      finalLevel = 'Excellent'
+      finalDesignation = 'Jr.Operator'
+      console.log("Both Four Process and Over Lock conditions met")
     } else if (hasFourProcess) {
-        finalGrade = 'A+';
-        finalLevel = 'Very Good';
-        finalDesignation = 'Jr.Operator';
-        console.log("Only Four Process condition met");
+      finalGrade = 'A+'
+      finalLevel = 'Very Good'
+      finalDesignation = 'Jr.Operator'
+      console.log("Only Four Process condition met")
     }
 
     // Capacity-based rules
     processes.forEach(process => {
-        const capacity = Math.round(process.capacity);
+      const capacity = Math.round(process.capacity)
 
-        if (process.processName === "Neck-join" && process.smv === 0.35 && finalGrade !== 'A++') {
-            if (capacity >= 150 && finalGrade !== 'A+') {
-                finalGrade = 'A+';
-                if (finalLevel !== 'Multiskill') finalLevel = 'Very Good';
-                finalDesignation = 'Jr.Operator';
-            } else if (capacity >= 120 && capacity <= 149 && !['A++', 'A+'].includes(finalGrade)) {
-                finalGrade = 'A';
-                if (finalLevel !== 'Multiskill') finalLevel = 'Good';
-                finalDesignation = 'Jr.Operator';
-            } else if (capacity >= 100 && capacity <= 119 && !['A++', 'A+', 'A'].includes(finalGrade)) {
-                finalGrade = 'B+';
-                if (finalLevel !== 'Multiskill') finalLevel = 'Medium';
-                finalDesignation = 'Jr.Operator';
-            }
+      if (process.processName === "Neck-join" && process.smv === 0.35 && finalGrade !== 'A++') {
+        if (capacity >= 150 && finalGrade !== 'A+') {
+          finalGrade = 'A+'
+          if (finalLevel !== 'Multiskill') finalLevel = 'Very Good'
+          finalDesignation = 'Jr.Operator'
+        } else if (capacity >= 120 && capacity <= 149 && !['A++', 'A+'].includes(finalGrade)) {
+          finalGrade = 'A'
+          if (finalLevel !== 'Multiskill') finalLevel = 'Good'
+          finalDesignation = 'Jr.Operator'
+        } else if (capacity >= 100 && capacity <= 119 && !['A++', 'A+', 'A'].includes(finalGrade)) {
+          finalGrade = 'B+'
+          if (finalLevel !== 'Multiskill') finalLevel = 'Medium'
+          finalDesignation = 'Jr.Operator'
         }
-        
-        else if (process.processName === "Bottom-hem" && process.smv === 0.23 && finalGrade !== 'A++') {
-            if (capacity >= 220 && finalGrade !== 'A+') {
-                finalGrade = 'A+';
-                if (finalLevel !== 'Multiskill') finalLevel = 'Very Good';
-                finalDesignation = 'Jr.Operator';
-            } else if (capacity >= 200 && capacity <= 219 && !['A++', 'A+'].includes(finalGrade)) {
-                finalGrade = 'A';
-                if (finalLevel !== 'Multiskill') finalLevel = 'Good';
-                finalDesignation = 'Jr.Operator';
-            } else if (capacity >= 180 && capacity <= 199 && !['A++', 'A+', 'A'].includes(finalGrade)) {
-                finalGrade = 'B+';
-                if (finalLevel !== 'Multiskill') finalLevel = 'Medium';
-                finalDesignation = 'Jr.Operator';
-            }
+      }
+      
+      else if (process.processName === "Bottom-hem" && process.smv === 0.23 && finalGrade !== 'A++') {
+        if (capacity >= 220 && finalGrade !== 'A+') {
+          finalGrade = 'A+'
+          if (finalLevel !== 'Multiskill') finalLevel = 'Very Good'
+          finalDesignation = 'Jr.Operator'
+        } else if (capacity >= 200 && capacity <= 219 && !['A++', 'A+'].includes(finalGrade)) {
+          finalGrade = 'A'
+          if (finalLevel !== 'Multiskill') finalLevel = 'Good'
+          finalDesignation = 'Jr.Operator'
+        } else if (capacity >= 180 && capacity <= 199 && !['A++', 'A+', 'A'].includes(finalGrade)) {
+          finalGrade = 'B+'
+          if (finalLevel !== 'Multiskill') finalLevel = 'Medium'
+          finalDesignation = 'Jr.Operator'
         }
-    });
+      }
+    })
 
-    return { finalGrade, finalLevel, finalDesignation };
-  };
+    return { finalGrade, finalLevel, finalDesignation }
+  }
 
   // Calculate initial grade
-  let grade, level, designation;
+  let grade, level, designation
   
   if (averageQualityScore < 5) {
-    grade = 'Unskill'; 
-    level = 'Unskill'; 
-    designation = 'Asst.Operator';
+    grade = 'Unskill' 
+    level = 'Unskill' 
+    designation = 'Asst.Operator'
   } else {
     // Initial assessment based on total score
     if (totalScore >= 90) {
-      grade = 'A++'; level = 'Excellent'; designation = 'Jr.Operator';
+      grade = 'A++'; level = 'Excellent'; designation = 'Jr.Operator'
     } else if (totalScore >= 80) {
-      grade = 'A+'; level = 'Better'; designation = 'Jr.Operator';
+      grade = 'A+'; level = 'Better'; designation = 'Jr.Operator'
     } else if (totalScore >= 75) {
-      grade = 'A'; level = 'Good'; designation = 'Jr.Operator';
+      grade = 'A'; level = 'Good'; designation = 'Jr.Operator'
     } else if (totalScore >= 65) {
-      grade = 'B+'; level = 'Medium'; designation = 'Jr.Operator';
+      grade = 'B+'; level = 'Medium'; designation = 'Jr.Operator'
     } else if (totalScore >= 50) {
-      grade = 'B'; level = 'Average'; designation = 'Gen.Operator';
+      grade = 'B'; level = 'Average'; designation = 'Gen.Operator'
     } else {
-      grade = 'Unskill'; level = 'Unskill'; designation = 'Asst.Operator';
+      grade = 'Unskill'; level = 'Unskill'; designation = 'Asst.Operator'
     }
 
     // Apply special process rules if operator got lower grade
@@ -1544,11 +1708,11 @@ const calculateMachineScore = (processes) => {
       grade, 
       level, 
       designation
-    );
+    )
     
-    grade = adjustedAssessment.finalGrade;
-    level = adjustedAssessment.finalLevel;
-    designation = adjustedAssessment.finalDesignation;
+    grade = adjustedAssessment.finalGrade
+    level = adjustedAssessment.finalLevel
+    designation = adjustedAssessment.finalDesignation
   }
 
   return {

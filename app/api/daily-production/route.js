@@ -1,7 +1,149 @@
+
+// /api/daily-production
 import { connectDB } from '@/lib/db';
 import DailyProduction from '@/models/DailyProduction';
-import { NextResponse } from 'next/server';
 import Machine from '@/models/Machine';
+import { NextResponse } from 'next/server';
+
+// export async function POST(req) {
+//   try {
+//     await connectDB();
+//     const body = await req.json();
+
+//     if (!Array.isArray(body) || body.length === 0) {
+//       return NextResponse.json(
+//         { error: 'Payload must be a non-empty array' },
+//         { status: 400 }
+//       );
+//     }
+
+//     const savedEntries = [];
+
+//     for (const row of body) {
+//       const {
+//         date,
+//         buyerId,
+//         styleId,
+//         supervisor,
+//         floor,
+//         line,
+//         process,
+//         status,
+//         workAs,
+//         target,
+
+//         operatorId,
+//         operatorCode,
+//         operatorName,
+//         designation,
+
+//         uniqueMachine,
+//         machineType
+//       } = row;
+
+//       /* ===== Validation ===== */
+//       if (
+//         !date ||
+//         !buyerId ||
+//         !styleId ||
+//         !operatorId ||
+//         !operatorCode ||
+//         !operatorName ||
+//         !process ||
+//         !workAs ||
+//         !status
+//       ) {
+//         continue; // skip invalid row
+//       }
+
+//       const entryDate = new Date(date);
+
+//       const startOfDay = new Date(entryDate);
+//       startOfDay.setUTCHours(0, 0, 0, 0);
+
+//       const endOfDay = new Date(entryDate);
+//       endOfDay.setUTCHours(23, 59, 59, 999);
+
+//       /* ===== Duplicate check ===== */
+//       if (workAs === 'operator') {
+//         const duplicate = await DailyProduction.findOne({
+//           date: { $gte: startOfDay, $lte: endOfDay },
+//           $or: [
+//             { 'operator.operatorId': operatorCode },
+//             { uniqueMachine }
+//           ]
+//         });
+
+//         if (duplicate) continue;
+//       }
+
+//       /* ===== Mapping ===== */
+//       const payload = {
+//         date: entryDate,
+//         buyerId,
+//         styleId,
+//         supervisor,
+//         floor,
+//         line,
+//         process,
+//         status,
+//         workAs,
+//         target,
+
+//         operator: {
+//           _id: operatorId,
+//           operatorId: operatorCode,
+//           name: operatorName,
+//           designation
+//         },
+
+//         machineType: workAs === 'operator' ? machineType : undefined,
+//         uniqueMachine: workAs === 'operator' ? uniqueMachine : undefined,
+
+//         hourlyProduction: []
+//       };
+
+//       const saved = await DailyProduction.create(payload);
+//       savedEntries.push(saved);
+
+//       /* ===== Machine location update ===== */
+//       if (workAs === 'operator' && uniqueMachine) {
+//         await Machine.updateOne(
+//           { uniqueId: uniqueMachine },
+//           {
+//             $set: {
+//               lastLocation: {
+//                 date: entryDate,
+//                 line,
+//                 supervisor,
+//                 floor,
+//                 updatedAt: new Date()
+//               }
+//             }
+//           }
+//         );
+//       }
+//     }
+
+//     return NextResponse.json(
+//       {
+//         message: 'Daily production saved',
+//         inserted: savedEntries.length
+//       },
+//       { status: 201 }
+//     );
+
+//   } catch (error) {
+//     console.error('DailyProduction POST error:', error);
+//     return NextResponse.json(
+//       { error: 'Failed to save daily production' },
+//       { status: 500 }
+//     );
+//   }
+// }
+
+
+
 
 
 
@@ -58,8 +200,7 @@ export async function POST(req) {
 
     const productionEntry = await DailyProduction.create(payload);
 
-    // ✅ Update machine's lastLocation
-   // ✅ Update machine's lastLocation
+    
 if (workAs === 'operator' && uniqueMachine && line && supervisor && floor) {
   console.log("🟢 Attempting to update Machine lastLocation with:", { 
     uniqueMachine, 
