@@ -103,7 +103,7 @@ export default function AccessControl() {
       });
     }
   } catch (error) {
-    console.error('Error fetching permissions:', error);
+   // console.error('Error fetching permissions:', error);
   } finally {
     setLoading(false);
   }

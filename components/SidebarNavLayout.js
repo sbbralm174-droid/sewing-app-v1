@@ -122,14 +122,14 @@ export default function FloatingLayout() {
 
   // Fetch permissions from API
   useEffect(() => {
-    console.log("🛠️ Fetching permissions...");
+    //console.log("🛠️ Fetching permissions...");
     fetch("/api/permissions")
       .then((res) => {
         if (!res.ok) throw new Error('Failed to fetch permissions');
         return res.json();
       })
       .then((data) => {
-        console.log("✅ Permissions loaded:", data.permissions);
+        // console.log("✅ Permissions loaded:", data.permissions);
         setPermissions(data.permissions || []);
       })
       .catch((err) => {
@@ -140,7 +140,7 @@ export default function FloatingLayout() {
 
   // Fetch notifications from API (Initial Load)
   useEffect(() => {
-    console.log("🛠️ Initial fetch of notifications started.");
+   // console.log("🛠️ Initial fetch of notifications started.");
     fetch("/api/socket")
       .then((res) => {
         if (!res.ok) throw new Error('Network response was not ok');
@@ -149,7 +149,7 @@ export default function FloatingLayout() {
       .then((data) => {
         const notifData = Array.isArray(data) ? data : data.notifications || [];
         setNotifications(notifData);
-        console.log(`🎉 Initial notifications loaded: ${notifData.length} items.`);
+        // console.log(`🎉 Initial notifications loaded: ${notifData.length} items.`);
         setIsLoading(false);
       })
       .catch((err) => {
@@ -166,7 +166,7 @@ export default function FloatingLayout() {
       socket = io(SOCKET_SERVER_URL);
 
       socket.on('connect', () => {
-        console.log("🟢 Socket Client Connected for Live Updates:", socket.id);
+      //  console.log("🟢 Socket Client Connected for Live Updates:", socket.id);
       });
       
       socket.on('notifications-deleted', (payload) => {

@@ -83,8 +83,7 @@ export default function HourlyReportPage() {
       if (!res.ok) throw new Error(data.message || 'Something went wrong');
 
       setSubmitMessage({ type: 'success', text: 'Report submitted successfully!' });
-      setFloor('');
-      setHour('');
+      
       fetchReports();
     } catch (error) {
       setSubmitMessage({ type: 'error', text: error.message });

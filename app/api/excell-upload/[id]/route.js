@@ -6,7 +6,7 @@ import mongoose from 'mongoose';
 // GET single document by ID
 export async function GET(req, { params }) {
   try {
-    const { id } = params;
+    const { id } = await params;
     
     // Validate MongoDB ID
     if (!mongoose.Types.ObjectId.isValid(id)) {

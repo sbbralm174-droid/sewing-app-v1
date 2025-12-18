@@ -3,8 +3,13 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Swal from "sweetalert2";
+import HeaderForm from "@/components/HeaderForm";
+import ScannerSection from "@/components/ScannerSection";
+import SummarySection from "@/components/SummarySection";
+import ProductionTable from "@/components/ProductionTable";
 
 export default function DailyProductionPage() {
+  // Main state
   const [formData, setFormData] = useState({
     buyer: "",
     style: "",
@@ -12,33 +17,284 @@ export default function DailyProductionPage() {
     floor: "",
     line: "",
   });
-
+  
   const [tableData, setTableData] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isHeaderComplete, setIsHeaderComplete] = useState(false);
+  
+  // Dropdown data
   const [buyers, setBuyers] = useState([]);
   const [styles, setStyles] = useState([]);
   const [filteredStyles, setFilteredStyles] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isHeaderComplete, setIsHeaderComplete] = useState(false);
   const [processes, setProcesses] = useState([]);
   
-  // নতুন state: Excel ফাইলগুলোর জন্য
+  // Excel file data
   const [excelFiles, setExcelFiles] = useState([]);
   const [selectedFileId, setSelectedFileId] = useState("");
   const [breakdownProcesses, setBreakdownProcesses] = useState([]);
+  const [originalBreakdownProcesses, setOriginalBreakdownProcesses] = useState([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
   
-  // Scan related states
+  // Scan related
   const [scanInput, setScanInput] = useState("");
   const [scanFocus, setScanFocus] = useState(false);
   const [lastScannedData, setLastScannedData] = useState("");
   
+  // UI state
+  const [highlightedRow, setHighlightedRow] = useState(null);
+  const [summary, setSummary] = useState({
+    processCount: 0,
+    breakdownCount: 0,
+    total: 0
+  });
+  
+  // Refs
   const scanInputRef = useRef(null);
   const scanTimeoutRef = useRef(null);
 
+  // Initial data fetching
   useEffect(() => {
     fetchProcesses();
-    fetchExcelFiles(); // ফাইলগুলো লোড করবে
+    fetchExcelFiles();
   }, []);
+
+  // Summary update
+  useEffect(() => {
+    updateSummary();
+  }, [tableData]);
+
+  // Header completion check
+  useEffect(() => {
+    const complete = formData.buyer && formData.style && formData.supervisor && 
+                    formData.floor && formData.line;
+    setIsHeaderComplete(complete);
+    
+    if (complete && tableData.length === 0) {
+      addNewRow();
+    }
+  }, [formData, tableData.length]);
+
+  // Buyer change handler
+  useEffect(() => {
+    if (formData.buyer && styles.length > 0) {
+      const buyerSpecificStyles = styles.filter(
+        (style) => style.buyerId?._id === formData.buyer || 
+                  style.buyerId === formData.buyer ||
+                  style.buyerName === buyers.find(b => b._id === formData.buyer)?.name
+      );
+      setFilteredStyles(buyerSpecificStyles);
+      
+      if (formData.style && !buyerSpecificStyles.some(s => s._id === formData.style)) {
+        setFormData(prev => ({ ...prev, style: "" }));
+      }
+    } else {
+      setFilteredStyles([]);
+      if (formData.style) {
+        setFormData(prev => ({ ...prev, style: "" }));
+      }
+    }
+  }, [formData.buyer, styles, buyers, formData.style]);
+
+  // Auto focus scanner
+  useEffect(() => {
+    if (isHeaderComplete && scanInputRef.current) {
+      scanInputRef.current.focus();
+    }
+  }, [isHeaderComplete, tableData.length]);
+
+  // Fetch dropdown data
+  useEffect(() => {
+    fetchDropdownData();
+  }, []);
+
+  const updateSummary = () => {
+    const processCount = tableData.filter(row => row.process).length;
+    const breakdownCount = tableData.filter(row => row.breakdownProcess).length;
+    setSummary({
+      processCount,
+      breakdownCount,
+      total: processCount + breakdownCount
+    });
+  };
+
+  const createEmptyRow = () => ({
+    id: Date.now() + Math.random(),
+    operator: null,
+    uniqueMachine: "",
+    process: "",
+    breakdownProcess: "",
+    workAs: "operator",
+    target: "",
+    scannedMachine: null,
+    allowedProcesses: {},
+    selectedSMV: "",
+    selectedSMVType: ""
+  });
+
+  const addNewRow = () => {
+    const newRow = createEmptyRow();
+    setTableData((prev) => [...prev, newRow]);
+    
+    Swal.fire({
+      icon: "success",
+      title: "New Row Added",
+      text: `Row ${tableData.length + 1} has been added`,
+      timer: 1000,
+      showConfirmButton: false,
+    });
+  };
+
+  const removeRow = (rowIndex) => {
+    if (tableData.length <= 1) {
+      Swal.fire({
+        icon: "warning",
+        title: "Cannot Remove",
+        text: "At least one row is required",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+      return;
+    }
+
+    Swal.fire({
+      title: `Remove Row ${rowIndex + 1}?`,
+      text: "Are you sure you want to remove this row?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Yes, remove it!",
+      cancelButtonText: "Cancel",
+    }).then((result) => {
+      if (result.isConfirmed) {
+        const removedOperator = tableData[rowIndex].operator?.name;
+        setTableData((prev) => prev.filter((_, index) => index !== rowIndex));
+        Swal.fire(
+          "Removed!",
+          removedOperator ? `Row for ${removedOperator} has been removed.` : "Row has been removed.",
+          "success"
+        );
+      }
+    });
+  };
+
+  const cancelMachine = (rowIndex) => {
+    setTableData((prev) => {
+      const updated = [...prev];
+      updated[rowIndex] = {
+        ...updated[rowIndex],
+        uniqueMachine: "",
+        scannedMachine: null,
+        machineType: "",
+      };
+      return updated;
+    });
+
+    Swal.fire({
+      icon: "info",
+      title: "Machine Removed",
+      text: "Machine assignment has been cancelled",
+      timer: 1500,
+      showConfirmButton: false,
+    });
+  };
+
+  const handleSubmit = async () => {
+    const completeRows = tableData.filter(
+      row =>
+        row.operator &&
+        (row.process || row.breakdownProcess) &&
+        row.workAs &&
+        row.target &&
+        (row.workAs === 'helper' || row.uniqueMachine)
+    );
+
+    if (completeRows.length === 0) {
+      Swal.fire("Error", "No complete rows to save", "error");
+      return;
+    }
+
+    const payload = completeRows.map((row, index) => ({
+      date: new Date(),
+      buyerId: formData.buyer,
+      styleId: formData.style,
+      supervisor: formData.supervisor,
+      floor: formData.floor,
+      line: formData.line,
+      process: row.process,
+      breakdownProcess: row.breakdownProcess,
+      workAs: row.workAs,
+      status: "present",
+      target: Number(row.target),
+      operatorId: row.operator._id,
+      operatorCode: row.operator.operatorId,
+      operatorName: row.operator.name,
+      designation: row.operator.designation || "Operator",
+      uniqueMachine: row.workAs === 'operator' ? row.uniqueMachine : null,
+      machineType: row.workAs === 'operator' ? row.machineType : null,
+      smv: row.selectedSMV,
+      smvType: row.selectedSMVType,
+      rowNo: index + 1
+      
+    }));
+
+    try {
+      const res = await fetch("/api/daily-production", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        Swal.fire("Error", data.error || "Failed to save", "error");
+        return;
+      }
+
+      Swal.fire("Success", "Daily production saved successfully", "success");
+      // Reset form after successful save
+      setTableData([]);
+      setFormData({
+        buyer: "",
+        style: "",
+        supervisor: "",
+        floor: "",
+        line: "",
+      });
+
+    } catch (err) {
+      console.error(err);
+      Swal.fire("Error", "Server error", "error");
+    }
+  };
+
+  const fetchDropdownData = async () => {
+    try {
+      setIsLoading(true);
+      
+      const [buyersRes, stylesRes] = await Promise.all([
+        fetch('/api/buyers'),
+        fetch('/api/styles')
+      ]);
+      
+      const buyersData = await buyersRes.json();
+      const stylesData = await stylesRes.json();
+      
+      setBuyers(buyersData.data || []);
+      setStyles(stylesData.data || []);
+    } catch (error) {
+      console.error("Error fetching dropdown data:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Error Loading Data",
+        text: "Failed to load buyers and styles",
+        timer: 2000,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const fetchProcesses = async () => {
     try {
@@ -50,7 +306,6 @@ export default function DailyProductionPage() {
     }
   };
 
-  // Excel ফাইলগুলো fetch করার ফাংশন
   const fetchExcelFiles = async () => {
     try {
       setIsLoadingFiles(true);
@@ -72,11 +327,11 @@ export default function DailyProductionPage() {
     }
   };
 
-  // ফাইল সিলেক্ট হলে তার ডেটা লোড করবে
   const handleFileSelect = async (fileId) => {
     setSelectedFileId(fileId);
     if (!fileId) {
       setBreakdownProcesses([]);
+      setOriginalBreakdownProcesses([]);
       return;
     }
 
@@ -86,7 +341,6 @@ export default function DailyProductionPage() {
       const data = await res.json();
       
       if (data.success && data.data && data.data.data) {
-        // Process নামগুলো extract করবে
         const processesList = data.data.data.map(item => ({
           id: item._id,
           process: item.process,
@@ -94,8 +348,9 @@ export default function DailyProductionPage() {
           smv: item.smv,
           mcTypeHp: item.mcTypeHp,
           capacity: item.capacity,
-          manPower: item.manPower
+          manPower: item.manPower || 1
         }));
+        setOriginalBreakdownProcesses(processesList);
         setBreakdownProcesses(processesList);
         
         Swal.fire({
@@ -115,76 +370,9 @@ export default function DailyProductionPage() {
         timer: 2000,
       });
       setBreakdownProcesses([]);
+      setOriginalBreakdownProcesses([]);
     } finally {
       setIsLoadingFiles(false);
-    }
-  };
-
-  // Check if header is complete
-  useEffect(() => {
-    const complete = formData.buyer && formData.style && formData.supervisor && 
-                    formData.floor && formData.line;
-    setIsHeaderComplete(complete);
-    
-    if (complete && tableData.length === 0) {
-      addNewRow();
-    }
-  }, [formData, tableData.length]);
-
-  // Buyer change হলে style filter করবে
-  useEffect(() => {
-    if (formData.buyer && styles.length > 0) {
-      const buyerSpecificStyles = styles.filter(
-        (style) => style.buyerId?._id === formData.buyer || 
-                  style.buyerId === formData.buyer ||
-                  style.buyerName === buyers.find(b => b._id === formData.buyer)?.name
-      );
-      setFilteredStyles(buyerSpecificStyles);
-      
-      if (formData.style && !buyerSpecificStyles.some(s => s._id === formData.style)) {
-        setFormData(prev => ({ ...prev, style: "" }));
-      }
-    } else {
-      setFilteredStyles([]);
-      if (formData.style) {
-        setFormData(prev => ({ ...prev, style: "" }));
-      }
-    }
-  }, [formData.buyer, styles, buyers, formData.style]);
-
-  // Auto focus on scan input when header is complete
-  useEffect(() => {
-    if (isHeaderComplete && scanInputRef.current) {
-      scanInputRef.current.focus();
-    }
-  }, [isHeaderComplete, tableData.length]);
-
-  // Fetch buyers and styles
-  useEffect(() => {
-    fetchDropdownData();
-  }, []);
-
-  const fetchDropdownData = async () => {
-    try {
-      setIsLoading(true);
-      
-      const buyersRes = await fetch('/api/buyers');
-      const buyersData = await buyersRes.json();
-      setBuyers(buyersData.data || []);
-
-      const stylesRes = await fetch('/api/styles');
-      const stylesData = await stylesRes.json();
-      setStyles(stylesData.data || []);
-    } catch (error) {
-      console.error("Error fetching dropdown data:", error);
-      Swal.fire({
-        icon: "error",
-        title: "Error Loading Data",
-        text: "Failed to load buyers and styles",
-        timer: 2000,
-      });
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -196,7 +384,6 @@ export default function DailyProductionPage() {
     }));
   };
 
-  // Handle QR scan input
   const handleScanInputChange = (e) => {
     const value = e.target.value;
     setScanInput(value);
@@ -218,55 +405,49 @@ export default function DailyProductionPage() {
   };
 
   const processScannedData = async (scannedData) => {
-    if (!scannedData || scannedData === lastScannedData) return;
+  if (!scannedData) return;
+  setScanInput("");
+
+  try {
+    let parsedData;
     
-    setLastScannedData(scannedData);
-    setScanInput("");
-    
+    // JSON ডাটা পার্স করা
     try {
-      let parsedData;
+      const rawData = JSON.parse(scannedData);
       
-      try {
-        parsedData = JSON.parse(scannedData);
-      } catch (error) {
-        parsedData = await identifyScanType(scannedData);
-      }
-
-      if (!parsedData || !parsedData.type) {
-        throw new Error("Invalid QR code format");
-      }
-
-      if (parsedData.type === "operator") {
-        await handleOperatorScan(parsedData);
-      } else if (parsedData.type === "machine") {
-        await handleMachineScan(parsedData);
-      } else {
-        throw new Error("Unknown QR code type");
-      }
-
-      setTimeout(() => {
-        if (scanInputRef.current) {
-          scanInputRef.current.focus();
-        }
-      }, 100);
-
-    } catch (error) {
-      console.error("Scan error:", error);
-      Swal.fire({
-        icon: "error",
-        title: "Scan Failed",
-        text: error.message || "Could not process scanned data",
-        timer: 2000,
-        showConfirmButton: false,
-      });
-      
-      setTimeout(() => {
-        if (scanInputRef.current) {
-          scanInputRef.current.focus();
-        }
-      }, 100);
+      // কী-গুলো (Keys) বড় হাত বা ছোট হাত যাই হোক, সেগুলোকে নরমাল করা
+      parsedData = {
+        type: (rawData.TYPE || rawData.type || "").toLowerCase(),
+        id: rawData.ID || rawData.id || rawData._id,
+        operatorId: rawData.OPERATORiD || rawData.operatorId || rawData.operatorID,
+        name: rawData.NAME || rawData.name,
+        designation: rawData.DESIGNATION || rawData.designation,
+        uniqueId: rawData.UNIQUEID || rawData.uniqueId,
+        machineType: rawData.MACHINETYPE || rawData.machineType
+      };
+    } catch (e) {
+      // যদি JSON না হয় তবে identifyScanType এ যাবে
+      parsedData = await identifyScanType(scannedData);
     }
-  };
+
+    // এখন চেক করুন (toLowerCase ব্যবহার করায় "operator" সহজেই মিলবে)
+    if (!parsedData || !parsedData.type) {
+      throw new Error("Invalid QR code format");
+    }
+
+    if (parsedData.type === "operator") {
+      await handleOperatorScan(parsedData);
+    } else if (parsedData.type === "machine") {
+      await handleMachineScan(parsedData);
+    }
+
+    setLastScannedData(scannedData);
+  } catch (error) {
+    console.error("Scan error details:", error);
+    setLastScannedData("");
+    Swal.fire({ icon: "error", title: "Scan Failed", text: error.message });
+  }
+};
 
   const identifyScanType = async (data) => {
     const cleanData = data.trim();
@@ -332,7 +513,10 @@ export default function DailyProductionPage() {
         showConfirmButton: false,
       });
       
-      highlightRow(existingRowIndex);
+      setHighlightedRow(existingRowIndex);
+      setTimeout(() => {
+        setHighlightedRow(null);
+      }, 3000);
       
       setTimeout(() => {
         if (scanInputRef.current) {
@@ -484,70 +668,34 @@ export default function DailyProductionPage() {
     });
   };
 
-  const createEmptyRow = () => {
-    return {
-      id: Date.now() + Math.random(),
-      operator: null,
-      uniqueMachine: "",
-      process: "",
-      breakdownProcess: "",
-      workAs: "operator",
-      target: "",
-      scannedMachine: null,
-      allowedProcesses: {},
-      selectedSMV: "", // নতুন: নির্বাচিত SMV
-      selectedSMVType: "" // নতুন: কোন ধরনের SMV (process/breakdown)
-    };
-  };
-
-  const addNewRow = () => {
-    const newRow = createEmptyRow();
-    setTableData((prev) => [...prev, newRow]);
-    
-    Swal.fire({
-      icon: "success",
-      title: "New Row Added",
-      text: "Row " + (tableData.length + 1) + " has been added",
-      timer: 1000,
-      showConfirmButton: false,
-    });
-  };
-
-  const highlightRow = (rowIndex) => {
-    const rows = document.querySelectorAll('tbody tr');
-    if (rows[rowIndex]) {
-      rows[rowIndex].classList.add('bg-yellow-100');
-      setTimeout(() => {
-        rows[rowIndex].classList.remove('bg-yellow-100');
-      }, 3000);
-    }
-  };
-
   const handleRowChange = (rowIndex, field, value) => {
     setTableData((prev) => {
       const updated = [...prev];
       
       if (field === "process") {
-        // Process সিলেক্ট করলে Breakdown Process ডিজেবল হবে
+        setHighlightedRow(rowIndex);
+        setTimeout(() => {
+          setHighlightedRow(null);
+        }, 2000);
+        
         const selectedProcess = processes.find(p => p._id === value);
         
         updated[rowIndex] = {
           ...updated[rowIndex],
           [field]: value,
-          breakdownProcess: "", // Reset breakdown process
+          breakdownProcess: "",
           selectedSMV: selectedProcess?.smv || "",
           selectedSMVType: selectedProcess?.smv ? "process" : "",
           target: selectedProcess?.smv ? calculateTarget(selectedProcess.smv) : ""
         };
       } 
       else if (field === "breakdownProcess") {
-        // Breakdown Process সিলেক্ট করলে Process ডিজেবল হবে
-        const selectedBreakdown = breakdownProcesses.find(bp => bp.process === value || bp.id === value);
+        const selectedBreakdown = originalBreakdownProcesses.find(bp => bp.process === value || bp.id === value);
         
         updated[rowIndex] = {
           ...updated[rowIndex],
           [field]: value,
-          process: "", // Reset process
+          process: "",
           selectedSMV: selectedBreakdown?.smv || "",
           selectedSMVType: selectedBreakdown?.smv ? "breakdown" : "",
           target: selectedBreakdown?.smv ? calculateTarget(selectedBreakdown.smv) : ""
@@ -561,732 +709,109 @@ export default function DailyProductionPage() {
     });
   };
 
-  // টার্গেট ক্যালকুলেট করার ফাংশন
   const calculateTarget = (smv) => {
     if (!smv || smv <= 0) return "";
-    const target = Math.round(60 / smv); // 60 মিনিট / SMV
-    return target;
+    return Math.round(60 / smv);
   };
 
-  const removeRow = (rowIndex) => {
-    if (tableData.length <= 1) {
-      Swal.fire({
-        icon: "warning",
-        title: "Cannot Remove",
-        text: "At least one row is required",
-        timer: 1500,
-        showConfirmButton: false,
-      });
-      return;
-    }
-
-    Swal.fire({
-      title: "Remove Row " + (rowIndex + 1) + "?",
-      text: "Are you sure you want to remove this row?",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#d33",
-      cancelButtonColor: "#3085d6",
-      confirmButtonText: "Yes, remove it!",
-      cancelButtonText: "Cancel",
-    }).then((result) => {
-      if (result.isConfirmed) {
-        const removedOperator = tableData[rowIndex].operator?.name;
-        setTableData((prev) => prev.filter((_, index) => index !== rowIndex));
-        Swal.fire(
-          "Removed!",
-          removedOperator ? `Row for ${removedOperator} has been removed.` : "Row has been removed.",
-          "success"
-        );
-      }
-    });
+  const getBreakdownSelectionCount = (processName) => {
+    return tableData.filter(row => row.breakdownProcess === processName).length;
   };
 
-  const cancelMachine = (rowIndex) => {
-    setTableData((prev) => {
-      const updated = [...prev];
-      updated[rowIndex] = {
-        ...updated[rowIndex],
-        uniqueMachine: "",
-        scannedMachine: null,
-        machineType: "",
-      };
-      return updated;
-    });
-
-    Swal.fire({
-      icon: "info",
-      title: "Machine Removed",
-      text: "Machine assignment has been cancelled",
-      timer: 1500,
-      showConfirmButton: false,
-    });
-  };
-
-  const handleSubmit = async () => {
-    const completeRows = tableData.filter(
-      row =>
-        row.operator &&
-        (row.process || row.breakdownProcess) && // যেকোনো একটি থাকলেই হবে
-        row.workAs &&
-        row.target &&
-        (row.workAs === 'helper' || row.uniqueMachine)
-    );
-
-    if (completeRows.length === 0) {
-      Swal.fire("Error", "No complete rows to save", "error");
-      return;
-    }
-
-    const payload = completeRows.map((row, index) => ({
-      date: new Date(),
-      buyerId: formData.buyer,
-      styleId: formData.style,
-      supervisor: formData.supervisor,
-      floor: formData.floor,
-      line: formData.line,
-      process: row.process,
-      breakdownProcess: row.breakdownProcess,
-      workAs: row.workAs,
-      status: "present",
-      target: Number(row.target),
-      operatorId: row.operator._id,
-      operatorCode: row.operator.operatorId,
-      operatorName: row.operator.name,
-      designation: row.operator.designation || "Operator",
-      uniqueMachine: row.workAs === 'operator' ? row.uniqueMachine : null,
-      machineType: row.workAs === 'operator' ? row.machineType : null,
-      smv: row.selectedSMV, // SMV সংরক্ষণ
-      smvType: row.selectedSMVType, // কোন ধরনের SMV
-      rowNo: index + 1
-    }));
-
-    console.table(payload);
-
-    try {
-      const res = await fetch("/api/daily-production", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        Swal.fire("Error", data.error || "Failed to save", "error");
-        return;
-      }
-
-      Swal.fire("Success", "Daily production saved successfully", "success");
-
-    } catch (err) {
-      console.error(err);
-      Swal.fire("Error", "Server error", "error");
-    }
+  const isBreakdownDisabled = (bp) => {
+    const selectedCount = getBreakdownSelectionCount(bp.process);
+    const manpower = parseInt(bp.manPower) || 1;
+    return selectedCount >= manpower;
   };
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header Form */}
-        <div className="bg-white mt-10 rounded-lg shadow p-6 mb-8">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">
-            Production Header Information
-          </h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Buyer */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Buyer *
-              </label>
-              <select
-                name="buyer"
-                value={formData.buyer}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              >
-                <option value="">Select Buyer</option>
-                {buyers.map((buyer) => (
-                  <option key={buyer._id} value={buyer._id}>
-                    {buyer.name}
-                  </option>
-                ))}
-              </select>
-              {isLoading && (
-                <div className="text-xs text-gray-500 mt-1">Loading buyers...</div>
-              )}
-            </div>
+        <HeaderForm
+          formData={formData}
+          buyers={buyers}
+          filteredStyles={filteredStyles}
+          excelFiles={excelFiles}
+          selectedFileId={selectedFileId}
+          breakdownProcesses={breakdownProcesses}
+          isLoading={isLoading}
+          isLoadingFiles={isLoadingFiles}
+          isHeaderComplete={isHeaderComplete}
+          onInputChange={handleInputChange}
+          onFileSelect={handleFileSelect}
+        />
 
-            {/* Style */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Style *
-                {formData.buyer && (
-                  <span className="text-xs text-gray-500 ml-2">
-                    ({filteredStyles.length} styles available)
-                  </span>
-                )}
-              </label>
-              <select
-                name="style"
-                value={formData.style}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-                disabled={!formData.buyer || filteredStyles.length === 0}
-              >
-                <option value="">
-                  {!formData.buyer 
-                    ? "Select buyer first" 
-                    : filteredStyles.length === 0 
-                      ? "No styles found for this buyer" 
-                      : "Select Style"}
-                </option>
-                {filteredStyles.map((style) => (
-                  <option key={style._id} value={style._id}>
-                    {style.name}
-                  </option>
-                ))}
-              </select>
-              {formData.buyer && filteredStyles.length === 0 && !isLoading && (
-                <div className="text-xs text-red-500 mt-1">
-                  No styles found for selected buyer
-                </div>
-              )}
-            </div>
-
-            {/* Excel File Selector */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Select Excel File (for Breakdown Processes)
-                {selectedFileId && breakdownProcesses.length > 0 && (
-                  <span className="text-xs text-green-600 ml-2">
-                    ({breakdownProcesses.length} breakdown processes loaded)
-                  </span>
-                )}
-              </label>
-              <select
-                value={selectedFileId}
-                onChange={(e) => handleFileSelect(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                disabled={isLoadingFiles}
-              >
-                <option value="">Select Excel File</option>
-                {excelFiles.map((file) => (
-                  <option key={file._id} value={file._id}>
-                    {file.fileName}
-                  </option>
-                ))}
-              </select>
-              {isLoadingFiles && (
-                <div className="text-xs text-gray-500 mt-1">Loading files...</div>
-              )}
-              {selectedFileId && (
-                <div className="text-xs text-gray-500 mt-1">
-                  Select a file to load breakdown processes
-                </div>
-              )}
-            </div>
-
-            {/* Supervisor */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Supervisor *
-              </label>
-              <input
-                type="text"
-                name="supervisor"
-                value={formData.supervisor}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter supervisor name"
-                required
-              />
-            </div>
-
-            {/* Floor */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Floor *
-              </label>
-              <input
-                type="text"
-                name="floor"
-                value={formData.floor}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="e.g., 1st Floor"
-                required
-              />
-            </div>
-
-            {/* Line */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Line *
-              </label>
-              <input
-                type="text"
-                name="line"
-                value={formData.line}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="e.g., Line-01"
-                required
-              />
-            </div>
-
-            {/* Status */}
-            <div className="flex items-end">
-              <div className="w-full p-3 bg-gray-50 rounded-md">
-                <div className="text-sm text-gray-600">Header Status:</div>
-                <div className={`font-medium ${isHeaderComplete ? 'text-green-600' : 'text-red-600'}`}>
-                  {isHeaderComplete 
-                    ? "✓ Complete - Ready to scan" 
-                    : "✗ Incomplete - Fill all fields"}
-                </div>
-                {formData.buyer && formData.style && (
-                  <div className="text-xs text-green-600 mt-1">
-                    ✓ Style matched with buyer
-                  </div>
-                )}
-                {selectedFileId && breakdownProcesses.length > 0 && (
-                  <div className="text-xs text-green-600 mt-1">
-                    ✓ Breakdown processes loaded
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Scanner Section */}
         {isHeaderComplete && (
-          <div className="mb-6 bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-800">
-                QR Code Scanner
-              </h2>
-              <div className="flex items-center">
-                <div className={`w-3 h-3 rounded-full mr-2 ${scanFocus ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
-                <span className="text-sm text-gray-600">
-                  {scanFocus ? 'Scanner Active' : 'Click to Activate'}
-                </span>
-              </div>
-            </div>
-            
-            <div className="relative">
-              <input
-                ref={scanInputRef}
-                type="text"
-                value={scanInput}
-                onChange={handleScanInputChange}
-                onFocus={() => setScanFocus(true)}
-                onBlur={() => setScanFocus(false)}
-                className="w-full px-4 py-4 text-lg border-2 border-blue-500 rounded-lg focus:outline-none focus:ring-4 focus:ring-blue-200 font-mono"
-                placeholder="Point QR scanner here or type manually..."
-                autoFocus
-              />
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-500 bg-blue-50 px-2 py-1 rounded">
-                    Auto-detect
-                  </span>
-                  <button
-                    onClick={() => {
-                      setScanInput("");
-                      if (scanInputRef.current) {
-                        scanInputRef.current.focus();
-                      }
-                    }}
-                    className="text-gray-400 hover:text-gray-600"
-                    title="Clear"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+          <ScannerSection
+            scanInput={scanInput}
+            scanFocus={scanFocus}
+            scanInputRef={scanInputRef}
+            onScanChange={handleScanInputChange}
+            onScanFocus={() => setScanFocus(true)}
+            onScanBlur={() => setScanFocus(false)}
+            onClearScan={() => {
+              setScanInput("");
+              if (scanInputRef.current) {
+                scanInputRef.current.focus();
+              }
+            }}
+          />
         )}
 
-        {/* Table Section */}
-        <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
-          <div className="p-4 border-b flex justify-between items-center">
-            <h2 className="text-lg font-semibold">
-              Operator Production Details
-              <span className="ml-2 text-sm font-normal text-gray-500">
-                ({tableData.length} rows)
-              </span>
-              {selectedFileId && (
-                <span className="ml-2 text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
-                  Breakdown processes available
-                </span>
-              )}
-            </h2>
-            <div className="flex gap-2">
-              <button
-                onClick={addNewRow}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm flex items-center gap-1"
-                disabled={!isHeaderComplete}
-              >
-                <span>+</span> Add New Row
-              </button>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            {tableData.length === 0 ? (
-              <div className="p-12 text-center">
-                <div className="text-gray-400 mb-4">
-                  <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No Operators Added Yet</h3>
-                <p className="text-gray-500 mb-4">
-                  {isHeaderComplete 
-                    ? "Scan operator QR code in the scanner section above" 
-                    : "Complete header fields first to enable scanning"}
-                </p>
-              </div>
-            ) : (
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Row
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Operator
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Machine
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Process
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Breakdown Process
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      SMV
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Work As
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Target
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {tableData.map((row, index) => (
-                    <tr 
-                      key={row.id} 
-                      className={`hover:bg-gray-50 ${!row.operator ? 'bg-gray-50' : row.operator && row.uniqueMachine ? 'bg-green-50' : ''}`}
-                    >
-                      {/* Row Number */}
-                      <td className="px-6 py-4 text-center">
-                        <div className="font-bold text-gray-700">{index + 1}</div>
-                        {!row.operator && (
-                          <div className="text-xs text-gray-400 mt-1">Waiting for operator</div>
-                        )}
-                      </td>
-
-                      {/* Operator */}
-                      <td className="px-6 py-4">
-                        {row.operator ? (
-                          <div className="bg-blue-50 p-3 rounded border border-blue-200">
-                            <div className="text-sm font-medium text-gray-900">
-                              {row.operator.name}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              ID: {row.operator.operatorId}
-                            </div>
-                            <div className="text-xs text-gray-400 mt-1">
-                              {row.operator.designation}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-center p-4">
-                            <div className="text-gray-400 text-sm mb-2">No Operator</div>
-                            <div className="text-xs text-gray-500">
-                              Scan operator QR above
-                            </div>
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Machine */}
-                      <td className="px-6 py-4">
-                        {row.uniqueMachine ? (
-                          <div className="bg-green-50 p-3 rounded border border-green-200">
-                            <div className="text-sm font-medium text-gray-900">
-                              {row.uniqueMachine}
-                            </div>
-                            {row.machineType && (
-                              <div className="text-xs text-gray-500 mt-1">
-                                {row.machineType}
-                              </div>
-                            )}
-                            <button
-                              onClick={() => cancelMachine(index)}
-                              className="text-xs text-red-600 hover:text-red-800 mt-2"
-                              title="Remove machine"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="text-center p-4">
-                            <div className="text-gray-400 text-sm mb-2">No Machine</div>
-                            {row.operator ? (
-                              <div className="text-xs text-green-500">
-                                Ready for machine scan
-                              </div>
-                            ) : (
-                              <div className="text-xs text-gray-500">
-                                Add operator first
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Process */}
-                      <td className="px-6 py-4">
-                        <select
-                          value={row.process}
-                          onChange={(e) => handleRowChange(index, "process", e.target.value)}
-                          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
-                            row.operator ? 'border-gray-300' : 'border-gray-200 bg-gray-100'
-                          }`}
-                          disabled={!row.operator || row.breakdownProcess}
-                        >
-                          <option value="">Select Process</option>
-                          {row.operator && row.allowedProcesses && Object.keys(row.allowedProcesses).length > 0 ? (
-                            Object.keys(row.allowedProcesses).map((process) => (
-                              <option key={process} value={process}>
-                                {process}
-                              </option>
-                            ))
-                          ) : (
-                            processes.map((process) => (
-                              <option key={process._id} value={process._id}>
-                                {process.name} (SMV: {process.smv})
-                              </option>
-                            ))
-                          )}
-                        </select>
-                        
-                        {row.breakdownProcess && (
-                          <div className="text-xs text-gray-500 mt-1">
-                            <span className="text-orange-600">Breakdown process selected</span>
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Breakdown Process */}
-                      <td className="px-6 py-4">
-                        <select
-                          value={row.breakdownProcess}
-                          onChange={(e) => handleRowChange(index, "breakdownProcess", e.target.value)}
-                          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
-                            row.operator ? 'border-gray-300' : 'border-gray-200 bg-gray-100'
-                          }`}
-                          disabled={!row.operator || !selectedFileId || row.process || breakdownProcesses.length === 0}
-                        >
-                          <option value="">Select Breakdown Process</option>
-                          {breakdownProcesses.map((bp) => (
-                            
-                            <option key={bp.id} value={bp.process}>
-                              {bp.process} (Man Power: {bp.manPower})
-                            </option>
-                          ))}
-                        </select>
-                        
-                        {row.process && (
-                          <div className="text-xs text-gray-500 mt-1">
-                            <span className="text-blue-600">Process selected</span>
-                          </div>
-                        )}
-                        
-                        {!selectedFileId && breakdownProcesses.length === 0 && (
-                          <div className="text-xs text-gray-400 mt-1">
-                            Select an Excel file to load breakdown processes
-                          </div>
-                        )}
-                      </td>
-
-                      {/* SMV */}
-                      <td className="px-6 py-4">
-                        {row.selectedSMV ? (
-                          <div className={`p-2 rounded border ${row.selectedSMVType === 'process' ? 'bg-blue-50 border-blue-200' : 'bg-orange-50 border-orange-200'}`}>
-                            <div className="text-sm font-medium text-gray-900">
-                              {row.selectedSMV}
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              {row.selectedSMVType === 'process' ? 'From Process' : 'From Breakdown'}
-                            </div>
-                            {row.selectedSMV && (
-                              <div className="text-xs text-green-600 mt-1">
-                                Target: {calculateTarget(row.selectedSMV)} pcs/hour
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="text-center p-2">
-                            <div className="text-gray-400 text-sm">N/A</div>
-                            <div className="text-xs text-gray-500">
-                              Select process or breakdown
-                            </div>
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Work As */}
-                      <td className="px-6 py-4">
-                        <select
-                          value={row.workAs}
-                          onChange={(e) =>
-                            handleRowChange(index, "workAs", e.target.value)
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                          disabled={!row.operator}
-                        >
-                          <option value="operator">Operator</option>
-                          <option value="helper">Helper</option>
-                        </select>
-                      </td>
-
-                      {/* Target */}
-                      <td className="px-6 py-4">
-                        <input
-                          type="number"
-                          value={row.target}
-                          onChange={(e) => handleRowChange(index, "target", e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                          placeholder="Enter target"
-                          min="0"
-                          disabled={!row.operator}
-                        />
-                        
-                        {/* SMV থেকে auto-calculated target */}
-                        {row.selectedSMV && (
-                          <div className="text-xs text-gray-600 mt-1">
-                            Auto-calculated: {calculateTarget(row.selectedSMV)} 
-                            <button
-                              onClick={() => handleRowChange(index, "target", calculateTarget(row.selectedSMV))}
-                              className="text-blue-600 hover:text-blue-800 ml-2"
-                              title="Use calculated target"
-                            >
-                              Use
-                            </button>
-                          </div>
-                        )}
-                        
-                        {/* Operator এর allowed processes থেকে suggested target */}
-                        {row.allowedProcesses && row.process && row.allowedProcesses[row.process] && (
-                          <button
-                            onClick={() => handleRowChange(index, "target", row.allowedProcesses[row.process])}
-                            className="text-xs text-blue-600 hover:text-blue-800 mt-1 block"
-                            title="Use suggested target"
-                          >
-                            Use suggested: {row.allowedProcesses[row.process]}
-                          </button>
-                        )}
-                      </td>
-
-                      {/* Actions */}
-                      <td className="px-6 py-4">
-                        <button
-                          onClick={() => removeRow(index)}
-                          className="px-3 py-1 bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100 text-sm font-medium"
-                          disabled={tableData.length <= 1}
-                        >
-                          Remove
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-
-        {/* Status Summary */}
         {tableData.length > 0 && (
-          <div className="mb-6 bg-gray-50 rounded-lg p-4">
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="text-center p-3 bg-white rounded shadow">
-                <div className="text-2xl font-bold text-blue-600">{tableData.length}</div>
-                <div className="text-sm text-gray-600">Total Rows</div>
-              </div>
-              <div className="text-center p-3 bg-white rounded shadow">
-                <div className="text-2xl font-bold text-green-600">
-                  {tableData.filter(row => row.operator && row.uniqueMachine && (row.process || row.breakdownProcess) && row.target).length}
-                </div>
-                <div className="text-sm text-gray-600">Complete</div>
-              </div>
-              <div className="text-center p-3 bg-white rounded shadow">
-                <div className="text-2xl font-bold text-yellow-600">
-                  {tableData.filter(row => row.process).length}
-                </div>
-                <div className="text-sm text-gray-600">Process Selected</div>
-              </div>
-              <div className="text-center p-3 bg-white rounded shadow">
-                <div className="text-2xl font-bold text-purple-600">
-                  {tableData.filter(row => row.breakdownProcess).length}
-                </div>
-                <div className="text-sm text-gray-600">Breakdown Selected</div>
-              </div>
-              <div className="text-center p-3 bg-white rounded shadow">
-                <div className="text-2xl font-bold text-indigo-600">
-                  {tableData.filter(row => row.selectedSMV).length}
-                </div>
-                <div className="text-sm text-gray-600">With SMV</div>
-              </div>
-            </div>
-          </div>
+          <SummarySection summary={summary} />
         )}
 
-        {/* Submit Button */}
-        <div className="flex justify-between items-center">
-          <div className="text-sm text-gray-500">
-            {tableData.length > 0 ? (
-              <span>
-                {tableData.filter(row => row.operator && row.uniqueMachine && (row.process || row.breakdownProcess) && row.target).length} of {tableData.length} rows complete
-              </span>
-            ) : (
-              <span>No rows added yet</span>
-            )}
+        <ProductionTable
+          tableData={tableData}
+          highlightedRow={highlightedRow}
+          processes={processes}
+          breakdownProcesses={breakdownProcesses}
+          originalBreakdownProcesses={originalBreakdownProcesses}
+          selectedFileId={selectedFileId}
+          isHeaderComplete={isHeaderComplete}
+          onAddRow={addNewRow}
+          onRemoveRow={removeRow}
+          onCancelMachine={cancelMachine}
+          onRowChange={handleRowChange}
+          getBreakdownSelectionCount={getBreakdownSelectionCount}
+          isBreakdownDisabled={isBreakdownDisabled}
+          calculateTarget={calculateTarget}
+          floor={formData.floor}
+        />
+
+        {/* Submit Section */}
+        <div className="mt-6 bg-white rounded-lg shadow p-6">
+          <div className="flex justify-between items-center">
+            <div className="text-sm text-gray-500">
+              {tableData.length > 0 ? (
+                <span>
+                  {tableData.filter(row => row.operator && row.uniqueMachine && (row.process || row.breakdownProcess) && row.target).length} of {tableData.length} rows complete
+                </span>
+              ) : (
+                <span>No rows added yet</span>
+              )}
+            </div>
+            <button
+              onClick={handleSubmit}
+              disabled={isLoading || tableData.length === 0}
+              className="px-8 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-md"
+            >
+              {isLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                  </svg>
+                  Save Daily Production
+                </>
+              )}
+            </button>
           </div>
-          <button
-            onClick={handleSubmit}
-            disabled={isLoading || tableData.length === 0}
-            className="px-8 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-md"
-          >
-            {isLoading ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                Saving...
-              </>
-            ) : (
-              <>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                </svg>
-                Save Daily Production
-              </>
-            )}
-          </button>
         </div>
       </div>
     </div>
