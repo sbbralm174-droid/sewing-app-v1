@@ -1,5 +1,4 @@
 // /supervisor/daily-production-by-qrcode
-
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -21,7 +20,6 @@ export default function DailyProductionPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isHeaderComplete, setIsHeaderComplete] = useState(false);
   const [processes, setProcesses] = useState([]);
-  const [filteredProcesses, setFilteredProcesses] = useState([]);
   
   // নতুন state: Excel ফাইলগুলোর জন্য
   const [excelFiles, setExcelFiles] = useState([]);
@@ -95,7 +93,8 @@ export default function DailyProductionPage() {
           sno: item.sno,
           smv: item.smv,
           mcTypeHp: item.mcTypeHp,
-          capacity: item.capacity
+          capacity: item.capacity,
+          manPower: item.manPower
         }));
         setBreakdownProcesses(processesList);
         
@@ -491,11 +490,13 @@ export default function DailyProductionPage() {
       operator: null,
       uniqueMachine: "",
       process: "",
-      breakdownProcess: "", // নতুন ফিল্ড যোগ করা হয়েছে
+      breakdownProcess: "",
       workAs: "operator",
       target: "",
       scannedMachine: null,
       allowedProcesses: {},
+      selectedSMV: "", // নতুন: নির্বাচিত SMV
+      selectedSMVType: "" // নতুন: কোন ধরনের SMV (process/breakdown)
     };
   };
 
@@ -525,9 +526,46 @@ export default function DailyProductionPage() {
   const handleRowChange = (rowIndex, field, value) => {
     setTableData((prev) => {
       const updated = [...prev];
-      updated[rowIndex][field] = value;
+      
+      if (field === "process") {
+        // Process সিলেক্ট করলে Breakdown Process ডিজেবল হবে
+        const selectedProcess = processes.find(p => p._id === value);
+        
+        updated[rowIndex] = {
+          ...updated[rowIndex],
+          [field]: value,
+          breakdownProcess: "", // Reset breakdown process
+          selectedSMV: selectedProcess?.smv || "",
+          selectedSMVType: selectedProcess?.smv ? "process" : "",
+          target: selectedProcess?.smv ? calculateTarget(selectedProcess.smv) : ""
+        };
+      } 
+      else if (field === "breakdownProcess") {
+        // Breakdown Process সিলেক্ট করলে Process ডিজেবল হবে
+        const selectedBreakdown = breakdownProcesses.find(bp => bp.process === value || bp.id === value);
+        
+        updated[rowIndex] = {
+          ...updated[rowIndex],
+          [field]: value,
+          process: "", // Reset process
+          selectedSMV: selectedBreakdown?.smv || "",
+          selectedSMVType: selectedBreakdown?.smv ? "breakdown" : "",
+          target: selectedBreakdown?.smv ? calculateTarget(selectedBreakdown.smv) : ""
+        };
+      }
+      else {
+        updated[rowIndex][field] = value;
+      }
+      
       return updated;
     });
+  };
+
+  // টার্গেট ক্যালকুলেট করার ফাংশন
+  const calculateTarget = (smv) => {
+    if (!smv || smv <= 0) return "";
+    const target = Math.round(60 / smv); // 60 মিনিট / SMV
+    return target;
   };
 
   const removeRow = (rowIndex) => {
@@ -589,7 +627,7 @@ export default function DailyProductionPage() {
     const completeRows = tableData.filter(
       row =>
         row.operator &&
-        row.process &&
+        (row.process || row.breakdownProcess) && // যেকোনো একটি থাকলেই হবে
         row.workAs &&
         row.target &&
         (row.workAs === 'helper' || row.uniqueMachine)
@@ -608,7 +646,7 @@ export default function DailyProductionPage() {
       floor: formData.floor,
       line: formData.line,
       process: row.process,
-      breakdownProcess: row.breakdownProcess, // নতুন ফিল্ড যোগ করা হয়েছে
+      breakdownProcess: row.breakdownProcess,
       workAs: row.workAs,
       status: "present",
       target: Number(row.target),
@@ -618,6 +656,8 @@ export default function DailyProductionPage() {
       designation: row.operator.designation || "Operator",
       uniqueMachine: row.workAs === 'operator' ? row.uniqueMachine : null,
       machineType: row.workAs === 'operator' ? row.machineType : null,
+      smv: row.selectedSMV, // SMV সংরক্ষণ
+      smvType: row.selectedSMVType, // কোন ধরনের SMV
       rowNo: index + 1
     }));
 
@@ -720,10 +760,10 @@ export default function DailyProductionPage() {
             {/* Excel File Selector */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Select Excel File
+                Select Excel File (for Breakdown Processes)
                 {selectedFileId && breakdownProcesses.length > 0 && (
                   <span className="text-xs text-green-600 ml-2">
-                    ({breakdownProcesses.length} processes loaded)
+                    ({breakdownProcesses.length} breakdown processes loaded)
                   </span>
                 )}
               </label>
@@ -932,6 +972,9 @@ export default function DailyProductionPage() {
                       Breakdown Process
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      SMV
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Work As
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1024,7 +1067,7 @@ export default function DailyProductionPage() {
                           className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
                             row.operator ? 'border-gray-300' : 'border-gray-200 bg-gray-100'
                           }`}
-                          disabled={!row.operator}
+                          disabled={!row.operator || row.breakdownProcess}
                         >
                           <option value="">Select Process</option>
                           {row.operator && row.allowedProcesses && Object.keys(row.allowedProcesses).length > 0 ? (
@@ -1036,31 +1079,20 @@ export default function DailyProductionPage() {
                           ) : (
                             processes.map((process) => (
                               <option key={process._id} value={process._id}>
-                                {process.name} ({process.code})
+                                {process.name} (SMV: {process.smv})
                               </option>
                             ))
                           )}
                         </select>
                         
-                        {row.process && (
+                        {row.breakdownProcess && (
                           <div className="text-xs text-gray-500 mt-1">
-                            {(() => {
-                              const selectedProcess = processes.find(p => p._id === row.process);
-                              if (selectedProcess) {
-                                return (
-                                  <>
-                                    <div>SMV: {selectedProcess.smv}</div>
-                                    <div>Machine: {selectedProcess.machineType}</div>
-                                  </>
-                                );
-                              }
-                              return null;
-                            })()}
+                            <span className="text-orange-600">Breakdown process selected</span>
                           </div>
                         )}
                       </td>
 
-                      {/* নতুন: Breakdown Process */}
+                      {/* Breakdown Process */}
                       <td className="px-6 py-4">
                         <select
                           value={row.breakdownProcess}
@@ -1068,37 +1100,52 @@ export default function DailyProductionPage() {
                           className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
                             row.operator ? 'border-gray-300' : 'border-gray-200 bg-gray-100'
                           }`}
-                          disabled={!row.operator || breakdownProcesses.length === 0}
+                          disabled={!row.operator || !selectedFileId || row.process || breakdownProcesses.length === 0}
                         >
                           <option value="">Select Breakdown Process</option>
                           {breakdownProcesses.map((bp) => (
+                            
                             <option key={bp.id} value={bp.process}>
-                              {bp.process}
+                              {bp.process} (Man Power: {bp.manPower})
                             </option>
                           ))}
                         </select>
                         
-                        {row.breakdownProcess && (
+                        {row.process && (
                           <div className="text-xs text-gray-500 mt-1">
-                            {(() => {
-                              const selectedBP = breakdownProcesses.find(bp => bp.process === row.breakdownProcess);
-                              if (selectedBP) {
-                                return (
-                                  <>
-                                    <div>SMV: {selectedBP.smv}</div>
-                                    {/* <div>MC Type: {selectedBP.mcTypeHp}</div> */}
-                                    <div>Capacity: {selectedBP.capacity}</div>
-                                  </>
-                                );
-                              }
-                              return null;
-                            })()}
+                            <span className="text-blue-600">Process selected</span>
                           </div>
                         )}
                         
-                        {breakdownProcesses.length === 0 && (
+                        {!selectedFileId && breakdownProcesses.length === 0 && (
                           <div className="text-xs text-gray-400 mt-1">
-                            Select an Excel file above to load breakdown processes
+                            Select an Excel file to load breakdown processes
+                          </div>
+                        )}
+                      </td>
+
+                      {/* SMV */}
+                      <td className="px-6 py-4">
+                        {row.selectedSMV ? (
+                          <div className={`p-2 rounded border ${row.selectedSMVType === 'process' ? 'bg-blue-50 border-blue-200' : 'bg-orange-50 border-orange-200'}`}>
+                            <div className="text-sm font-medium text-gray-900">
+                              {row.selectedSMV}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {row.selectedSMVType === 'process' ? 'From Process' : 'From Breakdown'}
+                            </div>
+                            {row.selectedSMV && (
+                              <div className="text-xs text-green-600 mt-1">
+                                Target: {calculateTarget(row.selectedSMV)} pcs/hour
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-center p-2">
+                            <div className="text-gray-400 text-sm">N/A</div>
+                            <div className="text-xs text-gray-500">
+                              Select process or breakdown
+                            </div>
                           </div>
                         )}
                       </td>
@@ -1123,18 +1170,33 @@ export default function DailyProductionPage() {
                         <input
                           type="number"
                           value={row.target}
-                          onChange={(e) =>
-                            handleRowChange(index, "target", e.target.value)
-                          }
+                          onChange={(e) => handleRowChange(index, "target", e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                           placeholder="Enter target"
                           min="0"
                           disabled={!row.operator}
                         />
+                        
+                        {/* SMV থেকে auto-calculated target */}
+                        {row.selectedSMV && (
+                          <div className="text-xs text-gray-600 mt-1">
+                            Auto-calculated: {calculateTarget(row.selectedSMV)} 
+                            <button
+                              onClick={() => handleRowChange(index, "target", calculateTarget(row.selectedSMV))}
+                              className="text-blue-600 hover:text-blue-800 ml-2"
+                              title="Use calculated target"
+                            >
+                              Use
+                            </button>
+                          </div>
+                        )}
+                        
+                        {/* Operator এর allowed processes থেকে suggested target */}
                         {row.allowedProcesses && row.process && row.allowedProcesses[row.process] && (
                           <button
                             onClick={() => handleRowChange(index, "target", row.allowedProcesses[row.process])}
-                            className="text-xs text-blue-600 hover:text-blue-800 mt-1"
+                            className="text-xs text-blue-600 hover:text-blue-800 mt-1 block"
+                            title="Use suggested target"
                           >
                             Use suggested: {row.allowedProcesses[row.process]}
                           </button>
@@ -1169,27 +1231,27 @@ export default function DailyProductionPage() {
               </div>
               <div className="text-center p-3 bg-white rounded shadow">
                 <div className="text-2xl font-bold text-green-600">
-                  {tableData.filter(row => row.operator && row.uniqueMachine && row.process && row.target).length}
+                  {tableData.filter(row => row.operator && row.uniqueMachine && (row.process || row.breakdownProcess) && row.target).length}
                 </div>
                 <div className="text-sm text-gray-600">Complete</div>
               </div>
               <div className="text-center p-3 bg-white rounded shadow">
                 <div className="text-2xl font-bold text-yellow-600">
-                  {tableData.filter(row => row.operator && !row.uniqueMachine).length}
+                  {tableData.filter(row => row.process).length}
                 </div>
-                <div className="text-sm text-gray-600">Need Machine</div>
+                <div className="text-sm text-gray-600">Process Selected</div>
               </div>
               <div className="text-center p-3 bg-white rounded shadow">
                 <div className="text-2xl font-bold text-purple-600">
-                  {tableData.filter(row => row.operator && row.uniqueMachine && (!row.process || !row.target)).length}
+                  {tableData.filter(row => row.breakdownProcess).length}
                 </div>
-                <div className="text-sm text-gray-600">Incomplete</div>
+                <div className="text-sm text-gray-600">Breakdown Selected</div>
               </div>
               <div className="text-center p-3 bg-white rounded shadow">
                 <div className="text-2xl font-bold text-indigo-600">
-                  {tableData.filter(row => row.breakdownProcess).length}
+                  {tableData.filter(row => row.selectedSMV).length}
                 </div>
-                <div className="text-sm text-gray-600">With Breakdown</div>
+                <div className="text-sm text-gray-600">With SMV</div>
               </div>
             </div>
           </div>
@@ -1200,7 +1262,7 @@ export default function DailyProductionPage() {
           <div className="text-sm text-gray-500">
             {tableData.length > 0 ? (
               <span>
-                {tableData.filter(row => row.operator && row.uniqueMachine && row.process && row.target).length} of {tableData.length} rows complete
+                {tableData.filter(row => row.operator && row.uniqueMachine && (row.process || row.breakdownProcess) && row.target).length} of {tableData.length} rows complete
               </span>
             ) : (
               <span>No rows added yet</span>
