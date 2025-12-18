@@ -1,3 +1,5 @@
+// /supervisor/daily-production-by-qrcode
+
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -15,11 +17,17 @@ export default function DailyProductionPage() {
   const [tableData, setTableData] = useState([]);
   const [buyers, setBuyers] = useState([]);
   const [styles, setStyles] = useState([]);
-  const [filteredStyles, setFilteredStyles] = useState([]); // নতুন state
+  const [filteredStyles, setFilteredStyles] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isHeaderComplete, setIsHeaderComplete] = useState(false);
   const [processes, setProcesses] = useState([]);
   const [filteredProcesses, setFilteredProcesses] = useState([]);
+  
+  // নতুন state: Excel ফাইলগুলোর জন্য
+  const [excelFiles, setExcelFiles] = useState([]);
+  const [selectedFileId, setSelectedFileId] = useState("");
+  const [breakdownProcesses, setBreakdownProcesses] = useState([]);
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
   
   // Scan related states
   const [scanInput, setScanInput] = useState("");
@@ -29,26 +37,89 @@ export default function DailyProductionPage() {
   const scanInputRef = useRef(null);
   const scanTimeoutRef = useRef(null);
 
+  useEffect(() => {
+    fetchProcesses();
+    fetchExcelFiles(); // ফাইলগুলো লোড করবে
+  }, []);
 
- useEffect(() => {
-  fetchProcesses();
-}, []);
+  const fetchProcesses = async () => {
+    try {
+      const res = await fetch('/api/processes');
+      const data = await res.json();
+      setProcesses(data);
+    } catch (error) {
+      console.error("Error fetching processes:", error);
+    }
+  };
 
-const fetchProcesses = async () => {
-  try {
-    const res = await fetch('/api/processes');
-    const data = await res.json();
-    setProcesses(data);
-  } catch (error) {
-    console.error("Error fetching processes:", error);
-  }
-};
+  // Excel ফাইলগুলো fetch করার ফাংশন
+  const fetchExcelFiles = async () => {
+    try {
+      setIsLoadingFiles(true);
+      const res = await fetch('/api/excell-upload/files');
+      const data = await res.json();
+      if (data.success && data.data) {
+        setExcelFiles(data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching Excel files:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to load Excel files",
+        timer: 2000,
+      });
+    } finally {
+      setIsLoadingFiles(false);
+    }
+  };
 
+  // ফাইল সিলেক্ট হলে তার ডেটা লোড করবে
+  const handleFileSelect = async (fileId) => {
+    setSelectedFileId(fileId);
+    if (!fileId) {
+      setBreakdownProcesses([]);
+      return;
+    }
 
-
-
-
-
+    try {
+      setIsLoadingFiles(true);
+      const res = await fetch(`/api/excell-upload/${fileId}`);
+      const data = await res.json();
+      
+      if (data.success && data.data && data.data.data) {
+        // Process নামগুলো extract করবে
+        const processesList = data.data.data.map(item => ({
+          id: item._id,
+          process: item.process,
+          sno: item.sno,
+          smv: item.smv,
+          mcTypeHp: item.mcTypeHp,
+          capacity: item.capacity
+        }));
+        setBreakdownProcesses(processesList);
+        
+        Swal.fire({
+          icon: "success",
+          title: "File Loaded!",
+          text: `${processesList.length} breakdown processes loaded`,
+          timer: 1500,
+          showConfirmButton: false,
+        });
+      }
+    } catch (error) {
+      console.error("Error loading file data:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to load file data",
+        timer: 2000,
+      });
+      setBreakdownProcesses([]);
+    } finally {
+      setIsLoadingFiles(false);
+    }
+  };
 
   // Check if header is complete
   useEffect(() => {
@@ -56,7 +127,6 @@ const fetchProcesses = async () => {
                     formData.floor && formData.line;
     setIsHeaderComplete(complete);
     
-    // If header becomes complete and no rows exist, create first row
     if (complete && tableData.length === 0) {
       addNewRow();
     }
@@ -72,7 +142,6 @@ const fetchProcesses = async () => {
       );
       setFilteredStyles(buyerSpecificStyles);
       
-      // যদি selected style টা filtered list এ না থাকে, তাহলে reset করবে
       if (formData.style && !buyerSpecificStyles.some(s => s._id === formData.style)) {
         setFormData(prev => ({ ...prev, style: "" }));
       }
@@ -100,17 +169,12 @@ const fetchProcesses = async () => {
     try {
       setIsLoading(true);
       
-      // Fetch buyers
       const buyersRes = await fetch('/api/buyers');
       const buyersData = await buyersRes.json();
-      
-      // সঠিকভাবে data access করো
       setBuyers(buyersData.data || []);
 
-      // Fetch styles
       const stylesRes = await fetch('/api/styles');
       const stylesData = await stylesRes.json();
-      // সঠিকভাবে data access করো
       setStyles(stylesData.data || []);
     } catch (error) {
       console.error("Error fetching dropdown data:", error);
@@ -138,19 +202,14 @@ const fetchProcesses = async () => {
     const value = e.target.value;
     setScanInput(value);
     
-    // Clear previous timeout
     if (scanTimeoutRef.current) {
       clearTimeout(scanTimeoutRef.current);
     }
     
-    // Check if scan is complete (based on QR scanner behavior)
-    // QR scanners usually send data with Enter key or Tab
-    // We'll check if input ends with Enter or has length > 10
     if (value.length > 10 && (value.includes('\n') || value.includes('\r'))) {
       const cleanValue = value.replace(/[\n\r]/g, '').trim();
       processScannedData(cleanValue);
     } else {
-      // Set timeout to detect end of scanning
       scanTimeoutRef.current = setTimeout(() => {
         if (value.length > 5 && value !== lastScannedData) {
           processScannedData(value);
@@ -168,11 +227,9 @@ const fetchProcesses = async () => {
     try {
       let parsedData;
       
-      // Try to parse as JSON (QR code data)
       try {
         parsedData = JSON.parse(scannedData);
       } catch (error) {
-        // If not JSON, try to identify type
         parsedData = await identifyScanType(scannedData);
       }
 
@@ -188,7 +245,6 @@ const fetchProcesses = async () => {
         throw new Error("Unknown QR code type");
       }
 
-      // Refocus on scan input after successful scan
       setTimeout(() => {
         if (scanInputRef.current) {
           scanInputRef.current.focus();
@@ -205,7 +261,6 @@ const fetchProcesses = async () => {
         showConfirmButton: false,
       });
       
-      // Refocus on scan input even on error
       setTimeout(() => {
         if (scanInputRef.current) {
           scanInputRef.current.focus();
@@ -217,7 +272,6 @@ const fetchProcesses = async () => {
   const identifyScanType = async (data) => {
     const cleanData = data.trim();
     
-    // Try operator first
     if (cleanData.startsWith("TGS-") || cleanData.includes("OP-")) {
       const operator = await fetchOperatorById(cleanData);
       if (operator) {
@@ -232,7 +286,6 @@ const fetchProcesses = async () => {
       }
     }
     
-    // Try machine
     const machine = await fetchMachineById(cleanData);
     if (machine) {
       return {
@@ -267,13 +320,11 @@ const fetchProcesses = async () => {
   };
 
   const handleOperatorScan = async (operatorData) => {
-    // Check if operator already exists in any row
     const existingRowIndex = tableData.findIndex(
       row => row.operator && row.operator.operatorId === operatorData.operatorId
     );
 
     if (existingRowIndex !== -1) {
-      // Focus on existing operator's row
       Swal.fire({
         icon: "info",
         title: "Operator Already Added",
@@ -284,7 +335,6 @@ const fetchProcesses = async () => {
       
       highlightRow(existingRowIndex);
       
-      // Refocus on scan input
       setTimeout(() => {
         if (scanInputRef.current) {
           scanInputRef.current.focus();
@@ -293,19 +343,15 @@ const fetchProcesses = async () => {
       return;
     }
 
-    // Find first empty row (without operator)
     let targetRowIndex = tableData.findIndex(row => !row.operator);
     
-    // If no empty row, create new row
     if (targetRowIndex === -1) {
       targetRowIndex = tableData.length;
       addNewRow();
       
-      // Wait a bit for row to be created
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    // Update the target row with operator data
     setTableData(prev => {
       const updated = [...prev];
       if (!updated[targetRowIndex]) {
@@ -321,7 +367,6 @@ const fetchProcesses = async () => {
           designation: operatorData.designation,
         },
         allowedProcesses: operatorData.allowedProcesses || {},
-        // Auto-select first process if available
         process: Object.keys(operatorData.allowedProcesses || {})[0] || "",
       };
       
@@ -338,28 +383,22 @@ const fetchProcesses = async () => {
   };
 
   const handleMachineScan = async (machineData) => {
-    // Smart detection: Find the most appropriate row
     let targetRowIndex;
     
-    // 1. First, find rows with operator but without machine
     const rowsWithOperatorNoMachine = tableData
       .map((row, index) => ({ row, index }))
       .filter(item => item.row.operator && !item.row.uniqueMachine);
     
     if (rowsWithOperatorNoMachine.length > 0) {
-      // Use the most recent row (last one)
       targetRowIndex = rowsWithOperatorNoMachine[rowsWithOperatorNoMachine.length - 1].index;
     } else {
-      // 2. Find any row with operator
       const rowsWithOperator = tableData
         .map((row, index) => ({ row, index }))
         .filter(item => item.row.operator);
       
       if (rowsWithOperator.length > 0) {
-        // Replace machine in most recent row with operator
         targetRowIndex = rowsWithOperator[rowsWithOperator.length - 1].index;
         
-        // Warn about replacement
         const result = await Swal.fire({
           title: "Replace Machine?",
           text: `Row ${targetRowIndex + 1} already has a machine. Replace it?`,
@@ -378,7 +417,6 @@ const fetchProcesses = async () => {
           return;
         }
       } else {
-        // 3. No rows with operator, create new row
         targetRowIndex = tableData.length;
         addNewRow();
         
@@ -399,7 +437,6 @@ const fetchProcesses = async () => {
       }
     }
 
-    // Check if machine already assigned to any row
     const machineAlreadyAssigned = tableData.some(
       (row, index) => row.scannedMachine === machineData.uniqueId && index !== targetRowIndex
     );
@@ -421,7 +458,6 @@ const fetchProcesses = async () => {
       return;
     }
 
-    // Update row with machine
     setTableData(prev => {
       const updated = [...prev];
       
@@ -455,6 +491,7 @@ const fetchProcesses = async () => {
       operator: null,
       uniqueMachine: "",
       process: "",
+      breakdownProcess: "", // নতুন ফিল্ড যোগ করা হয়েছে
       workAs: "operator",
       target: "",
       scannedMachine: null,
@@ -549,76 +586,68 @@ const fetchProcesses = async () => {
   };
 
   const handleSubmit = async () => {
-  const completeRows = tableData.filter(
-    row =>
-      row.operator &&
-      row.process &&
-      row.workAs &&
-      row.target &&
-      (row.workAs === 'helper' || row.uniqueMachine)
-  );
+    const completeRows = tableData.filter(
+      row =>
+        row.operator &&
+        row.process &&
+        row.workAs &&
+        row.target &&
+        (row.workAs === 'helper' || row.uniqueMachine)
+    );
 
-  if (completeRows.length === 0) {
-    Swal.fire("Error", "No complete rows to save", "error");
-    return;
-  }
-
-  const payload = completeRows.map((row, index) => ({
-    date: new Date(),
-
-    buyerId: formData.buyer,
-    styleId: formData.style,
-    supervisor: formData.supervisor,
-    floor: formData.floor,
-    line: formData.line,
-
-    process: row.process,
-    workAs: row.workAs,
-    status: "present",
-    target: Number(row.target),
-
-    operatorId: row.operator._id,
-    operatorCode: row.operator.operatorId,
-    operatorName: row.operator.name,
-    designation: row.operator.designation || "Operator",
-
-    uniqueMachine: row.workAs === 'operator' ? row.uniqueMachine : null,
-    machineType: row.workAs === 'operator' ? row.machineType : null,
-
-    rowNo: index + 1
-  }));
-
-  console.table(payload);
-
-  try {
-    const res = await fetch("/api/daily-production", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      Swal.fire("Error", data.error || "Failed to save", "error");
+    if (completeRows.length === 0) {
+      Swal.fire("Error", "No complete rows to save", "error");
       return;
     }
 
-    Swal.fire("Success", "Daily production saved successfully", "success");
+    const payload = completeRows.map((row, index) => ({
+      date: new Date(),
+      buyerId: formData.buyer,
+      styleId: formData.style,
+      supervisor: formData.supervisor,
+      floor: formData.floor,
+      line: formData.line,
+      process: row.process,
+      breakdownProcess: row.breakdownProcess, // নতুন ফিল্ড যোগ করা হয়েছে
+      workAs: row.workAs,
+      status: "present",
+      target: Number(row.target),
+      operatorId: row.operator._id,
+      operatorCode: row.operator.operatorId,
+      operatorName: row.operator.name,
+      designation: row.operator.designation || "Operator",
+      uniqueMachine: row.workAs === 'operator' ? row.uniqueMachine : null,
+      machineType: row.workAs === 'operator' ? row.machineType : null,
+      rowNo: index + 1
+    }));
 
-  } catch (err) {
-    console.error(err);
-    Swal.fire("Error", "Server error", "error");
-  }
-};
+    console.table(payload);
 
+    try {
+      const res = await fetch("/api/daily-production", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
 
+      const data = await res.json();
+
+      if (!res.ok) {
+        Swal.fire("Error", data.error || "Failed to save", "error");
+        return;
+      }
+
+      Swal.fire("Success", "Daily production saved successfully", "success");
+
+    } catch (err) {
+      console.error(err);
+      Swal.fire("Error", "Server error", "error");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
-        
-
         {/* Header Form */}
         <div className="bg-white mt-10 rounded-lg shadow p-6 mb-8">
           <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">
@@ -650,7 +679,7 @@ const fetchProcesses = async () => {
               )}
             </div>
 
-            {/* Style - Now shows only buyer-specific styles */}
+            {/* Style */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Style *
@@ -684,6 +713,39 @@ const fetchProcesses = async () => {
               {formData.buyer && filteredStyles.length === 0 && !isLoading && (
                 <div className="text-xs text-red-500 mt-1">
                   No styles found for selected buyer
+                </div>
+              )}
+            </div>
+
+            {/* Excel File Selector */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select Excel File
+                {selectedFileId && breakdownProcesses.length > 0 && (
+                  <span className="text-xs text-green-600 ml-2">
+                    ({breakdownProcesses.length} processes loaded)
+                  </span>
+                )}
+              </label>
+              <select
+                value={selectedFileId}
+                onChange={(e) => handleFileSelect(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isLoadingFiles}
+              >
+                <option value="">Select Excel File</option>
+                {excelFiles.map((file) => (
+                  <option key={file._id} value={file._id}>
+                    {file.fileName}
+                  </option>
+                ))}
+              </select>
+              {isLoadingFiles && (
+                <div className="text-xs text-gray-500 mt-1">Loading files...</div>
+              )}
+              {selectedFileId && (
+                <div className="text-xs text-gray-500 mt-1">
+                  Select a file to load breakdown processes
                 </div>
               )}
             </div>
@@ -750,16 +812,22 @@ const fetchProcesses = async () => {
                     ✓ Style matched with buyer
                   </div>
                 )}
+                {selectedFileId && breakdownProcesses.length > 0 && (
+                  <div className="text-xs text-green-600 mt-1">
+                    ✓ Breakdown processes loaded
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
-        {/* Scanner Section - Always Visible when header is complete */}
+
+        {/* Scanner Section */}
         {isHeaderComplete && (
           <div className="mb-6 bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-800">
-                 QR Code Scanner
+                QR Code Scanner
               </h2>
               <div className="flex items-center">
                 <div className={`w-3 h-3 rounded-full mr-2 ${scanFocus ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
@@ -801,8 +869,6 @@ const fetchProcesses = async () => {
                 </div>
               </div>
             </div>
-            
-            
           </div>
         )}
 
@@ -814,6 +880,11 @@ const fetchProcesses = async () => {
               <span className="ml-2 text-sm font-normal text-gray-500">
                 ({tableData.length} rows)
               </span>
+              {selectedFileId && (
+                <span className="ml-2 text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                  Breakdown processes available
+                </span>
+              )}
             </h2>
             <div className="flex gap-2">
               <button
@@ -858,12 +929,14 @@ const fetchProcesses = async () => {
                       Process
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Breakdown Process
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Work As
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Target
                     </th>
-                    
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
                     </th>
@@ -944,52 +1017,91 @@ const fetchProcesses = async () => {
                       </td>
 
                       {/* Process */}
-                      {/* Process Column */}
-<td className="px-6 py-4">
-  <select
-    value={row.process}
-    onChange={(e) => handleRowChange(index, "process", e.target.value)}
-    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
-      row.operator ? 'border-gray-300' : 'border-gray-200 bg-gray-100'
-    }`}
-    disabled={!row.operator}
-  >
-    <option value="">Select Process</option>
-    {/* First show allowed processes if available */}
-    {row.operator && row.allowedProcesses && Object.keys(row.allowedProcesses).length > 0 ? (
-      Object.keys(row.allowedProcesses).map((process) => (
-        <option key={process} value={process}>
-          {process}
-        </option>
-      ))
-    ) : (
-      // If no allowed processes, show all processes from API
-      processes.map((process) => (
-        <option key={process._id} value={process._id}>
-          {process.name} ({process.code})
-        </option>
-      ))
-    )}
-  </select>
-  
-  {/* Show process details if selected */}
-  {row.process && (
-    <div className="text-xs text-gray-500 mt-1">
-      {(() => {
-        const selectedProcess = processes.find(p => p._id === row.process);
-        if (selectedProcess) {
-          return (
-            <>
-              <div>SMV: {selectedProcess.smv}</div>
-              <div>Machine: {selectedProcess.machineType}</div>
-            </>
-          );
-        }
-        return null;
-      })()}
-    </div>
-  )}
-</td>
+                      <td className="px-6 py-4">
+                        <select
+                          value={row.process}
+                          onChange={(e) => handleRowChange(index, "process", e.target.value)}
+                          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                            row.operator ? 'border-gray-300' : 'border-gray-200 bg-gray-100'
+                          }`}
+                          disabled={!row.operator}
+                        >
+                          <option value="">Select Process</option>
+                          {row.operator && row.allowedProcesses && Object.keys(row.allowedProcesses).length > 0 ? (
+                            Object.keys(row.allowedProcesses).map((process) => (
+                              <option key={process} value={process}>
+                                {process}
+                              </option>
+                            ))
+                          ) : (
+                            processes.map((process) => (
+                              <option key={process._id} value={process._id}>
+                                {process.name} ({process.code})
+                              </option>
+                            ))
+                          )}
+                        </select>
+                        
+                        {row.process && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            {(() => {
+                              const selectedProcess = processes.find(p => p._id === row.process);
+                              if (selectedProcess) {
+                                return (
+                                  <>
+                                    <div>SMV: {selectedProcess.smv}</div>
+                                    <div>Machine: {selectedProcess.machineType}</div>
+                                  </>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* নতুন: Breakdown Process */}
+                      <td className="px-6 py-4">
+                        <select
+                          value={row.breakdownProcess}
+                          onChange={(e) => handleRowChange(index, "breakdownProcess", e.target.value)}
+                          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                            row.operator ? 'border-gray-300' : 'border-gray-200 bg-gray-100'
+                          }`}
+                          disabled={!row.operator || breakdownProcesses.length === 0}
+                        >
+                          <option value="">Select Breakdown Process</option>
+                          {breakdownProcesses.map((bp) => (
+                            <option key={bp.id} value={bp.process}>
+                              {bp.process}
+                            </option>
+                          ))}
+                        </select>
+                        
+                        {row.breakdownProcess && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            {(() => {
+                              const selectedBP = breakdownProcesses.find(bp => bp.process === row.breakdownProcess);
+                              if (selectedBP) {
+                                return (
+                                  <>
+                                    <div>SMV: {selectedBP.smv}</div>
+                                    {/* <div>MC Type: {selectedBP.mcTypeHp}</div> */}
+                                    <div>Capacity: {selectedBP.capacity}</div>
+                                  </>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
+                        )}
+                        
+                        {breakdownProcesses.length === 0 && (
+                          <div className="text-xs text-gray-400 mt-1">
+                            Select an Excel file above to load breakdown processes
+                          </div>
+                        )}
+                      </td>
 
                       {/* Work As */}
                       <td className="px-6 py-4">
@@ -1029,8 +1141,6 @@ const fetchProcesses = async () => {
                         )}
                       </td>
 
-                      
-
                       {/* Actions */}
                       <td className="px-6 py-4">
                         <button
@@ -1052,7 +1162,7 @@ const fetchProcesses = async () => {
         {/* Status Summary */}
         {tableData.length > 0 && (
           <div className="mb-6 bg-gray-50 rounded-lg p-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <div className="text-center p-3 bg-white rounded shadow">
                 <div className="text-2xl font-bold text-blue-600">{tableData.length}</div>
                 <div className="text-sm text-gray-600">Total Rows</div>
@@ -1074,6 +1184,12 @@ const fetchProcesses = async () => {
                   {tableData.filter(row => row.operator && row.uniqueMachine && (!row.process || !row.target)).length}
                 </div>
                 <div className="text-sm text-gray-600">Incomplete</div>
+              </div>
+              <div className="text-center p-3 bg-white rounded shadow">
+                <div className="text-2xl font-bold text-indigo-600">
+                  {tableData.filter(row => row.breakdownProcess).length}
+                </div>
+                <div className="text-sm text-gray-600">With Breakdown</div>
               </div>
             </div>
           </div>

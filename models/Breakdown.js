@@ -1,59 +1,38 @@
 import mongoose from 'mongoose';
 
-const BreakdownSchema = new mongoose.Schema(
-  {
-    sno: {
-      type: String,
-      required: true
-    },
-    process: {
-      type: String,
-      required: true
-    },
-    mcTypeHp: {
-      type: String,
-      required: true
-    },
-    smv: {
-      type: Number,
-      required: true
-    },
-    capacity: {
-      type: Number,
-      required: true
-    },
-    manPower: {
-      type: Number,
-      required: true
-    },
-    balanceCapacity: {
-      type: Number,
-      required: true
-    },
-    supportOperation: {
-      type: String
-    },
-    adjustTarget: {
-      type: Number,
-      required: true
-    },
-    remarks: {
-      type: String
-    },
-    uploadedAt: {
-      type: Date,
-      default: Date.now
-    },
-    fileName: {
-      type: String
-    }
+const ExcelDataSchema = new mongoose.Schema({
+  fileName: {
+    type: String,
+    required: true,
   },
-  {
-    timestamps: true
+  uploadedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  data: [
+    {
+      sno: String,
+      process: String,
+      mcTypeHp: String,
+      smv: Number,
+      capacity: Number,
+      manPower: Number,
+      balanceCapacity: Number,
+      supportOperation: String,
+      adjustTarget: Number,
+      remarks: String
+    }
+  ],
+  totalRecords: {
+    type: Number,
+    required: true,
   }
-);
+}, {
+  timestamps: true
+});
 
-// Check if model already exists to prevent OverwriteModelError
-const Breakdown = mongoose.models.Breakdown || mongoose.model('Breakdown', BreakdownSchema);
+// Create indexes for better query performance
+ExcelDataSchema.index({ fileName: 1 });
+ExcelDataSchema.index({ 'uploadedAt': -1 });
 
-export default Breakdown;
+export const Breakdown = mongoose.models.Breakdown || mongoose.model('Breakdown', ExcelDataSchema);
