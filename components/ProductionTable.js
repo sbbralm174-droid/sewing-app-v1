@@ -19,44 +19,38 @@ const ProductionTable = ({
   getBreakdownSelectionCount,
   isBreakdownDisabled,
   calculateTarget,
-  floor
+  floor,
+  onHourlyDataChange // নতুন prop যোগ করুন
 }) => {
   const [hours, setHours] = useState([]);
   const [hourlyInputs, setHourlyInputs] = useState({});
   const [isLoadingHours, setIsLoadingHours] = useState(false);
   const [expandedRow, setExpandedRow] = useState(null);
 
-  // Calculate production statistics - CORRECTED LOGIC
+  // Calculate production statistics
   const productionStats = useMemo(() => {
-    // 1. ঘরের ক্রমিক numbering (প্রতিটি ঘরের জন্য, production বসুক বা না বসুক)
     const numberedHourlyInputs = {};
-    let slotNumber = 0; // মোট ঘরের সংখ্যা
+    let slotNumber = 0;
     
-    // All possible hour slots (from fetched hours)
     const allHourSlots = hours || [];
     
-    // প্রতিটি ঘরের জন্য ক্রমিক নম্বর দিন
     allHourSlots.forEach((hourSlot) => {
-      // Check each row for this hour slot
       tableData.forEach(row => {
         const key = `${row.id}-${hourSlot}`;
         const value = hourlyInputs[key];
         
-        slotNumber++; // প্রতিটি ঘরের জন্য একটি নম্বর
+        slotNumber++;
         
-        // যদি এই ঘরে production বসে (value > 0)
         if (value && parseInt(value) > 0) {
-          numberedHourlyInputs[key] = slotNumber; // ঘরের ক্রমিক নম্বর
+          numberedHourlyInputs[key] = slotNumber;
         } else {
-          numberedHourlyInputs[key] = 0; // খালি ঘর
+          numberedHourlyInputs[key] = 0;
         }
       });
     });
     
-    // 2. সর্বশেষ কোন ঘরে production বসেছে
     let lastProductionNumber = 0;
     
-    // সব ঘর চেক করে সর্বোচ্চ নম্বর যেখানে production বসেছে
     Object.keys(numberedHourlyInputs).forEach(key => {
       const number = numberedHourlyInputs[key];
       if (number > lastProductionNumber) {
@@ -64,7 +58,6 @@ const ProductionTable = ({
       }
     });
     
-    // 3. Total Target = (সব row এর target যোগফল) × সর্বশেষ ঘর নম্বর
     const totalTargetValue = tableData.reduce((sum, row) => {
       const target = parseFloat(row.target) || 0;
       return sum + target;
@@ -72,20 +65,16 @@ const ProductionTable = ({
     
     const totalTarget = totalTargetValue * lastProductionNumber;
     
-    // 4. Achievement = সব hourly inputs এর যোগফল
     const achievement = Object.keys(hourlyInputs).reduce((sum, key) => {
       const value = hourlyInputs[key] || '0';
       return sum + (parseInt(value) || 0);
     }, 0);
     
-    // 5. Deviation
     const deviation = totalTarget - achievement;
     
-    // 6. মোট কতটা ঘরে production বসেছে (শুধু production বসেছে এমন ঘর)
     const productionFilledSlots = Object.values(numberedHourlyInputs)
       .filter(num => num > 0).length;
     
-    // 7. Production বসেছে এমন ঘরগুলোর নম্বর লিস্ট
     const productionSequence = [];
     for (let i = 1; i <= lastProductionNumber; i++) {
       const hasProduction = Object.values(numberedHourlyInputs).some(n => n === i);
@@ -108,6 +97,18 @@ const ProductionTable = ({
       filledHourlyInputs: Object.values(hourlyInputs).filter(v => v && parseInt(v) > 0).length
     };
   }, [tableData, hourlyInputs, hours]);
+
+  // Parent component-এ hourly data পাঠানো
+  useEffect(() => {
+    if (onHourlyDataChange) {
+      onHourlyDataChange({
+        hourlyInputs,
+        productionStats,
+        hours,
+        tableData
+      });
+    }
+  }, [hourlyInputs, productionStats, hours, tableData]);
 
   // floor পরিবর্তন হলে hours fetch করুন
   useEffect(() => {
@@ -199,10 +200,11 @@ const ProductionTable = ({
   // hourly input change handler
   const handleHourlyInputChange = (rowId, hour, value) => {
     const key = `${rowId}-${hour}`;
-    setHourlyInputs(prev => ({
-      ...prev,
+    const newInputs = {
+      ...hourlyInputs,
       [key]: value
-    }));
+    };
+    setHourlyInputs(newInputs);
   };
 
   // toggle row expansion
@@ -683,7 +685,7 @@ const ProductionTable = ({
                 </tbody>
               </table>
               
-              {/* Production Stats Section - CORRECTED */}
+              {/* Production Stats Section */}
               <div className="bg-gray-50 p-4 border-t border-gray-200">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="text-sm text-gray-700">

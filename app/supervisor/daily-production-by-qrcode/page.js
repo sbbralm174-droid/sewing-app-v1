@@ -1,7 +1,8 @@
-// /supervisor/daily-production-by-qrcode
+// /supervisor/daily-production-by-qrcode/page.jsx
+
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
 import HeaderForm from "@/components/HeaderForm";
 import ScannerSection from "@/components/ScannerSection";
@@ -46,6 +47,14 @@ export default function DailyProductionPage() {
     processCount: 0,
     breakdownCount: 0,
     total: 0
+  });
+  
+  // Hourly data state - parent state এ রাখুন
+  const [hourlyData, setHourlyData] = useState({
+    hourlyInputs: {},
+    productionStats: {},
+    hours: [],
+    tableData: []
   });
   
   // Refs
@@ -199,6 +208,12 @@ export default function DailyProductionPage() {
     });
   };
 
+  // ProductionTable থেকে hourly data পাওয়ার ফাংশন
+  const handleHourlyDataChange = (data) => {
+    console.log("Hourly data received in parent:", data);
+    setHourlyData(data);
+  };
+
   const handleSubmit = async () => {
     const completeRows = tableData.filter(
       row =>
@@ -214,31 +229,54 @@ export default function DailyProductionPage() {
       return;
     }
 
-    const payload = completeRows.map((row, index) => ({
-      date: new Date(),
-      buyerId: formData.buyer,
-      styleId: formData.style,
-      supervisor: formData.supervisor,
-      floor: formData.floor,
-      line: formData.line,
-      process: row.process,
-      breakdownProcess: row.breakdownProcess,
-      workAs: row.workAs,
-      status: "present",
-      target: Number(row.target),
-      operatorId: row.operator._id,
-      operatorCode: row.operator.operatorId,
-      operatorName: row.operator.name,
-      designation: row.operator.designation || "Operator",
-      uniqueMachine: row.workAs === 'operator' ? row.uniqueMachine : null,
-      machineType: row.workAs === 'operator' ? row.machineType : null,
-      smv: row.selectedSMV,
-      smvType: row.selectedSMVType,
-      rowNo: index + 1
+    // Prepare payload with hourly production data
+    const payload = completeRows.map((row, index) => {
+      // এই row-এর জন্য hourly production ডাটা সংগ্রহ
+      const rowHourlyProduction = [];
       
-    }));
+      if (hourlyData.hours && hourlyData.hourlyInputs) {
+        hourlyData.hours.forEach(hour => {
+          const key = `${row.id}-${hour}`;
+          const productionCount = parseInt(hourlyData.hourlyInputs[key]) || 0;
+          if (productionCount > 0) {
+            rowHourlyProduction.push({
+              hour: hour,
+              productionCount: productionCount,
+              defects: []
+            });
+          }
+        });
+      }
+
+      return {
+        date: new Date(),
+        buyerId: formData.buyer,
+        styleId: formData.style,
+        supervisor: formData.supervisor,
+        floor: formData.floor,
+        line: formData.line,
+        process: row.process,
+        breakdownProcess: row.breakdownProcess,
+        workAs: row.workAs,
+        status: "present",
+        target: Number(row.target),
+        operatorId: row.operator._id,
+        operatorCode: row.operator.operatorId,
+        operatorName: row.operator.name,
+        designation: row.operator.designation || "Operator",
+        uniqueMachine: row.workAs === 'operator' ? row.uniqueMachine : null,
+        machineType: row.workAs === 'operator' ? row.machineType : null,
+        smv: row.selectedSMV,
+        smvType: row.selectedSMVType,
+        rowNo: index + 1,
+        hourlyProduction: rowHourlyProduction
+      };
+    });
+
+    console.log("Final Payload to save:", payload); // ডিবাগিং এর জন্য
 
     try {
+      setIsLoading(true);
       const res = await fetch("/api/daily-production", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -252,20 +290,28 @@ export default function DailyProductionPage() {
         return;
       }
 
-      Swal.fire("Success", "Daily production saved successfully", "success");
-      // Reset form after successful save
-      setTableData([]);
-      setFormData({
-        buyer: "",
-        style: "",
-        supervisor: "",
-        floor: "",
-        line: "",
+      Swal.fire({
+        icon: "success",
+        title: "Success!",
+        html: `
+          <div class="text-left">
+            <p><strong>Daily production saved successfully!</strong></p>
+            <p>Total rows saved: ${data.inserted || payload.length}</p>
+            <p>Hourly data: ${payload.reduce((sum, row) => sum + row.hourlyProduction.length, 0)} entries</p>
+          </div>
+        `,
+        timer: 3000,
+        showConfirmButton: false,
       });
+      
+      // Reset form after successful save
+      
 
     } catch (err) {
       console.error(err);
       Swal.fire("Error", "Server error", "error");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -405,49 +451,45 @@ export default function DailyProductionPage() {
   };
 
   const processScannedData = async (scannedData) => {
-  if (!scannedData) return;
-  setScanInput("");
+    if (!scannedData) return;
+    setScanInput("");
 
-  try {
-    let parsedData;
-    
-    // JSON ডাটা পার্স করা
     try {
-      const rawData = JSON.parse(scannedData);
+      let parsedData;
       
-      // কী-গুলো (Keys) বড় হাত বা ছোট হাত যাই হোক, সেগুলোকে নরমাল করা
-      parsedData = {
-        type: (rawData.TYPE || rawData.type || "").toLowerCase(),
-        id: rawData.ID || rawData.id || rawData._id,
-        operatorId: rawData.OPERATORiD || rawData.operatorId || rawData.operatorID,
-        name: rawData.NAME || rawData.name,
-        designation: rawData.DESIGNATION || rawData.designation,
-        uniqueId: rawData.UNIQUEID || rawData.uniqueId,
-        machineType: rawData.MACHINETYPE || rawData.machineType
-      };
-    } catch (e) {
-      // যদি JSON না হয় তবে identifyScanType এ যাবে
-      parsedData = await identifyScanType(scannedData);
-    }
+      try {
+        const rawData = JSON.parse(scannedData);
+        
+        parsedData = {
+          type: (rawData.TYPE || rawData.type || "").toLowerCase(),
+          id: rawData.ID || rawData.id || rawData._id,
+          operatorId: rawData.OPERATORiD || rawData.operatorId || rawData.operatorID,
+          name: rawData.NAME || rawData.name,
+          designation: rawData.DESIGNATION || rawData.designation,
+          uniqueId: rawData.UNIQUEID || rawData.uniqueId,
+          machineType: rawData.MACHINETYPE || rawData.machineType
+        };
+      } catch (e) {
+        parsedData = await identifyScanType(scannedData);
+      }
 
-    // এখন চেক করুন (toLowerCase ব্যবহার করায় "operator" সহজেই মিলবে)
-    if (!parsedData || !parsedData.type) {
-      throw new Error("Invalid QR code format");
-    }
+      if (!parsedData || !parsedData.type) {
+        throw new Error("Invalid QR code format");
+      }
 
-    if (parsedData.type === "operator") {
-      await handleOperatorScan(parsedData);
-    } else if (parsedData.type === "machine") {
-      await handleMachineScan(parsedData);
-    }
+      if (parsedData.type === "operator") {
+        await handleOperatorScan(parsedData);
+      } else if (parsedData.type === "machine") {
+        await handleMachineScan(parsedData);
+      }
 
-    setLastScannedData(scannedData);
-  } catch (error) {
-    console.error("Scan error details:", error);
-    setLastScannedData("");
-    Swal.fire({ icon: "error", title: "Scan Failed", text: error.message });
-  }
-};
+      setLastScannedData(scannedData);
+    } catch (error) {
+      console.error("Scan error details:", error);
+      setLastScannedData("");
+      Swal.fire({ icon: "error", title: "Scan Failed", text: error.message });
+    }
+  };
 
   const identifyScanType = async (data) => {
     const cleanData = data.trim();
@@ -778,6 +820,7 @@ export default function DailyProductionPage() {
           isBreakdownDisabled={isBreakdownDisabled}
           calculateTarget={calculateTarget}
           floor={formData.floor}
+          onHourlyDataChange={handleHourlyDataChange} // নতুন prop
         />
 
         {/* Submit Section */}
@@ -785,9 +828,14 @@ export default function DailyProductionPage() {
           <div className="flex justify-between items-center">
             <div className="text-sm text-gray-500">
               {tableData.length > 0 ? (
-                <span>
-                  {tableData.filter(row => row.operator && row.uniqueMachine && (row.process || row.breakdownProcess) && row.target).length} of {tableData.length} rows complete
-                </span>
+                <div>
+                  <span className="font-medium">
+                    {tableData.filter(row => row.operator && row.uniqueMachine && (row.process || row.breakdownProcess) && row.target).length} of {tableData.length} rows complete
+                  </span>
+                  <div className="text-xs mt-1">
+                    Hourly data: {Object.values(hourlyData.hourlyInputs || {}).filter(v => v && parseInt(v) > 0).length} inputs filled
+                  </div>
+                </div>
               ) : (
                 <span>No rows added yet</span>
               )}
