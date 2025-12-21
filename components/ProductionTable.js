@@ -26,78 +26,88 @@ const ProductionTable = ({
   const [isLoadingHours, setIsLoadingHours] = useState(false);
   const [expandedRow, setExpandedRow] = useState(null);
 
-  // Calculate production statistics
-  // Calculate production statistics - FIXED
-const productionStats = useMemo(() => {
-  // 1. ঘরের ক্রমিক numbering (প্রতিটি ঘরের জন্য, production বসুক বা না বসুক)
-  const numberedHourlyInputs = {};
-  let slotNumber = 0; // মোট ঘরের সংখ্যা
-  
-  // All possible hour slots (from fetched hours)
-  const allHourSlots = hours || [];
-  
-  // প্রতিটি ঘরের জন্য ক্রমিক নম্বর দিন
-  allHourSlots.forEach((hourSlot, hourIndex) => {
-    // Check each row for this hour slot
-    tableData.forEach(row => {
-      const key = `${row.id}-${hourSlot}`;
-      const value = hourlyInputs[key];
-      
-      slotNumber++; // প্রতিটি ঘরের জন্য একটি নম্বর
-      
-      // যদি এই ঘরে production বসে (value > 0)
-      if (value && parseInt(value) > 0) {
-        numberedHourlyInputs[key] = slotNumber; // ঘরের ক্রমিক নম্বর
-      } else {
-        numberedHourlyInputs[key] = 0; // খালি ঘর
+  // Calculate production statistics - CORRECTED LOGIC
+  const productionStats = useMemo(() => {
+    // 1. ঘরের ক্রমিক numbering (প্রতিটি ঘরের জন্য, production বসুক বা না বসুক)
+    const numberedHourlyInputs = {};
+    let slotNumber = 0; // মোট ঘরের সংখ্যা
+    
+    // All possible hour slots (from fetched hours)
+    const allHourSlots = hours || [];
+    
+    // প্রতিটি ঘরের জন্য ক্রমিক নম্বর দিন
+    allHourSlots.forEach((hourSlot) => {
+      // Check each row for this hour slot
+      tableData.forEach(row => {
+        const key = `${row.id}-${hourSlot}`;
+        const value = hourlyInputs[key];
+        
+        slotNumber++; // প্রতিটি ঘরের জন্য একটি নম্বর
+        
+        // যদি এই ঘরে production বসে (value > 0)
+        if (value && parseInt(value) > 0) {
+          numberedHourlyInputs[key] = slotNumber; // ঘরের ক্রমিক নম্বর
+        } else {
+          numberedHourlyInputs[key] = 0; // খালি ঘর
+        }
+      });
+    });
+    
+    // 2. সর্বশেষ কোন ঘরে production বসেছে
+    let lastProductionNumber = 0;
+    
+    // সব ঘর চেক করে সর্বোচ্চ নম্বর যেখানে production বসেছে
+    Object.keys(numberedHourlyInputs).forEach(key => {
+      const number = numberedHourlyInputs[key];
+      if (number > lastProductionNumber) {
+        lastProductionNumber = number;
       }
     });
-  });
-  
-  // 2. সর্বশেষ কোন ঘরে production বসেছে
-  let lastProductionNumber = 0;
-  
-  // সব ঘর চেক করে সর্বোচ্চ নম্বর যেখানে production বসেছে
-  Object.keys(numberedHourlyInputs).forEach(key => {
-    const number = numberedHourlyInputs[key];
-    if (number > lastProductionNumber) {
-      lastProductionNumber = number;
+    
+    // 3. Total Target = (সব row এর target যোগফল) × সর্বশেষ ঘর নম্বর
+    const totalTargetValue = tableData.reduce((sum, row) => {
+      const target = parseFloat(row.target) || 0;
+      return sum + target;
+    }, 0);
+    
+    const totalTarget = totalTargetValue * lastProductionNumber;
+    
+    // 4. Achievement = সব hourly inputs এর যোগফল
+    const achievement = Object.keys(hourlyInputs).reduce((sum, key) => {
+      const value = hourlyInputs[key] || '0';
+      return sum + (parseInt(value) || 0);
+    }, 0);
+    
+    // 5. Deviation
+    const deviation = totalTarget - achievement;
+    
+    // 6. মোট কতটা ঘরে production বসেছে (শুধু production বসেছে এমন ঘর)
+    const productionFilledSlots = Object.values(numberedHourlyInputs)
+      .filter(num => num > 0).length;
+    
+    // 7. Production বসেছে এমন ঘরগুলোর নম্বর লিস্ট
+    const productionSequence = [];
+    for (let i = 1; i <= lastProductionNumber; i++) {
+      const hasProduction = Object.values(numberedHourlyInputs).some(n => n === i);
+      productionSequence.push({
+        number: i,
+        hasProduction
+      });
     }
-  });
-  
-  // 3. Total Target = target × সর্বশেষ ঘর নম্বর
-  const totalTargetValue = tableData.reduce((sum, row) => {
-    const target = parseFloat(row.target) || 0;
-    return sum + target;
-  }, 0);
-  
-  const totalTarget = totalTargetValue * lastProductionNumber;
-  
-  // 4. Achievement
-  const achievement = Object.keys(hourlyInputs).reduce((sum, key) => {
-    const value = hourlyInputs[key] || '0';
-    return sum + (parseInt(value) || 0);
-  }, 0);
-  
-  // 5. Deviation
-  const deviation = totalTarget - achievement;
-  
-  // 6. মোট কতটা ঘরে production বসেছে (শুধু production বসেছে এমন ঘর)
-  const productionFilledSlots = Object.values(numberedHourlyInputs)
-    .filter(num => num > 0).length;
-  
-  return {
-    numberedHourlyInputs,
-    lastProductionNumber,
-    totalTarget,
-    achievement,
-    deviation,
-    totalSlots: slotNumber,
-    productionFilledSlots,
-    totalHourlyInputs: Object.keys(hourlyInputs).length,
-    filledHourlyInputs: Object.values(hourlyInputs).filter(v => v && parseInt(v) > 0).length
-  };
-}, [tableData, hourlyInputs, hours]);
+    
+    return {
+      numberedHourlyInputs,
+      lastProductionNumber,
+      totalTarget,
+      achievement,
+      deviation,
+      totalSlots: slotNumber,
+      productionFilledSlots,
+      productionSequence,
+      totalHourlyInputs: Object.keys(hourlyInputs).length,
+      filledHourlyInputs: Object.values(hourlyInputs).filter(v => v && parseInt(v) > 0).length
+    };
+  }, [tableData, hourlyInputs, hours]);
 
   // floor পরিবর্তন হলে hours fetch করুন
   useEffect(() => {
@@ -186,7 +196,7 @@ const productionStats = useMemo(() => {
     }
   }, [tableData, hours]);
 
-  // hourly input change handler - FIXED
+  // hourly input change handler
   const handleHourlyInputChange = (rowId, hour, value) => {
     const key = `${rowId}-${hour}`;
     setHourlyInputs(prev => ({
@@ -210,7 +220,7 @@ const productionStats = useMemo(() => {
           <h4 className="font-medium text-gray-700">
             Hourly Production - Row {row.rowNumber}
             <span className="ml-2 text-xs text-blue-600">
-              (Inputs: {productionStats.filledHourlyInputs}/{productionStats.totalHourlyInputs})
+              (Filled: {productionStats.filledHourlyInputs}/{productionStats.totalHourlyInputs})
             </span>
           </h4>
           <button
@@ -225,14 +235,15 @@ const productionStats = useMemo(() => {
           {hours.map(hour => {
             const key = `${row.id}-${hour}`;
             const inputNumber = productionStats.numberedHourlyInputs[key] || 0;
+            const hasProduction = inputNumber > 0;
             
             return (
-              <div key={key} className="bg-white p-3 rounded border relative">
+              <div key={key} className={`bg-white p-3 rounded border ${hasProduction ? 'border-blue-300' : 'border-gray-200'}`}>
                 <div className="flex justify-between items-start mb-1">
                   <div className="text-xs font-medium text-gray-500">
                     {hour}
                   </div>
-                  {inputNumber > 0 && (
+                  {hasProduction && (
                     <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-0.5 rounded-full">
                       #{inputNumber}
                     </span>
@@ -247,9 +258,9 @@ const productionStats = useMemo(() => {
                   min="0"
                   disabled={!row.operator}
                 />
-                {inputNumber === 0 && hourlyInputs[key] && parseInt(hourlyInputs[key]) > 0 && (
-                  <div className="text-xs text-gray-400 mt-1 text-right">
-                    Next: #{productionStats.lastProductionNumber + 1}
+                {!hasProduction && hourlyInputs[key] && parseInt(hourlyInputs[key]) > 0 && (
+                  <div className="text-xs text-blue-500 mt-1 text-right">
+                    Will be: #{productionStats.lastProductionNumber + 1}
                   </div>
                 )}
               </div>
@@ -672,18 +683,28 @@ const productionStats = useMemo(() => {
                 </tbody>
               </table>
               
-              {/* Production Stats Section - এক লাইনে কমা কমা করে */}
+              {/* Production Stats Section - CORRECTED */}
               <div className="bg-gray-50 p-4 border-t border-gray-200">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="text-sm text-gray-700">
-                    <span className="font-semibold">Last Production Input: </span>
-                    <span className="font-bold text-blue-600">
-                      {productionStats.lastProductionNumber > 0 
-                        ? `#${productionStats.lastProductionNumber}` 
-                        : 'No inputs yet'}
-                    </span>
+                    <span className="font-semibold">Production Sequence: </span>
+                    {productionStats.lastProductionNumber > 0 ? (
+                      <span className="font-bold text-blue-600">
+                        {productionStats.productionSequence.map((slot, idx) => (
+                          <span key={slot.number}>
+                            <span className={slot.hasProduction ? 'text-blue-600' : 'text-gray-400'}>
+                              {slot.number}
+                              {!slot.hasProduction && <span className="text-gray-300 text-xs ml-1">(empty)</span>}
+                            </span>
+                            {idx < productionStats.productionSequence.length - 1 && ', '}
+                          </span>
+                        ))}
+                      </span>
+                    ) : (
+                      <span className="text-gray-500">No production inputs yet</span>
+                    )}
                     <span className="ml-4 text-gray-600">
-                      ({productionStats.filledHourlyInputs} hourly inputs filled)
+                      (Last Input: <span className="font-bold">#{productionStats.lastProductionNumber || 0}</span>)
                     </span>
                   </div>
                   
@@ -693,19 +714,24 @@ const productionStats = useMemo(() => {
                       <span className="font-bold text-blue-600">
                         {productionStats.totalTarget.toLocaleString()}
                         <span className="text-xs text-gray-500 ml-1">
-                          (Target: {tableData.reduce((sum, row) => sum + (parseFloat(row.target) || 0), 0).toLocaleString()} × Last Input: {productionStats.lastProductionNumber})
+                          (Sum Targets: {tableData.reduce((sum, row) => sum + (parseFloat(row.target) || 0), 0).toLocaleString()} × Last Input: {productionStats.lastProductionNumber})
                         </span>
                       </span>
                     </div>
                     
                     <div className="text-sm">
                       <span className="font-semibold text-gray-700">Achievement: </span>
-                      <span className="font-bold text-green-600">{productionStats.achievement.toLocaleString()}</span>
+                      <span className="font-bold text-green-600">
+                        {productionStats.achievement.toLocaleString()}
+                        <span className="text-xs text-gray-500 ml-1">
+                          ({productionStats.filledHourlyInputs} inputs)
+                        </span>
+                      </span>
                     </div>
                     
                     <div className="text-sm">
                       <span className="font-semibold text-gray-700">Deviation: </span>
-                      <span className={`font-bold ${productionStats.deviation >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      <span className={`font-bold ${productionStats.deviation > 0 ? 'text-red-600' : productionStats.deviation < 0 ? 'text-green-600' : 'text-gray-600'}`}>
                         {productionStats.deviation.toLocaleString()}
                         {productionStats.deviation > 0 && ' (Behind)'}
                         {productionStats.deviation < 0 && ' (Ahead)'}
