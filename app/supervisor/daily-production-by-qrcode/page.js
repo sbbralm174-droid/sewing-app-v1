@@ -49,13 +49,16 @@ export default function DailyProductionPage() {
     total: 0
   });
   
-  // Hourly data state - parent state এ রাখুন
+  // Hourly data state
   const [hourlyData, setHourlyData] = useState({
     hourlyInputs: {},
     productionStats: {},
     hours: [],
     tableData: []
   });
+  
+  // নতুন state: machine scan এর জন্য সিলেক্টেড row
+  const [selectedRowForMachine, setSelectedRowForMachine] = useState(null);
   
   // Refs
   const scanInputRef = useRef(null);
@@ -111,10 +114,13 @@ export default function DailyProductionPage() {
     }
   }, [isHeaderComplete, tableData.length]);
 
-  // Fetch dropdown data
+  // selectedRowForMachine পরিবর্তন হলে notification দিন
   useEffect(() => {
-    fetchDropdownData();
-  }, []);
+    if (selectedRowForMachine !== null) {
+      // Small notification
+      console.log(`Row ${selectedRowForMachine + 1} selected for machine scan`);
+    }
+  }, [selectedRowForMachine]);
 
   const updateSummary = () => {
     const processCount = tableData.filter(row => row.process).length;
@@ -178,6 +184,12 @@ export default function DailyProductionPage() {
       if (result.isConfirmed) {
         const removedOperator = tableData[rowIndex].operator?.name;
         setTableData((prev) => prev.filter((_, index) => index !== rowIndex));
+        
+        // যদি সরানো row টি selectedRowForMachine হয়, তাহলে reset করুন
+        if (selectedRowForMachine === rowIndex) {
+          setSelectedRowForMachine(null);
+        }
+        
         Swal.fire(
           "Removed!",
           removedOperator ? `Row for ${removedOperator} has been removed.` : "Row has been removed.",
@@ -208,159 +220,230 @@ export default function DailyProductionPage() {
     });
   };
 
-  // ProductionTable থেকে hourly data পাওয়ার ফাংশন
-  const handleHourlyDataChange = (data) => {
-    console.log("Hourly data received in parent:", data);
-    setHourlyData(data);
-  };
-
-
-
- const handleSubmit = async () => {
-  // ✅ Only operator is required now
-  const completeRows = tableData.filter(row => row.operator);
-
-  if (completeRows.length === 0) {
-    Swal.fire("Error", "At least one operator is required to save", "error");
-    return;
-  }
-
-  // ✅ Prepare payload
-  const payload = completeRows.map((row, index) => {
-    const rowHourlyProduction = [];
-
-    if (hourlyData?.hours && hourlyData?.hourlyInputs) {
-      hourlyData.hours.forEach(hour => {
-        const key = `${row.id}-${hour}`;
-        const productionCount = parseInt(hourlyData.hourlyInputs[key]) || 0;
-
-        if (productionCount > 0) {
-          rowHourlyProduction.push({
-            hour,
-            productionCount,
-            defects: []
-          });
-        }
-      });
-    }
-
-    return {
-      date: new Date(),
-      buyerId: formData.buyer || null,
-      styleId: formData.style || null,
-      supervisor: formData.supervisor || null,
-      floor: formData.floor || null,
-      line: formData.line || null,
-      process: row.process || null,
-      breakdownProcess: row.breakdownProcess || null,
-      workAs: row.workAs || "operator",
-      status: "present",
-      target: row.target ? Number(row.target) : 0,
-      operatorId: row.operator._id,
-      operatorCode: row.operator.operatorId,
-      operatorName: row.operator.name,
-      designation: row.operator.designation || "Operator",
-      uniqueMachine: row.uniqueMachine || null,
-      machineType: row.machineType || null,
-      smv: row.selectedSMV || null,
-      smvType: row.selectedSMVType || null,
-      rowNo: index + 1,
-      hourlyProduction: rowHourlyProduction
-    };
-  });
-
-  console.log("Final Payload to save:", payload);
-
-  try {
-    setIsLoading(true);
-
-    const res = await fetch("/api/daily-production", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-
-    const data = await res.json();
-
-    if (res.status === 409) {
-      // 🔴 Duplicate entry detected
-      Swal.fire({
-        icon: "warning",
-        title: "Duplicate Entry!",
-        html: `<div class="text-left">
-                 <p>${data.message}</p>
-               </div>`,
-      });
-      return;
-    }
-
-    if (!res.ok) {
-      Swal.fire("Error", data.error || "Failed to save", "error");
-      return;
-    }
-
-    Swal.fire({
-      icon: "success",
-      title: "Success!",
-      html: `<div class="text-left">
-               <p><strong>Daily production saved successfully!</strong></p>
-               <p>Total rows saved: ${data.inserted || payload.length}</p>
-               <p>Hourly data entries: ${
-                 payload.reduce(
-                   (sum, row) => sum + row.hourlyProduction.length,
-                   0
-                 )
-               }</p>
-             </div>`,
-      timer: 3000,
-      showConfirmButton: false
-    });
-
-    // ✅ Optional: reset after save
-    // setTableData([]);
-    // setHourlyData({});
-
-  } catch (err) {
-    console.error(err);
-    Swal.fire("Error", "Server error", "error");
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-
-
-  
-
-
-
-
-  const fetchDropdownData = async () => {
-    try {
-      setIsLoading(true);
-      
-      const [buyersRes, stylesRes] = await Promise.all([
-        fetch('/api/buyers'),
-        fetch('/api/styles')
-      ]);
-      
-      const buyersData = await buyersRes.json();
-      const stylesData = await stylesRes.json();
-      
-      setBuyers(buyersData.data || []);
-      setStyles(stylesData.data || []);
-    } catch (error) {
-      console.error("Error fetching dropdown data:", error);
+  // ✅ নতুন ফাংশন: machine scan এর জন্য row সিলেক্ট করতে
+  const handleSelectRowForMachine = (rowIndex) => {
+    // চেক করুন এই row-এ অপারেটর আছে কিনা
+    if (!tableData[rowIndex]?.operator) {
       Swal.fire({
         icon: "error",
-        title: "Error Loading Data",
-        text: "Failed to load buyers and styles",
+        title: "No Operator",
+        text: `Row ${rowIndex + 1} has no operator. Please scan operator QR first.`,
         timer: 2000,
+        showConfirmButton: false,
       });
+      return;
+    }
+
+    // যদি এই row-এ ইতিমধ্যে মেশিন থাকে
+    if (tableData[rowIndex]?.uniqueMachine) {
+      Swal.fire({
+        title: "Replace Machine?",
+        text: `Row ${rowIndex + 1} already has a machine (${tableData[rowIndex].uniqueMachine}). Click again to replace it.`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Yes, replace",
+        cancelButtonText: "Cancel",
+      }).then((result) => {
+        if (result.isConfirmed) {
+          setSelectedRowForMachine(rowIndex);
+          Swal.fire({
+            icon: "info",
+            title: "Row Selected",
+            text: `Row ${rowIndex + 1} is selected for machine replacement. Now scan new machine QR.`,
+            timer: 2000,
+            showConfirmButton: false,
+          });
+          
+          // Scanner ফোকাস করুন
+          setTimeout(() => {
+            if (scanInputRef.current) {
+              scanInputRef.current.focus();
+            }
+          }, 100);
+        }
+      });
+      return;
+    }
+
+    // Row সিলেক্ট করুন
+    setSelectedRowForMachine(rowIndex);
+    
+    Swal.fire({
+      icon: "info",
+      title: "Row Selected",
+      text: `Row ${rowIndex + 1} is now selected for machine scan. Ready to scan machine QR.`,
+      timer: 2000,
+      showConfirmButton: false,
+    });
+    
+    // Scanner ফোকাস করুন
+    setTimeout(() => {
+      if (scanInputRef.current) {
+        scanInputRef.current.focus();
+      }
+    }, 100);
+  };
+
+  const handleSubmit = async () => {
+    // ✅ Only operator is required now
+    const completeRows = tableData.filter(row => row.operator);
+
+    if (completeRows.length === 0) {
+      Swal.fire("Error", "At least one operator is required to save", "error");
+      return;
+    }
+
+    // ✅ Prepare payload
+    const payload = completeRows.map((row, index) => {
+      const rowHourlyProduction = [];
+
+      if (hourlyData?.hours && hourlyData?.hourlyInputs) {
+        hourlyData.hours.forEach(hour => {
+          const key = `${row.id}-${hour}`;
+          const productionCount = parseInt(hourlyData.hourlyInputs[key]) || 0;
+
+          if (productionCount > 0) {
+            rowHourlyProduction.push({
+              hour,
+              productionCount,
+              defects: []
+            });
+          }
+        });
+      }
+
+      return {
+        date: new Date(),
+        buyerId: formData.buyer || null,
+        styleId: formData.style || null,
+        supervisor: formData.supervisor || null,
+        floor: formData.floor || null,
+        line: formData.line || null,
+        process: row.process || null,
+        breakdownProcess: row.breakdownProcess || null,
+        workAs: row.workAs || "operator",
+        status: "present",
+        target: row.target ? Number(row.target) : 0,
+        operatorId: row.operator._id,
+        operatorCode: row.operator.operatorId,
+        operatorName: row.operator.name,
+        designation: row.operator.designation || "Operator",
+        uniqueMachine: row.uniqueMachine || null,
+        machineType: row.machineType || null,
+        smv: row.selectedSMV || null,
+        smvType: row.selectedSMVType || null,
+        rowNo: index + 1,
+        hourlyProduction: rowHourlyProduction
+      };
+    });
+
+    console.log("Final Payload to save:", payload);
+
+    try {
+      setIsLoading(true);
+
+      const res = await fetch("/api/daily-production", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+
+      if (res.status === 409) {
+        // 🔴 Duplicate entry detected
+        Swal.fire({
+          icon: "warning",
+          title: "Duplicate Entry!",
+          html: `<div class="text-left">
+                   <p>${data.message}</p>
+                 </div>`,
+        });
+        return;
+      }
+
+      if (!res.ok) {
+        Swal.fire("Error", data.error || "Failed to save", "error");
+        return;
+      }
+
+      Swal.fire({
+        icon: "success",
+        title: "Success!",
+        html: `<div class="text-left">
+                 <p><strong>Daily production saved successfully!</strong></p>
+                 <p>Total rows saved: ${data.inserted || payload.length}</p>
+                 <p>Hourly data entries: ${
+                   payload.reduce(
+                     (sum, row) => sum + row.hourlyProduction.length,
+                     0
+                   )
+                 }</p>
+               </div>`,
+        timer: 3000,
+        showConfirmButton: false
+      });
+
+    } catch (err) {
+      console.error(err);
+      Swal.fire("Error", "Server error", "error");
     } finally {
       setIsLoading(false);
     }
   };
+
+// Fetch dropdown data
+  useEffect(() => {
+    fetchDropdownData();
+  }, []);
+
+
+  const fetchDropdownData = async () => {
+  try {
+    setIsLoading(true);
+    
+    const [buyersRes, stylesRes] = await Promise.all([
+      fetch('/api/buyers'),
+      fetch('/api/styles')
+    ]);
+    
+    const buyersData = await buyersRes.json();
+    const stylesData = await stylesRes.json();
+    
+    // Buyers data check
+    if (buyersData && buyersData.success) {
+      setBuyers(buyersData.data || []);
+    } else if (buyersData && Array.isArray(buyersData)) {
+      setBuyers(buyersData);
+    } else {
+      console.error("Invalid buyers data format:", buyersData);
+      setBuyers([]);
+    }
+    
+    // Styles data check
+    if (stylesData && stylesData.success) {
+      setStyles(stylesData.data || []);
+    } else if (stylesData && Array.isArray(stylesData)) {
+      setStyles(stylesData);
+    } else {
+      console.error("Invalid styles data format:", stylesData);
+      setStyles([]);
+    }
+    
+  } catch (error) {
+    console.error("Error fetching dropdown data:", error);
+    Swal.fire({
+      icon: "error",
+      title: "Error Loading Data",
+      text: "Failed to load buyers and styles",
+      timer: 2000,
+    });
+    setBuyers([]);
+    setStyles([]);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const fetchProcesses = async () => {
     try {
@@ -630,38 +713,55 @@ export default function DailyProductionPage() {
   const handleMachineScan = async (machineData) => {
     let targetRowIndex;
     
-    const rowsWithOperatorNoMachine = tableData
-      .map((row, index) => ({ row, index }))
-      .filter(item => item.row.operator && !item.row.uniqueMachine);
-    
-    if (rowsWithOperatorNoMachine.length > 0) {
-      targetRowIndex = rowsWithOperatorNoMachine[rowsWithOperatorNoMachine.length - 1].index;
-    } else {
+    // 1. যদি user কোনো row স্পেসিফিকভাবে সিলেক্ট করে থাকে
+    if (selectedRowForMachine !== null) {
+      targetRowIndex = selectedRowForMachine;
+      
+      // চেক করুন যে সিলেক্টেড row-এ অপারেটর আছে কিনা
+      if (!tableData[targetRowIndex]?.operator) {
+        Swal.fire({
+          icon: "error",
+          title: "No Operator",
+          text: `Row ${targetRowIndex + 1} has no operator. Cannot assign machine.`,
+          timer: 2000,
+          showConfirmButton: false,
+        });
+        setSelectedRowForMachine(null);
+        return;
+      }
+    }
+    // 2. যদি user কোনো row সিলেক্ট না করে থাকে, তাহলে ডিফল্ট হিসেবে শেষ row নিন
+    else {
       const rowsWithOperator = tableData
         .map((row, index) => ({ row, index }))
         .filter(item => item.row.operator);
       
       if (rowsWithOperator.length > 0) {
+        // শেষ row যেখানে অপারেটর আছে
         targetRowIndex = rowsWithOperator[rowsWithOperator.length - 1].index;
         
-        const result = await Swal.fire({
-          title: "Replace Machine?",
-          text: `Row ${targetRowIndex + 1} already has a machine. Replace it?`,
-          icon: "warning",
-          showCancelButton: true,
-          confirmButtonText: "Replace",
-          cancelButtonText: "Cancel",
-        });
-        
-        if (!result.isConfirmed) {
-          setTimeout(() => {
-            if (scanInputRef.current) {
-              scanInputRef.current.focus();
-            }
-          }, 100);
-          return;
+        // যদি ইতিমধ্যে মেশিন থাকে, confirmation চাই
+        if (tableData[targetRowIndex].uniqueMachine) {
+          const result = await Swal.fire({
+            title: "Replace Machine?",
+            text: `Row ${targetRowIndex + 1} already has a machine. Replace it?`,
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonText: "Replace",
+            cancelButtonText: "Cancel",
+          });
+          
+          if (!result.isConfirmed) {
+            setTimeout(() => {
+              if (scanInputRef.current) {
+                scanInputRef.current.focus();
+              }
+            }, 100);
+            return;
+          }
         }
       } else {
+        // কোনো অপারেটর নেই, নতুন row যোগ করুন
         targetRowIndex = tableData.length;
         addNewRow();
         
@@ -682,6 +782,7 @@ export default function DailyProductionPage() {
       }
     }
 
+    // চেক করুন মেশিনটি অন্য কোথাও assigned কিনা
     const machineAlreadyAssigned = tableData.some(
       (row, index) => row.scannedMachine === machineData.uniqueId && index !== targetRowIndex
     );
@@ -720,6 +821,9 @@ export default function DailyProductionPage() {
       return updated;
     });
 
+    // selectedRowForMachine রিসেট করুন
+    setSelectedRowForMachine(null);
+    
     const operatorName = tableData[targetRowIndex]?.operator?.name || "New Operator";
     Swal.fire({
       icon: "success",
@@ -841,7 +945,10 @@ export default function DailyProductionPage() {
           isBreakdownDisabled={isBreakdownDisabled}
           calculateTarget={calculateTarget}
           floor={formData.floor}
-          onHourlyDataChange={handleHourlyDataChange} // নতুন prop
+          onHourlyDataChange={setHourlyData}
+          // নতুন props
+          selectedRowForMachine={selectedRowForMachine}
+          onSelectRowForMachine={handleSelectRowForMachine}
         />
 
         {/* Submit Section */}
@@ -856,6 +963,11 @@ export default function DailyProductionPage() {
                   <div className="text-xs mt-1">
                     Hourly data: {Object.values(hourlyData.hourlyInputs || {}).filter(v => v && parseInt(v) > 0).length} inputs filled
                   </div>
+                  {selectedRowForMachine !== null && (
+                    <div className="text-xs text-blue-600 mt-1 font-medium">
+                      ✓ Row {selectedRowForMachine + 1} selected for machine scan
+                    </div>
+                  )}
                 </div>
               ) : (
                 <span>No rows added yet</span>
