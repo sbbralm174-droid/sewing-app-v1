@@ -75,7 +75,7 @@ const DailyProductionSchema = new mongoose.Schema({
   },
   process: { 
     type: String, 
-    required: true 
+    required: false
   },
   breakdownProcess: {
     type: String,
@@ -83,7 +83,7 @@ const DailyProductionSchema = new mongoose.Schema({
   },
   status: { 
     type: String, 
-    enum: ['present', 'absent'], 
+    enum: ['present', 'absent', 'idle'], 
     required: true,
     default: 'present'
   },

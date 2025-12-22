@@ -214,106 +214,126 @@ export default function DailyProductionPage() {
     setHourlyData(data);
   };
 
-  const handleSubmit = async () => {
-    const completeRows = tableData.filter(
-      row =>
-        row.operator &&
-        (row.process || row.breakdownProcess) &&
-        row.workAs &&
-        row.target &&
-        (row.workAs === 'helper' || row.uniqueMachine)
-    );
 
-    if (completeRows.length === 0) {
-      Swal.fire("Error", "No complete rows to save", "error");
+
+ const handleSubmit = async () => {
+  // ✅ Only operator is required now
+  const completeRows = tableData.filter(row => row.operator);
+
+  if (completeRows.length === 0) {
+    Swal.fire("Error", "At least one operator is required to save", "error");
+    return;
+  }
+
+  // ✅ Prepare payload
+  const payload = completeRows.map((row, index) => {
+    const rowHourlyProduction = [];
+
+    if (hourlyData?.hours && hourlyData?.hourlyInputs) {
+      hourlyData.hours.forEach(hour => {
+        const key = `${row.id}-${hour}`;
+        const productionCount = parseInt(hourlyData.hourlyInputs[key]) || 0;
+
+        if (productionCount > 0) {
+          rowHourlyProduction.push({
+            hour,
+            productionCount,
+            defects: []
+          });
+        }
+      });
+    }
+
+    return {
+      date: new Date(),
+      buyerId: formData.buyer || null,
+      styleId: formData.style || null,
+      supervisor: formData.supervisor || null,
+      floor: formData.floor || null,
+      line: formData.line || null,
+      process: row.process || null,
+      breakdownProcess: row.breakdownProcess || null,
+      workAs: row.workAs || "operator",
+      status: "present",
+      target: row.target ? Number(row.target) : 0,
+      operatorId: row.operator._id,
+      operatorCode: row.operator.operatorId,
+      operatorName: row.operator.name,
+      designation: row.operator.designation || "Operator",
+      uniqueMachine: row.uniqueMachine || null,
+      machineType: row.machineType || null,
+      smv: row.selectedSMV || null,
+      smvType: row.selectedSMVType || null,
+      rowNo: index + 1,
+      hourlyProduction: rowHourlyProduction
+    };
+  });
+
+  console.log("Final Payload to save:", payload);
+
+  try {
+    setIsLoading(true);
+
+    const res = await fetch("/api/daily-production", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+
+    if (res.status === 409) {
+      // 🔴 Duplicate entry detected
+      Swal.fire({
+        icon: "warning",
+        title: "Duplicate Entry!",
+        html: `<div class="text-left">
+                 <p>${data.message}</p>
+               </div>`,
+      });
       return;
     }
 
-    // Prepare payload with hourly production data
-    const payload = completeRows.map((row, index) => {
-      // এই row-এর জন্য hourly production ডাটা সংগ্রহ
-      const rowHourlyProduction = [];
-      
-      if (hourlyData.hours && hourlyData.hourlyInputs) {
-        hourlyData.hours.forEach(hour => {
-          const key = `${row.id}-${hour}`;
-          const productionCount = parseInt(hourlyData.hourlyInputs[key]) || 0;
-          if (productionCount > 0) {
-            rowHourlyProduction.push({
-              hour: hour,
-              productionCount: productionCount,
-              defects: []
-            });
-          }
-        });
-      }
+    if (!res.ok) {
+      Swal.fire("Error", data.error || "Failed to save", "error");
+      return;
+    }
 
-      return {
-        date: new Date(),
-        buyerId: formData.buyer,
-        styleId: formData.style,
-        supervisor: formData.supervisor,
-        floor: formData.floor,
-        line: formData.line,
-        process: row.process,
-        breakdownProcess: row.breakdownProcess,
-        workAs: row.workAs,
-        status: "present",
-        target: Number(row.target),
-        operatorId: row.operator._id,
-        operatorCode: row.operator.operatorId,
-        operatorName: row.operator.name,
-        designation: row.operator.designation || "Operator",
-        uniqueMachine: row.workAs === 'operator' ? row.uniqueMachine : null,
-        machineType: row.workAs === 'operator' ? row.machineType : null,
-        smv: row.selectedSMV,
-        smvType: row.selectedSMVType,
-        rowNo: index + 1,
-        hourlyProduction: rowHourlyProduction
-      };
+    Swal.fire({
+      icon: "success",
+      title: "Success!",
+      html: `<div class="text-left">
+               <p><strong>Daily production saved successfully!</strong></p>
+               <p>Total rows saved: ${data.inserted || payload.length}</p>
+               <p>Hourly data entries: ${
+                 payload.reduce(
+                   (sum, row) => sum + row.hourlyProduction.length,
+                   0
+                 )
+               }</p>
+             </div>`,
+      timer: 3000,
+      showConfirmButton: false
     });
 
-    console.log("Final Payload to save:", payload); // ডিবাগিং এর জন্য
+    // ✅ Optional: reset after save
+    // setTableData([]);
+    // setHourlyData({});
 
-    try {
-      setIsLoading(true);
-      const res = await fetch("/api/daily-production", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+  } catch (err) {
+    console.error(err);
+    Swal.fire("Error", "Server error", "error");
+  } finally {
+    setIsLoading(false);
+  }
+};
 
-      const data = await res.json();
 
-      if (!res.ok) {
-        Swal.fire("Error", data.error || "Failed to save", "error");
-        return;
-      }
 
-      Swal.fire({
-        icon: "success",
-        title: "Success!",
-        html: `
-          <div class="text-left">
-            <p><strong>Daily production saved successfully!</strong></p>
-            <p>Total rows saved: ${data.inserted || payload.length}</p>
-            <p>Hourly data: ${payload.reduce((sum, row) => sum + row.hourlyProduction.length, 0)} entries</p>
-          </div>
-        `,
-        timer: 3000,
-        showConfirmButton: false,
-      });
-      
-      // Reset form after successful save
-      
+  
 
-    } catch (err) {
-      console.error(err);
-      Swal.fire("Error", "Server error", "error");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+
+
 
   const fetchDropdownData = async () => {
     try {
@@ -769,6 +789,7 @@ export default function DailyProductionPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
+        
         <HeaderForm
           formData={formData}
           buyers={buyers}
