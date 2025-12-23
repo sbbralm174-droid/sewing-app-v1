@@ -739,7 +739,7 @@ function DataEntry({
               </div>
             )}
             <div className="mt-2 text-xs text-yellow-600">
-              <strong>Note:</strong> Edit the data below and click "Update Assessment" to save changes
+              <strong>Note:</strong> Edit the data below and click Update Assessment to save changes
             </div>
           </div>
         )}

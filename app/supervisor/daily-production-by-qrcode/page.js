@@ -549,7 +549,7 @@ export default function DailyProductionPage() {
         if (value.length > 5 && value !== lastScannedData) {
           processScannedData(value);
         }
-      }, 500);
+      }, );
     }
   };
 
@@ -644,195 +644,105 @@ export default function DailyProductionPage() {
     }
   };
 
+
+  const operatorMapRef = useRef(new Map());   // operatorId -> rowIndex
   const handleOperatorScan = async (operatorData) => {
-    const existingRowIndex = tableData.findIndex(
-      row => row.operator && row.operator.operatorId === operatorData.operatorId
-    );
+  const existingIndex = operatorMapRef.current.get(operatorData.operatorId);
 
-    if (existingRowIndex !== -1) {
-      Swal.fire({
-        icon: "info",
-        title: "Operator Already Added",
-        text: `Focusing on row ${existingRowIndex + 1} for ${operatorData.name}`,
-        timer: 1500,
-        showConfirmButton: false,
-      });
-      
-      setHighlightedRow(existingRowIndex);
-      setTimeout(() => {
-        setHighlightedRow(null);
-      }, 3000);
-      
-      setTimeout(() => {
-        if (scanInputRef.current) {
-          scanInputRef.current.focus();
-        }
-      }, 100);
-      return;
-    }
+  // 🔁 Duplicate operator
+  if (existingIndex !== undefined) {
+    setHighlightedRow(existingIndex);
+    setTimeout(() => setHighlightedRow(null), 2000);
+    scanInputRef.current?.focus();
+    return;
+  }
 
-    let targetRowIndex = tableData.findIndex(row => !row.operator);
-    
-    if (targetRowIndex === -1) {
-      targetRowIndex = tableData.length;
-      addNewRow();
-      
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
+  // ➕ Find empty row (no loop)
+  let targetIndex = tableData.length;
 
-    setTableData(prev => {
-      const updated = [...prev];
-      if (!updated[targetRowIndex]) {
-        updated[targetRowIndex] = createEmptyRow();
-      }
-      
-      updated[targetRowIndex] = {
-        ...updated[targetRowIndex],
-        operator: {
-          _id: operatorData.id,
-          operatorId: operatorData.operatorId,
-          name: operatorData.name,
-          designation: operatorData.designation,
-        },
-        allowedProcesses: operatorData.allowedProcesses || {},
-        process: Object.keys(operatorData.allowedProcesses || {})[0] || "",
-      };
-      
-      return updated;
-    });
+  setTableData(prev => {
+    const updated = [...prev];
+    const emptyIndex = prev.findIndex(r => !r.operator);
 
-    Swal.fire({
-      icon: "success",
-      title: "Operator Added!",
-      text: `${operatorData.name} added to row ${targetRowIndex + 1}`,
-      timer: 1500,
-      showConfirmButton: false,
-    });
-  };
+    targetIndex = emptyIndex !== -1 ? emptyIndex : prev.length;
 
+    updated[targetIndex] = {
+      ...(updated[targetIndex] || createEmptyRow()),
+      operator: {
+        _id: operatorData.id,
+        operatorId: operatorData.operatorId,
+        name: operatorData.name,
+        designation: operatorData.designation,
+      },
+      allowedProcesses: operatorData.allowedProcesses || {},
+      process: Object.keys(operatorData.allowedProcesses || {})[0] || "",
+    };
+
+    return updated;
+  });
+
+  // ✅ CACHE UPDATE (🔥 KEY PART)
+  operatorMapRef.current.set(operatorData.operatorId, targetIndex);
+
+  Swal.fire({
+    icon: "success",
+    title: "Operator Added",
+    text: `${operatorData.name} → Row ${targetIndex + 1}`,
+    timer: 1200,
+    showConfirmButton: false,
+  });
+};
+
+  const machineMapRef = useRef(new Map());    // uniqueMachine -> rowIndex
   const handleMachineScan = async (machineData) => {
-    let targetRowIndex;
-    
-    // 1. যদি user কোনো row স্পেসিফিকভাবে সিলেক্ট করে থাকে
-    if (selectedRowForMachine !== null) {
-      targetRowIndex = selectedRowForMachine;
-      
-      // চেক করুন যে সিলেক্টেড row-এ অপারেটর আছে কিনা
-      if (!tableData[targetRowIndex]?.operator) {
-        Swal.fire({
-          icon: "error",
-          title: "No Operator",
-          text: `Row ${targetRowIndex + 1} has no operator. Cannot assign machine.`,
-          timer: 2000,
-          showConfirmButton: false,
-        });
-        setSelectedRowForMachine(null);
-        return;
-      }
-    }
-    // 2. যদি user কোনো row সিলেক্ট না করে থাকে, তাহলে ডিফল্ট হিসেবে শেষ row নিন
-    else {
-      const rowsWithOperator = tableData
-        .map((row, index) => ({ row, index }))
-        .filter(item => item.row.operator);
-      
-      if (rowsWithOperator.length > 0) {
-        // শেষ row যেখানে অপারেটর আছে
-        targetRowIndex = rowsWithOperator[rowsWithOperator.length - 1].index;
-        
-        // যদি ইতিমধ্যে মেশিন থাকে, confirmation চাই
-        if (tableData[targetRowIndex].uniqueMachine) {
-          const result = await Swal.fire({
-            title: "Replace Machine?",
-            text: `Row ${targetRowIndex + 1} already has a machine. Replace it?`,
-            icon: "warning",
-            showCancelButton: true,
-            confirmButtonText: "Replace",
-            cancelButtonText: "Cancel",
-          });
-          
-          if (!result.isConfirmed) {
-            setTimeout(() => {
-              if (scanInputRef.current) {
-                scanInputRef.current.focus();
-              }
-            }, 100);
-            return;
-          }
-        }
-      } else {
-        // কোনো অপারেটর নেই, নতুন row যোগ করুন
-        targetRowIndex = tableData.length;
-        addNewRow();
-        
-        Swal.fire({
-          icon: "warning",
-          title: "Operator Needed",
-          text: "Please scan an operator QR for this machine",
-          timer: 2000,
-          showConfirmButton: false,
-        });
-        
-        setTimeout(() => {
-          if (scanInputRef.current) {
-            scanInputRef.current.focus();
-          }
-        }, 100);
-        return;
-      }
-    }
+  const existingIndex = machineMapRef.current.get(machineData.uniqueId);
 
-    // চেক করুন মেশিনটি অন্য কোথাও assigned কিনা
-    const machineAlreadyAssigned = tableData.some(
-      (row, index) => row.scannedMachine === machineData.uniqueId && index !== targetRowIndex
-    );
-
-    if (machineAlreadyAssigned) {
-      Swal.fire({
-        icon: "warning",
-        title: "Machine Already Assigned",
-        text: "This machine is already assigned to another operator",
-        timer: 2000,
-        showConfirmButton: false,
-      });
-      
-      setTimeout(() => {
-        if (scanInputRef.current) {
-          scanInputRef.current.focus();
-        }
-      }, 100);
-      return;
-    }
-
-    setTableData(prev => {
-      const updated = [...prev];
-      
-      if (!updated[targetRowIndex]) {
-        updated[targetRowIndex] = createEmptyRow();
-      }
-      
-      updated[targetRowIndex] = {
-        ...updated[targetRowIndex],
-        uniqueMachine: machineData.uniqueId,
-        scannedMachine: machineData.uniqueId,
-        machineType: machineData.machineType,
-      };
-      
-      return updated;
-    });
-
-    // selectedRowForMachine রিসেট করুন
-    setSelectedRowForMachine(null);
-    
-    const operatorName = tableData[targetRowIndex]?.operator?.name || "New Operator";
+  // 🔁 Machine already used
+  if (existingIndex !== undefined) {
     Swal.fire({
-      icon: "success",
-      title: "Machine Assigned!",
-      text: `${machineData.uniqueId} assigned to ${operatorName}`,
+      icon: "warning",
+      title: "Machine In Use",
+      text: `Already assigned to row ${existingIndex + 1}`,
       timer: 1500,
       showConfirmButton: false,
     });
-  };
+    scanInputRef.current?.focus();
+    return;
+  }
+
+  let targetIndex = selectedRowForMachine;
+
+  if (targetIndex === null || !tableData[targetIndex]?.operator) {
+    Swal.fire("Error", "Select a row with operator first", "error");
+    return;
+  }
+
+  setTableData(prev => {
+    const updated = [...prev];
+
+    updated[targetIndex] = {
+      ...updated[targetIndex],
+      uniqueMachine: machineData.uniqueId,
+      scannedMachine: machineData.uniqueId,
+      machineType: machineData.machineType,
+    };
+
+    return updated;
+  });
+
+  // ✅ CACHE UPDATE
+  machineMapRef.current.set(machineData.uniqueId, targetIndex);
+  setSelectedRowForMachine(null);
+
+  Swal.fire({
+    icon: "success",
+    title: "Machine Assigned",
+    text: `${machineData.uniqueId} → Row ${targetIndex + 1}`,
+    timer: 1200,
+    showConfirmButton: false,
+  });
+};
+
 
   const handleRowChange = (rowIndex, field, value) => {
     setTableData((prev) => {
@@ -998,3 +908,5 @@ export default function DailyProductionPage() {
     </div>
   );
 }
+
+
