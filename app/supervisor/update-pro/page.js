@@ -38,6 +38,10 @@ export default function DailyProductionPage() {
   const [filteredHours, setFilteredHours] = useState([]);
   const [expandedRows, setExpandedRows] = useState({});
 
+  // State to track breakdown process counts and manPower
+  const [breakdownProcessCounts, setBreakdownProcessCounts] = useState({});
+  const [breakdownProcessManPower, setBreakdownProcessManPower] = useState({});
+
   // Sample data for floors and lines
   const sampleFloors = ['POODO', 'SEWING', 'CUTTING', 'FINISHING'];
   const sampleLines = {
@@ -64,6 +68,124 @@ export default function DailyProductionPage() {
     process.code?.toLowerCase().includes(processSearch.toLowerCase()) ||
     process.machineType?.toLowerCase().includes(processSearch.toLowerCase())
   );
+
+ // Calculate breakdown process counts and get all available processes
+useEffect(() => {
+  const counts = {};
+  const manPowerMap = {};
+  
+  // First, store all available processes from fileData
+  if (fileData?.data) {
+    fileData.data.forEach(item => {
+      const processName = item.process;
+      if (processName && !manPowerMap[processName]) {
+        manPowerMap[processName] = parseInt(item.manPower) || 0;
+      }
+    });
+  }
+  
+  // Count how many times each breakdown process is selected in the table
+  productionData.forEach(item => {
+    if (item.breakdownProcess && item.breakdownProcess.trim() !== '') {
+      const processName = item.breakdownProcess;
+      counts[processName] = (counts[processName] || 0) + 1;
+    }
+  });
+  
+  setBreakdownProcessCounts(counts);
+  setBreakdownProcessManPower(manPowerMap);
+}, [productionData, fileData]);
+
+  // Check if a breakdown process should be disabled
+  const isBreakdownProcessDisabled = (processName) => {
+    const count = breakdownProcessCounts[processName] || 0;
+    const manPower = breakdownProcessManPower[processName] || 0;
+    
+    // If manPower is 0 or not defined, don't disable
+    if (manPower <= 0) return false;
+    
+    // Disable if count is greater than or equal to manPower
+    return count >= manPower;
+  };
+
+  // Handle breakdown process selection from uploaded file
+  const handleBreakdownSelect = (index, excelProcess) => {
+    const currentProcessName = excelProcess.process;
+    const manPower = parseInt(excelProcess.manPower) || 0;
+    
+    // Check if process is already at max capacity
+    if (isBreakdownProcessDisabled(currentProcessName)) {
+      setMessage({ 
+        type: 'error', 
+        text: `This process (${currentProcessName}) has already reached its man power limit of ${manPower}` 
+      });
+      return;
+    }
+    
+    const updatedData = [...productionData];
+    
+    // Set breakdown process
+    updatedData[index].breakdownProcess = currentProcessName;
+    
+    // Clear main process field when breakdown is selected
+    updatedData[index].process = '';
+    
+    // Set SMV from excel file data
+    const smvValue = parseFloat(excelProcess.smv) || 0;
+    updatedData[index].smv = smvValue;
+    
+    // Calculate target based on SMV (Target = 60 / SMV)
+    if (smvValue > 0) {
+      updatedData[index].target = Math.round((60 / smvValue) * 100) / 100;
+    }
+    
+    setProductionData(updatedData);
+    setShowBreakdownDropdown(null);
+    setBreakdownSearch('');
+    setMessage({ type: 'success', text: `Process "${currentProcessName}" selected (Man Power: ${manPower})` });
+  };
+
+  // Handle input changes in table
+  const handleInputChange = (index, field, value) => {
+    const updatedData = [...productionData];
+    
+    // If clearing breakdown process, we need to handle it specially
+    if (field === 'breakdownProcess' && value === '') {
+      // Get the current process name before clearing
+      const currentProcess = updatedData[index].breakdownProcess;
+      
+      // Update the field
+      updatedData[index][field] = value;
+      
+      // Clear the message
+      if (message.text.includes(currentProcess)) {
+        setMessage({ type: '', text: '' });
+      }
+    } else if (field === 'process' && value.trim() !== '') {
+      // Clear breakdown process when main process is manually entered
+      const currentProcess = updatedData[index].breakdownProcess;
+      updatedData[index].breakdownProcess = '';
+      updatedData[index].process = value;
+      
+      // Clear the message if it was about the cleared breakdown process
+      if (currentProcess && message.text.includes(currentProcess)) {
+        setMessage({ type: '', text: '' });
+      }
+    } else {
+      updatedData[index][field] = value;
+    }
+    
+    // Calculate target if SMV changes
+    if (field === 'smv') {
+      const smv = parseFloat(value) || 0;
+      if (smv > 0) {
+        // Calculate target: 60 / SMV
+        updatedData[index].target = Math.round((60 / smv) * 100) / 100; // Round to 2 decimal places
+      }
+    }
+    
+    setProductionData(updatedData);
+  };
 
   // Handle hourly production input change - convert to array format
   const handleHourlyProductionChange = (rowIndex, hourName, value) => {
@@ -402,57 +524,6 @@ export default function DailyProductionPage() {
     await fetchProductionData();
   };
 
-  // Handle input changes in table
-  const handleInputChange = (index, field, value) => {
-    const updatedData = [...productionData];
-    
-    // Clear related fields when necessary
-    if (field === 'process' && value.trim() !== '') {
-      // Clear breakdown process when main process is manually entered
-      updatedData[index].breakdownProcess = '';
-    } else if (field === 'breakdownProcess' && value.trim() !== '') {
-      // Clear main process when breakdown is manually entered
-      updatedData[index].process = '';
-    }
-    
-    updatedData[index][field] = value;
-    
-    // Calculate target if SMV changes
-    if (field === 'smv') {
-      const smv = parseFloat(value) || 0;
-      if (smv > 0) {
-        // Calculate target: 60 / SMV
-        updatedData[index].target = Math.round((60 / smv) * 100) / 100; // Round to 2 decimal places
-      }
-    }
-    
-    setProductionData(updatedData);
-  };
-
-  // Handle breakdown process selection from uploaded file
-  const handleBreakdownSelect = (index, excelProcess) => {
-    const updatedData = [...productionData];
-    
-    // Set breakdown process
-    updatedData[index].breakdownProcess = excelProcess.process;
-    
-    // Clear main process field when breakdown is selected
-    updatedData[index].process = '';
-    
-    // Set SMV from excel file data
-    const smvValue = parseFloat(excelProcess.smv) || 0;
-    updatedData[index].smv = smvValue;
-    
-    // Calculate target based on SMV (Target = 60 / SMV)
-    if (smvValue > 0) {
-      updatedData[index].target = Math.round((60 / smvValue) * 100) / 100;
-    }
-    
-    setProductionData(updatedData);
-    setShowBreakdownDropdown(null);
-    setBreakdownSearch('');
-  };
-
   // Handle machine selection
   const handleMachineSelect = (index, machineId) => {
     const updatedData = [...productionData];
@@ -681,6 +752,52 @@ export default function DailyProductionPage() {
               {message.text}
             </div>
           )}
+
+          
+{fileData?.data && (
+  <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+    <div className="text-sm font-medium text-blue-700 mb-1">Breakdown Process Status:</div>
+    <div className="flex flex-wrap gap-2">
+      {/* Group processes by status */}
+      {Object.entries(breakdownProcessManPower).map(([processName, manPower]) => {
+        const count = breakdownProcessCounts[processName] || 0;
+        const isDisabled = isBreakdownProcessDisabled(processName);
+        const percentage = manPower > 0 ? Math.min(100, (count / manPower) * 100) : 0;
+        
+        return (
+          <div 
+            key={processName}
+            className={`text-xs px-2 py-1 rounded-full flex items-center gap-1 ${
+              count === 0 ? 'bg-gray-100 text-gray-800' : 
+              isDisabled ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+            }`}
+            title={`Process: ${processName}, Man Power: ${manPower}, Used: ${count}`}
+          >
+            <span className="font-medium">{processName}</span>
+            <span>: {count}/{manPower}</span>
+            {count > 0 && (
+              <span className="text-xs">({percentage.toFixed(0)}%)</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+    {/* <div className="mt-2 text-xs text-gray-600 flex gap-3">
+      <div className="flex items-center gap-1">
+        <div className="w-3 h-3 bg-gray-100 rounded"></div>
+        <span>Available (0/{breakdownProcessManPower[Object.keys(breakdownProcessManPower)[0]] || 0})</span>
+      </div>
+      <div className="flex items-center gap-1">
+        <div className="w-3 h-3 bg-green-100 rounded"></div>
+        <span>In use ({Object.keys(breakdownProcessCounts).filter(name => breakdownProcessCounts[name] > 0 && !isBreakdownProcessDisabled(name)).length})</span>
+      </div>
+      <div className="flex items-center gap-1">
+        <div className="w-3 h-3 bg-red-100 rounded"></div>
+        <span>Full ({Object.keys(breakdownProcessCounts).filter(isBreakdownProcessDisabled).length})</span>
+      </div>
+    </div> */}
+  </div>
+)}
         </div>
 
         {/* Production Data Table */}
@@ -739,12 +856,12 @@ export default function DailyProductionPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Target
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Total
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
                       Hours
-                    </th>
+                    </th> */}
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -978,31 +1095,56 @@ export default function DailyProductionPage() {
                                     No processes found matching {breakdownSearch}
                                   </div>
                                 ) : (
-                                  filteredFileData.map((excelProcess, idx) => (
-                                    <button
-                                      key={excelProcess._id || idx}
-                                      type="button"
-                                      onClick={() => handleBreakdownSelect(index, excelProcess)}
-                                      className="w-full text-left px-3 py-3 text-sm hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition dropdown-container"
-                                    >
-                                      <div className="font-medium text-gray-900">
-                                        {excelProcess.sno}. {excelProcess.process}
-                                      </div>
-                                      <div className="flex justify-between items-center mt-1">
-                                        <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-800 rounded">
-                                          {excelProcess.mcTypeHp}
-                                        </span>
-                                        <div className="flex items-center gap-3">
-                                          <span className="text-xs text-gray-600">
-                                            Capacity: {excelProcess.capacity}
-                                          </span>
-                                          <span className="text-xs font-medium text-green-600">
-                                            SMV: {excelProcess.smv}
+                                  filteredFileData.map((excelProcess, idx) => {
+                                    const processName = excelProcess.process;
+                                    const manPower = parseInt(excelProcess.manPower) || 0;
+                                    const isDisabled = isBreakdownProcessDisabled(processName);
+                                    const currentCount = breakdownProcessCounts[processName] || 0;
+                                    
+                                    return (
+                                      <button
+                                        key={excelProcess._id || idx}
+                                        type="button"
+                                        onClick={() => !isDisabled && handleBreakdownSelect(index, excelProcess)}
+                                        disabled={isDisabled}
+                                        className={`w-full text-left px-3 py-3 text-sm hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition dropdown-container ${
+                                          isDisabled 
+                                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                                            : 'hover:bg-blue-50'
+                                        }`}
+                                      >
+                                        <div className="font-medium">
+                                          {excelProcess.sno}. {excelProcess.process} 
+                                          <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${
+                                            isDisabled ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
+                                          }`}>
+                                            Man Power: {manPower}
                                           </span>
                                         </div>
-                                      </div>
-                                    </button>
-                                  ))
+                                        <div className="flex justify-between items-center mt-1">
+                                          <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-800 rounded">
+                                            {excelProcess.mcTypeHp}
+                                          </span>
+                                          <div className="flex items-center gap-3">
+                                            {isDisabled ? (
+                                              <span className="text-xs font-medium text-red-600">
+                                                Max reached ({currentCount}/{manPower})
+                                              </span>
+                                            ) : (
+                                              <>
+                                                <span className="text-xs text-gray-600">
+                                                  Used: {currentCount}/{manPower}
+                                                </span>
+                                                <span className="text-xs font-medium text-green-600">
+                                                  SMV: {excelProcess.smv}
+                                                </span>
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </button>
+                                    );
+                                  })
                                 )}
                               </div>
                             </div>
@@ -1034,28 +1176,6 @@ export default function DailyProductionPage() {
                             className="w-20 px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
                           />
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {calculateRowTotal(index)}
-                        </td>
-                        <td className="px-6 py-4">
-                          <button
-                            type="button"
-                            onClick={() => toggleRowExpansion(index)}
-                            className="flex items-center gap-1 px-3 py-1.5 text-sm bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition"
-                          >
-                            {expandedRows[index] ? (
-                              <>
-                                <Minus className="w-4 h-4" />
-                                <span>Hide Hours</span>
-                              </>
-                            ) : (
-                              <>
-                                <Plus className="w-4 h-4" />
-                                <span>Add Hours</span>
-                              </>
-                            )}
-                          </button>
-                        </td>
                       </tr>
                       
                       {/* Expanded Hourly Production Section - ডিফল্টভাবে দেখাবে */}
@@ -1064,9 +1184,9 @@ export default function DailyProductionPage() {
                           <td colSpan="10" className="px-6 py-4">
                             <div className="mb-2">
                               <h3 className="text-sm font-medium text-gray-700 mb-3">
-                                Hourly Production for Row {index + 1} - {item.operatorName || item.operator || 'N/A'}
+                                Hourly Production for Row {index + 1} - {item.operatorName || item.operator || 'N/A'} {item.operator.operatorId}
                               </h3>
-                              <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 xl:grid-cols-10 2xl:grid-cols-15 gap-3">
+                              <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-15 xl:grid-cols-15 2xl:grid-cols-15 gap-3">
                                 {hours.map((hour) => (
                                   <div key={hour._id} className="space-y-1">
                                     <label className="block text-xs font-medium text-gray-600">
@@ -1118,7 +1238,7 @@ export default function DailyProductionPage() {
               </div>
               <div className="flex items-center gap-3">
                 <div className="text-sm text-gray-500">
-                  <span className="font-medium">Tips:</span> Hourly inputs are visible by default
+                  <span className="font-medium">Tips:</span> Breakdown processes disable when man power limit reached
                 </div>
                 <button
                   onClick={fetchProductionData}

@@ -247,7 +247,7 @@ export default function Home() {
             <ul className="space-y-2 text-sm text-blue-800">
               <li className="flex items-start">
                 <span className="inline-block w-6 h-6 bg-blue-100 text-blue-600 rounded-full text-center mr-2 flex-shrink-0">1</span>
-                Fill in all production information fields and click "Submit Production Info"
+                Fill in all production information fields and click Submit Production Info
               </li>
               <li className="flex items-start">
                 <span className="inline-block w-6 h-6 bg-blue-100 text-blue-600 rounded-full text-center mr-2 flex-shrink-0">2</span>
@@ -263,7 +263,7 @@ export default function Home() {
               </li>
               <li className="flex items-start">
                 <span className="inline-block w-6 h-6 bg-blue-100 text-blue-600 rounded-full text-center mr-2 flex-shrink-0">5</span>
-                Use "Edit" button to modify other fields like Process, SMV, Target, etc.
+                Use Edit button to modify other fields like Process, SMV, Target, etc.
               </li>
             </ul>
           </div>
