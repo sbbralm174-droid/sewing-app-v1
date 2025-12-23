@@ -1,8 +1,6 @@
-// /supervisor/daily-production-by-qrcode/page.jsx
-
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Swal from "sweetalert2";
 import HeaderForm from "@/components/HeaderForm";
 import ScannerSection from "@/components/ScannerSection";
@@ -21,12 +19,10 @@ export default function DailyProductionPage() {
   
   const [tableData, setTableData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isHeaderComplete, setIsHeaderComplete] = useState(false);
   
   // Dropdown data
   const [buyers, setBuyers] = useState([]);
   const [styles, setStyles] = useState([]);
-  const [filteredStyles, setFilteredStyles] = useState([]);
   const [processes, setProcesses] = useState([]);
   
   // Excel file data
@@ -39,15 +35,9 @@ export default function DailyProductionPage() {
   // Scan related
   const [scanInput, setScanInput] = useState("");
   const [scanFocus, setScanFocus] = useState(false);
-  const [lastScannedData, setLastScannedData] = useState("");
   
   // UI state
   const [highlightedRow, setHighlightedRow] = useState(null);
-  const [summary, setSummary] = useState({
-    processCount: 0,
-    breakdownCount: 0,
-    total: 0
-  });
   
   // Hourly data state
   const [hourlyData, setHourlyData] = useState({
@@ -64,75 +54,92 @@ export default function DailyProductionPage() {
   const scanInputRef = useRef(null);
   const scanTimeoutRef = useRef(null);
 
-  // Initial data fetching
-  useEffect(() => {
-    fetchProcesses();
-    fetchExcelFiles();
-  }, []);
+  // Operator and Machine caches - useRef ব্যবহার করে re-rendering এড়ানো
+  const operatorMapRef = useRef(new Map());   // operatorId -> rowIndex
+  const machineMapRef = useRef(new Map());    // uniqueMachine -> rowIndex
 
-  // Summary update
-  useEffect(() => {
-    updateSummary();
+  // Header completion check - useMemo ব্যবহার করা
+  const isHeaderComplete = useMemo(() => {
+    return formData.buyer && formData.style && formData.supervisor && 
+           formData.floor && formData.line;
+  }, [formData]);
+
+  // Summary update - useMemo ব্যবহার করা
+  const summary = useMemo(() => {
+    const processCount = tableData.filter(row => row.process).length;
+    const breakdownCount = tableData.filter(row => row.breakdownProcess).length;
+    return {
+      processCount,
+      breakdownCount,
+      total: processCount + breakdownCount
+    };
   }, [tableData]);
 
-  // Header completion check
-  useEffect(() => {
-    const complete = formData.buyer && formData.style && formData.supervisor && 
-                    formData.floor && formData.line;
-    setIsHeaderComplete(complete);
-    
-    if (complete && tableData.length === 0) {
-      addNewRow();
-    }
-  }, [formData, tableData.length]);
-
-  // Buyer change handler
-  useEffect(() => {
+  // Filtered styles - useMemo ব্যবহার করা
+  const filteredStyles = useMemo(() => {
     if (formData.buyer && styles.length > 0) {
       const buyerSpecificStyles = styles.filter(
         (style) => style.buyerId?._id === formData.buyer || 
                   style.buyerId === formData.buyer ||
                   style.buyerName === buyers.find(b => b._id === formData.buyer)?.name
       );
-      setFilteredStyles(buyerSpecificStyles);
-      
-      if (formData.style && !buyerSpecificStyles.some(s => s._id === formData.style)) {
-        setFormData(prev => ({ ...prev, style: "" }));
-      }
-    } else {
-      setFilteredStyles([]);
-      if (formData.style) {
-        setFormData(prev => ({ ...prev, style: "" }));
-      }
+      return buyerSpecificStyles;
     }
-  }, [formData.buyer, styles, buyers, formData.style]);
+    return [];
+  }, [formData.buyer, styles, buyers]);
 
-  // Auto focus scanner
+  // Initial data fetching - useEffect optimization
   useEffect(() => {
-    if (isHeaderComplete && scanInputRef.current) {
-      scanInputRef.current.focus();
+    const fetchInitialData = async () => {
+      try {
+        await Promise.all([fetchProcesses(), fetchExcelFiles(), fetchDropdownData()]);
+      } catch (error) {
+        console.error("Error fetching initial data:", error);
+      }
+    };
+    fetchInitialData();
+  }, []);
+
+  // Header completion check with table data
+  useEffect(() => {
+    if (isHeaderComplete && tableData.length === 0) {
+      addNewRow();
     }
   }, [isHeaderComplete, tableData.length]);
 
-  // selectedRowForMachine পরিবর্তন হলে notification দিন
+  // Auto focus scanner - debounced with cleanup
+  useEffect(() => {
+    if (isHeaderComplete && scanInputRef.current) {
+      const timer = setTimeout(() => {
+        scanInputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isHeaderComplete, tableData.length]);
+
+  // selectedRowForMachine পরিবর্তন হলে notification - useEffect optimization
   useEffect(() => {
     if (selectedRowForMachine !== null) {
-      // Small notification
       console.log(`Row ${selectedRowForMachine + 1} selected for machine scan`);
     }
   }, [selectedRowForMachine]);
 
-  const updateSummary = () => {
-    const processCount = tableData.filter(row => row.process).length;
-    const breakdownCount = tableData.filter(row => row.breakdownProcess).length;
-    setSummary({
-      processCount,
-      breakdownCount,
-      total: processCount + breakdownCount
-    });
-  };
+  // Buyer change handler - useEffect optimization
+  useEffect(() => {
+    if (formData.buyer && formData.style && styles.length > 0) {
+      const isStyleValid = filteredStyles.some(s => s._id === formData.style);
+      if (!isStyleValid) {
+        setFormData(prev => ({ ...prev, style: "" }));
+      }
+    }
+  }, [formData.buyer, formData.style, styles, filteredStyles]);
 
-  const createEmptyRow = () => ({
+  // ✅ useCallback ব্যবহার করে function re-creation এড়ানো
+  const updateFormData = useCallback((field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  }, []);
+
+  const createEmptyRow = useCallback(() => ({
     id: Date.now() + Math.random(),
     operator: null,
     uniqueMachine: "",
@@ -144,11 +151,11 @@ export default function DailyProductionPage() {
     allowedProcesses: {},
     selectedSMV: "",
     selectedSMVType: ""
-  });
+  }), []);
 
-  const addNewRow = () => {
+  const addNewRow = useCallback(() => {
     const newRow = createEmptyRow();
-    setTableData((prev) => [...prev, newRow]);
+    setTableData(prev => [...prev, newRow]);
     
     Swal.fire({
       icon: "success",
@@ -157,9 +164,9 @@ export default function DailyProductionPage() {
       timer: 1000,
       showConfirmButton: false,
     });
-  };
+  }, [tableData.length, createEmptyRow]);
 
-  const removeRow = (rowIndex) => {
+  const removeRow = useCallback((rowIndex) => {
     if (tableData.length <= 1) {
       Swal.fire({
         icon: "warning",
@@ -183,7 +190,16 @@ export default function DailyProductionPage() {
     }).then((result) => {
       if (result.isConfirmed) {
         const removedOperator = tableData[rowIndex].operator?.name;
-        setTableData((prev) => prev.filter((_, index) => index !== rowIndex));
+        
+        // Cache থেকে অপারেটর এবং মেশিন remove করুন
+        if (tableData[rowIndex]?.operator?.operatorId) {
+          operatorMapRef.current.delete(tableData[rowIndex].operator.operatorId);
+        }
+        if (tableData[rowIndex]?.uniqueMachine) {
+          machineMapRef.current.delete(tableData[rowIndex].uniqueMachine);
+        }
+        
+        setTableData(prev => prev.filter((_, index) => index !== rowIndex));
         
         // যদি সরানো row টি selectedRowForMachine হয়, তাহলে reset করুন
         if (selectedRowForMachine === rowIndex) {
@@ -197,11 +213,17 @@ export default function DailyProductionPage() {
         );
       }
     });
-  };
+  }, [tableData, selectedRowForMachine]);
 
-  const cancelMachine = (rowIndex) => {
-    setTableData((prev) => {
+  const cancelMachine = useCallback((rowIndex) => {
+    setTableData(prev => {
       const updated = [...prev];
+      const uniqueMachine = updated[rowIndex]?.uniqueMachine;
+      
+      if (uniqueMachine) {
+        machineMapRef.current.delete(uniqueMachine);
+      }
+      
       updated[rowIndex] = {
         ...updated[rowIndex],
         uniqueMachine: "",
@@ -218,10 +240,10 @@ export default function DailyProductionPage() {
       timer: 1500,
       showConfirmButton: false,
     });
-  };
+  }, []);
 
-  // ✅ নতুন ফাংশন: machine scan এর জন্য row সিলেক্ট করতে
-  const handleSelectRowForMachine = (rowIndex) => {
+  // ✅ নতুন ফাংশন: machine scan এর জন্য row সিলেক্ট করতে - useCallback
+  const handleSelectRowForMachine = useCallback((rowIndex) => {
     // চেক করুন এই row-এ অপারেটর আছে কিনা
     if (!tableData[rowIndex]?.operator) {
       Swal.fire({
@@ -256,9 +278,7 @@ export default function DailyProductionPage() {
           
           // Scanner ফোকাস করুন
           setTimeout(() => {
-            if (scanInputRef.current) {
-              scanInputRef.current.focus();
-            }
+            scanInputRef.current?.focus();
           }, 100);
         }
       });
@@ -278,13 +298,11 @@ export default function DailyProductionPage() {
     
     // Scanner ফোকাস করুন
     setTimeout(() => {
-      if (scanInputRef.current) {
-        scanInputRef.current.focus();
-      }
+      scanInputRef.current?.focus();
     }, 100);
-  };
+  }, [tableData]);
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     // ✅ Only operator is required now
     const completeRows = tableData.filter(row => row.operator);
 
@@ -390,62 +408,56 @@ export default function DailyProductionPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [tableData, formData, hourlyData]);
 
-// Fetch dropdown data
-  useEffect(() => {
-    fetchDropdownData();
+  const fetchDropdownData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      
+      const [buyersRes, stylesRes] = await Promise.all([
+        fetch('/api/buyers'),
+        fetch('/api/styles')
+      ]);
+      
+      const buyersData = await buyersRes.json();
+      const stylesData = await stylesRes.json();
+      
+      // Buyers data check
+      if (buyersData && buyersData.success) {
+        setBuyers(buyersData.data || []);
+      } else if (buyersData && Array.isArray(buyersData)) {
+        setBuyers(buyersData);
+      } else {
+        console.error("Invalid buyers data format:", buyersData);
+        setBuyers([]);
+      }
+      
+      // Styles data check
+      if (stylesData && stylesData.success) {
+        setStyles(stylesData.data || []);
+      } else if (stylesData && Array.isArray(stylesData)) {
+        setStyles(stylesData);
+      } else {
+        console.error("Invalid styles data format:", stylesData);
+        setStyles([]);
+      }
+      
+    } catch (error) {
+      console.error("Error fetching dropdown data:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Error Loading Data",
+        text: "Failed to load buyers and styles",
+        timer: 2000,
+      });
+      setBuyers([]);
+      setStyles([]);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-
-  const fetchDropdownData = async () => {
-  try {
-    setIsLoading(true);
-    
-    const [buyersRes, stylesRes] = await Promise.all([
-      fetch('/api/buyers'),
-      fetch('/api/styles')
-    ]);
-    
-    const buyersData = await buyersRes.json();
-    const stylesData = await stylesRes.json();
-    
-    // Buyers data check
-    if (buyersData && buyersData.success) {
-      setBuyers(buyersData.data || []);
-    } else if (buyersData && Array.isArray(buyersData)) {
-      setBuyers(buyersData);
-    } else {
-      console.error("Invalid buyers data format:", buyersData);
-      setBuyers([]);
-    }
-    
-    // Styles data check
-    if (stylesData && stylesData.success) {
-      setStyles(stylesData.data || []);
-    } else if (stylesData && Array.isArray(stylesData)) {
-      setStyles(stylesData);
-    } else {
-      console.error("Invalid styles data format:", stylesData);
-      setStyles([]);
-    }
-    
-  } catch (error) {
-    console.error("Error fetching dropdown data:", error);
-    Swal.fire({
-      icon: "error",
-      title: "Error Loading Data",
-      text: "Failed to load buyers and styles",
-      timer: 2000,
-    });
-    setBuyers([]);
-    setStyles([]);
-  } finally {
-    setIsLoading(false);
-  }
-};
-
-  const fetchProcesses = async () => {
+  const fetchProcesses = useCallback(async () => {
     try {
       const res = await fetch('/api/processes');
       const data = await res.json();
@@ -453,9 +465,9 @@ export default function DailyProductionPage() {
     } catch (error) {
       console.error("Error fetching processes:", error);
     }
-  };
+  }, []);
 
-  const fetchExcelFiles = async () => {
+  const fetchExcelFiles = useCallback(async () => {
     try {
       setIsLoadingFiles(true);
       const res = await fetch('/api/excell-upload/files');
@@ -474,9 +486,9 @@ export default function DailyProductionPage() {
     } finally {
       setIsLoadingFiles(false);
     }
-  };
+  }, []);
 
-  const handleFileSelect = async (fileId) => {
+  const handleFileSelect = useCallback(async (fileId) => {
     setSelectedFileId(fileId);
     if (!fileId) {
       setBreakdownProcesses([]);
@@ -523,17 +535,15 @@ export default function DailyProductionPage() {
     } finally {
       setIsLoadingFiles(false);
     }
-  };
+  }, []);
 
-  const handleInputChange = (e) => {
+  const handleInputChange = useCallback((e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
+    updateFormData(name, value);
+  }, [updateFormData]);
 
-  const handleScanInputChange = (e) => {
+  // ✅ Debounced scan input handler
+  const handleScanInputChange = useCallback((e) => {
     const value = e.target.value;
     setScanInput(value);
     
@@ -541,19 +551,68 @@ export default function DailyProductionPage() {
       clearTimeout(scanTimeoutRef.current);
     }
     
-    if (value.length > 10 && (value.includes('\n') || value.includes('\r'))) {
-      const cleanValue = value.replace(/[\n\r]/g, '').trim();
-      processScannedData(cleanValue);
-    } else {
-      scanTimeoutRef.current = setTimeout(() => {
-        if (value.length > 5 && value !== lastScannedData) {
-          processScannedData(value);
-        }
-      }, );
-    }
-  };
+    // Use requestAnimationFrame for better performance
+    scanTimeoutRef.current = setTimeout(() => {
+      if (value.length > 5 && (value.includes('\n') || value.includes('\r'))) {
+        const cleanValue = value.replace(/[\n\r]/g, '').trim();
+        processScannedData(cleanValue);
+      } else if (value.length > 10) {
+        processScannedData(value.trim());
+      }
+    }, ); 
+  }, []);
 
-  const processScannedData = async (scannedData) => {
+  const identifyScanType = useCallback(async (data) => {
+    const cleanData = data.trim();
+    
+    if (cleanData.startsWith("TGS-") || cleanData.includes("OP-")) {
+      const operator = await fetchOperatorById(cleanData);
+      if (operator) {
+        return {
+          type: "operator",
+          id: operator._id,
+          operatorId: operator.operatorId,
+          name: operator.name,
+          designation: operator.designation,
+          allowedProcesses: operator.allowedProcesses
+        };
+      }
+    }
+    
+    const machine = await fetchMachineById(cleanData);
+    if (machine) {
+      return {
+        type: "machine",
+        id: machine._id,
+        uniqueId: machine.uniqueId,
+        machineType: machine.machineType?.name
+      };
+    }
+    
+    throw new Error("Could not identify scan type");
+  }, []);
+
+  const fetchOperatorById = useCallback(async (operatorId) => {
+    try {
+      const res = await fetch(`/api/operators/search?operatorId=${operatorId}`);
+      const operators = await res.json();
+      return operators[0];
+    } catch (error) {
+      return null;
+    }
+  }, []);
+
+  const fetchMachineById = useCallback(async (machineId) => {
+    try {
+      const res = await fetch(`/api/machines/search?uniqueId=${machineId}`);
+      const machines = await res.json();
+      return machines[0];
+    } catch (error) {
+      return null;
+    }
+  }, []);
+
+  const processScannedData = useCallback(async (scannedData) => {
     if (!scannedData) return;
     setScanInput("");
 
@@ -585,166 +644,118 @@ export default function DailyProductionPage() {
       } else if (parsedData.type === "machine") {
         await handleMachineScan(parsedData);
       }
-
-      setLastScannedData(scannedData);
     } catch (error) {
       console.error("Scan error details:", error);
-      setLastScannedData("");
-      Swal.fire({ icon: "error", title: "Scan Failed", text: error.message });
+      Swal.fire({ 
+        icon: "error", 
+        title: "Scan Failed", 
+        text: error.message,
+        timer: 1500
+      });
     }
-  };
+  }, [identifyScanType]);
 
-  const identifyScanType = async (data) => {
-    const cleanData = data.trim();
-    
-    if (cleanData.startsWith("TGS-") || cleanData.includes("OP-")) {
-      const operator = await fetchOperatorById(cleanData);
-      if (operator) {
-        return {
-          type: "operator",
-          id: operator._id,
-          operatorId: operator.operatorId,
-          name: operator.name,
-          designation: operator.designation,
-          allowedProcesses: operator.allowedProcesses
-        };
-      }
+  const handleOperatorScan = useCallback(async (operatorData) => {
+    const existingIndex = operatorMapRef.current.get(operatorData.operatorId);
+
+    // 🔁 Duplicate operator
+    if (existingIndex !== undefined) {
+      setHighlightedRow(existingIndex);
+      setTimeout(() => setHighlightedRow(null), 2000);
+      scanInputRef.current?.focus();
+      return;
     }
-    
-    const machine = await fetchMachineById(cleanData);
-    if (machine) {
-      return {
-        type: "machine",
-        id: machine._id,
-        uniqueId: machine.uniqueId,
-        machineType: machine.machineType?.name
+
+    // ➕ Find empty row (no loop)
+    setTableData(prev => {
+      const emptyIndex = prev.findIndex(r => !r.operator);
+      const targetIndex = emptyIndex !== -1 ? emptyIndex : prev.length;
+
+      const updated = [...prev];
+      updated[targetIndex] = {
+        ...(updated[targetIndex] || createEmptyRow()),
+        operator: {
+          _id: operatorData.id,
+          operatorId: operatorData.operatorId,
+          name: operatorData.name,
+          designation: operatorData.designation,
+        },
+        allowedProcesses: operatorData.allowedProcesses || {},
+        process: Object.keys(operatorData.allowedProcesses || {})[0] || "",
       };
-    }
-    
-    throw new Error("Could not identify scan type");
-  };
 
-  const fetchOperatorById = async (operatorId) => {
-    try {
-      const res = await fetch(`/api/operators/search?operatorId=${operatorId}`);
-      const operators = await res.json();
-      return operators[0];
-    } catch (error) {
-      return null;
-    }
-  };
+      // ✅ CACHE UPDATE
+      operatorMapRef.current.set(operatorData.operatorId, targetIndex);
 
-  const fetchMachineById = async (machineId) => {
-    try {
-      const res = await fetch(`/api/machines/search?uniqueId=${machineId}`);
-      const machines = await res.json();
-      return machines[0];
-    } catch (error) {
-      return null;
-    }
-  };
+      // Use microtask for showing alert to avoid blocking UI
+      Promise.resolve().then(() => {
+        Swal.fire({
+          icon: "success",
+          title: "Operator Added",
+          text: `${operatorData.name} → Row ${targetIndex + 1}`,
+          timer: 1200,
+          showConfirmButton: false,
+        });
+      });
 
-
-  const operatorMapRef = useRef(new Map());   // operatorId -> rowIndex
-  const handleOperatorScan = async (operatorData) => {
-  const existingIndex = operatorMapRef.current.get(operatorData.operatorId);
-
-  // 🔁 Duplicate operator
-  if (existingIndex !== undefined) {
-    setHighlightedRow(existingIndex);
-    setTimeout(() => setHighlightedRow(null), 2000);
-    scanInputRef.current?.focus();
-    return;
-  }
-
-  // ➕ Find empty row (no loop)
-  let targetIndex = tableData.length;
-
-  setTableData(prev => {
-    const updated = [...prev];
-    const emptyIndex = prev.findIndex(r => !r.operator);
-
-    targetIndex = emptyIndex !== -1 ? emptyIndex : prev.length;
-
-    updated[targetIndex] = {
-      ...(updated[targetIndex] || createEmptyRow()),
-      operator: {
-        _id: operatorData.id,
-        operatorId: operatorData.operatorId,
-        name: operatorData.name,
-        designation: operatorData.designation,
-      },
-      allowedProcesses: operatorData.allowedProcesses || {},
-      process: Object.keys(operatorData.allowedProcesses || {})[0] || "",
-    };
-
-    return updated;
-  });
-
-  // ✅ CACHE UPDATE (🔥 KEY PART)
-  operatorMapRef.current.set(operatorData.operatorId, targetIndex);
-
-  Swal.fire({
-    icon: "success",
-    title: "Operator Added",
-    text: `${operatorData.name} → Row ${targetIndex + 1}`,
-    timer: 1200,
-    showConfirmButton: false,
-  });
-};
-
-  const machineMapRef = useRef(new Map());    // uniqueMachine -> rowIndex
-  const handleMachineScan = async (machineData) => {
-  const existingIndex = machineMapRef.current.get(machineData.uniqueId);
-
-  // 🔁 Machine already used
-  if (existingIndex !== undefined) {
-    Swal.fire({
-      icon: "warning",
-      title: "Machine In Use",
-      text: `Already assigned to row ${existingIndex + 1}`,
-      timer: 1500,
-      showConfirmButton: false,
+      return updated;
     });
-    scanInputRef.current?.focus();
-    return;
-  }
+  }, [createEmptyRow]);
 
-  let targetIndex = selectedRowForMachine;
+  const handleMachineScan = useCallback(async (machineData) => {
+    const existingIndex = machineMapRef.current.get(machineData.uniqueId);
 
-  if (targetIndex === null || !tableData[targetIndex]?.operator) {
-    Swal.fire("Error", "Select a row with operator first", "error");
-    return;
-  }
+    // 🔁 Machine already used
+    if (existingIndex !== undefined) {
+      Swal.fire({
+        icon: "warning",
+        title: "Machine In Use",
+        text: `Already assigned to row ${existingIndex + 1}`,
+        timer: 1500,
+        showConfirmButton: false,
+      });
+      scanInputRef.current?.focus();
+      return;
+    }
 
-  setTableData(prev => {
-    const updated = [...prev];
+    let targetIndex = selectedRowForMachine;
 
-    updated[targetIndex] = {
-      ...updated[targetIndex],
-      uniqueMachine: machineData.uniqueId,
-      scannedMachine: machineData.uniqueId,
-      machineType: machineData.machineType,
-    };
+    if (targetIndex === null || !tableData[targetIndex]?.operator) {
+      Swal.fire("Error", "Select a row with operator first", "error");
+      return;
+    }
 
-    return updated;
-  });
+    setTableData(prev => {
+      const updated = [...prev];
 
-  // ✅ CACHE UPDATE
-  machineMapRef.current.set(machineData.uniqueId, targetIndex);
-  setSelectedRowForMachine(null);
+      updated[targetIndex] = {
+        ...updated[targetIndex],
+        uniqueMachine: machineData.uniqueId,
+        scannedMachine: machineData.uniqueId,
+        machineType: machineData.machineType,
+      };
 
-  Swal.fire({
-    icon: "success",
-    title: "Machine Assigned",
-    text: `${machineData.uniqueId} → Row ${targetIndex + 1}`,
-    timer: 1200,
-    showConfirmButton: false,
-  });
-};
+      // ✅ CACHE UPDATE
+      machineMapRef.current.set(machineData.uniqueId, targetIndex);
 
+      // Use microtask for showing alert
+      Promise.resolve().then(() => {
+        Swal.fire({
+          icon: "success",
+          title: "Machine Assigned",
+          text: `${machineData.uniqueId} → Row ${targetIndex + 1}`,
+          timer: 1200,
+          showConfirmButton: false,
+        });
+      });
 
-  const handleRowChange = (rowIndex, field, value) => {
+      return updated;
+    });
+
+    setSelectedRowForMachine(null);
+  }, [selectedRowForMachine, tableData]);
+
+  const handleRowChange = useCallback((rowIndex, field, value) => {
     setTableData((prev) => {
       const updated = [...prev];
       
@@ -783,22 +794,22 @@ export default function DailyProductionPage() {
       
       return updated;
     });
-  };
+  }, [processes, originalBreakdownProcesses]);
 
-  const calculateTarget = (smv) => {
+  const calculateTarget = useCallback((smv) => {
     if (!smv || smv <= 0) return "";
     return Math.round(60 / smv);
-  };
+  }, []);
 
-  const getBreakdownSelectionCount = (processName) => {
+  const getBreakdownSelectionCount = useCallback((processName) => {
     return tableData.filter(row => row.breakdownProcess === processName).length;
-  };
+  }, [tableData]);
 
-  const isBreakdownDisabled = (bp) => {
+  const isBreakdownDisabled = useCallback((bp) => {
     const selectedCount = getBreakdownSelectionCount(bp.process);
     const manpower = parseInt(bp.manPower) || 1;
     return selectedCount >= manpower;
-  };
+  }, [getBreakdownSelectionCount]);
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
@@ -828,9 +839,7 @@ export default function DailyProductionPage() {
             onScanBlur={() => setScanFocus(false)}
             onClearScan={() => {
               setScanInput("");
-              if (scanInputRef.current) {
-                scanInputRef.current.focus();
-              }
+              scanInputRef.current?.focus();
             }}
           />
         )}
@@ -908,5 +917,3 @@ export default function DailyProductionPage() {
     </div>
   );
 }
-
-
