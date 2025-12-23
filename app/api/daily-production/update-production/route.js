@@ -5,6 +5,7 @@ import { connectDB } from '@/lib/db';
 import DailyProduction from '@/models/DailyProduction';
 
 // ১. ডেটা খোঁজার এপিআই (GET)
+// ১. ডেটা খোঁজার এপিআই (GET)
 export async function GET(request) {
   try {
     await connectDB();
@@ -32,28 +33,41 @@ export async function GET(request) {
     .sort({ rowNo: 1 })
     .lean();
 
-    return NextResponse.json({ success: true, data: productions });
+    // Transform the data - ensure hourlyProduction is properly structured
+    const transformedProductions = productions.map(prod => ({
+      ...prod,
+      // Ensure hourlyProduction is always an array
+      hourlyProduction: Array.isArray(prod.hourlyProduction) 
+        ? prod.hourlyProduction 
+        : [],
+      // Extract operator information
+      operatorName: prod.operator?.name || prod.operator || '',
+      operatorId: prod.operator?._id || prod.operator || ''
+    }));
+
+    return NextResponse.json({ 
+      success: true, 
+      data: transformedProductions 
+    });
   } catch (error) {
     return NextResponse.json({ message: error.message }, { status: 500 });
   }
 }
 
 // ২. ডেটা আপডেট করার এপিআই (PUT)
+// ২. ডেটা আপডেট করার এপিআই (PUT)
 export async function PUT(request) {
   try {
     await connectDB();
-    const body = await request.json(); // এটি একটি অ্যারে হতে হবে (Array of objects)
+    const body = await request.json();
 
     if (!Array.isArray(body)) {
       return NextResponse.json({ message: "Data must be an array" }, { status: 400 });
     }
 
-    /* একসাথে অনেকগুলো ডকুমেন্ট আপডেট করার জন্য bulkWrite সবচেয়ে ফাস্ট।
-       এটি ডাটাবেসে মাত্র একবার হিট করে সব ডেটা আপডেট করে ফেলে।
-    */
     const updateOperations = body.map((item) => ({
       updateOne: {
-        filter: { _id: item._id }, // প্রতিটা আইটেমের ইউনিক ID দিয়ে ফিল্টার করবে
+        filter: { _id: item._id },
         update: { 
           $set: {
             process: item.process,
@@ -62,7 +76,10 @@ export async function PUT(request) {
             smv: item.smv,
             target: item.target,
             workAs: item.workAs,
-            hourlyProduction: item.hourlyProduction,
+            // Ensure hourlyProduction is always an array
+            hourlyProduction: Array.isArray(item.hourlyProduction) 
+              ? item.hourlyProduction 
+              : [],
             updatedAt: new Date()
           } 
         }

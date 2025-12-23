@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Search, Save, Loader2, RefreshCw, ChevronDown, X } from 'lucide-react';
+import { Search, Save, Loader2, RefreshCw, ChevronDown, X, Plus, Minus } from 'lucide-react';
 
 export default function DailyProductionPage() {
   const [searchParams, setSearchParams] = useState({
@@ -33,10 +33,10 @@ export default function DailyProductionPage() {
   const [machineSearch, setMachineSearch] = useState('');
   const [processSearch, setProcessSearch] = useState('');
 
-  // Refs for dropdown containers
-  const breakdownDropdownRefs = useRef([]);
-  const machineDropdownRefs = useRef([]);
-  const processDropdownRefs = useRef([]);
+  // Hours data state
+  const [hours, setHours] = useState([]);
+  const [filteredHours, setFilteredHours] = useState([]);
+  const [expandedRows, setExpandedRows] = useState({});
 
   // Sample data for floors and lines
   const sampleFloors = ['POODO', 'SEWING', 'CUTTING', 'FINISHING'];
@@ -65,12 +65,106 @@ export default function DailyProductionPage() {
     process.machineType?.toLowerCase().includes(processSearch.toLowerCase())
   );
 
-  // Initialize refs arrays
-  useEffect(() => {
-    breakdownDropdownRefs.current = breakdownDropdownRefs.current.slice(0, productionData.length);
-    machineDropdownRefs.current = machineDropdownRefs.current.slice(0, productionData.length);
-    processDropdownRefs.current = processDropdownRefs.current.slice(0, productionData.length);
-  }, [productionData]);
+  // Handle hourly production input change - convert to array format
+  const handleHourlyProductionChange = (rowIndex, hourName, value) => {
+    const updatedData = [...productionData];
+    
+    // Ensure hourlyProduction is an array
+    if (!Array.isArray(updatedData[rowIndex].hourlyProduction)) {
+      updatedData[rowIndex].hourlyProduction = [];
+    }
+    
+    // Find if hour already exists
+    const hourIndex = updatedData[rowIndex].hourlyProduction.findIndex(
+      hp => hp.hour === hourName
+    );
+    
+    if (hourIndex >= 0) {
+      // Update existing hour
+      if (value === '' || value === null) {
+        // Remove if empty
+        updatedData[rowIndex].hourlyProduction.splice(hourIndex, 1);
+      } else {
+        updatedData[rowIndex].hourlyProduction[hourIndex].productionCount = Number(value);
+      }
+    } else if (value !== '' && value !== null) {
+      // Add new hour entry
+      updatedData[rowIndex].hourlyProduction.push({
+        hour: hourName,
+        productionCount: Number(value),
+        defects: []
+      });
+    }
+    
+    setProductionData(updatedData);
+  };
+
+  // Get hourly production value for a specific hour
+  const getHourlyValue = (rowIndex, hourName) => {
+    const row = productionData[rowIndex];
+    if (!row || !Array.isArray(row.hourlyProduction)) return '';
+    
+    const hourEntry = row.hourlyProduction.find(hp => hp.hour === hourName);
+    return hourEntry ? hourEntry.productionCount.toString() : '';
+  };
+
+  // Calculate total for a row - updated for array format
+  const calculateRowTotal = (rowIndex) => {
+    const row = productionData[rowIndex];
+    if (!row || !Array.isArray(row.hourlyProduction)) return 0;
+    
+    return row.hourlyProduction.reduce((total, hp) => {
+      return total + (hp.productionCount || 0);
+    }, 0);
+  };
+
+  // Fetch hours data based on selected floor
+  const fetchHoursByFloor = async (floorName) => {
+    if (!floorName) return;
+    
+    try {
+      const response = await fetch(`/api/hours?floor=${floorName}`);
+      if (!response.ok) throw new Error('Failed to fetch hours');
+      
+      const data = await response.json();
+      
+      // Sort hours by time order (AM first, then PM in ascending order)
+      const sortedHours = data.sort((a, b) => {
+        // Extract time and period
+        const getTimeValue = (hourStr) => {
+          const [timeRange, period] = hourStr.split(' ');
+          const [start] = timeRange.split('-');
+          let hour = parseInt(start);
+          
+          // Convert to 24-hour format for comparison
+          if (period === 'PM' && hour !== 12) hour += 12;
+          if (period === 'AM' && hour === 12) hour = 0;
+          
+          return hour;
+        };
+        
+        return getTimeValue(a.hour) - getTimeValue(b.hour);
+      });
+      
+      // Limit to 15 hours maximum
+      const limitedHours = sortedHours.slice(0, 15);
+      
+      setHours(limitedHours);
+      setFilteredHours(limitedHours);
+    } catch (error) {
+      console.error('Error fetching hours:', error);
+      setHours([]);
+      setFilteredHours([]);
+    }
+  };
+
+  // Toggle row expansion
+  const toggleRowExpansion = (rowIndex) => {
+    setExpandedRows(prev => ({
+      ...prev,
+      [rowIndex]: !prev[rowIndex]
+    }));
+  };
 
   // Fetch uploaded files
   const fetchUploadedFiles = async () => {
@@ -156,6 +250,9 @@ export default function DailyProductionPage() {
         [field]: value,
         line: ''
       }));
+      
+      // Fetch hours for the selected floor
+      fetchHoursByFloor(value);
     }
   };
 
@@ -182,23 +279,37 @@ export default function DailyProductionPage() {
       if (result.success) {
         // Process operator data if it's an object
         const processedData = result.data.map(item => {
+          // Ensure hourlyProduction is always an array
+          const hourlyProduction = Array.isArray(item.hourlyProduction) 
+            ? item.hourlyProduction 
+            : [];
+          
           // Check if operator is an object and extract name
           if (item.operator && typeof item.operator === 'object') {
             return {
               ...item,
               operatorName: item.operator.name || item.operator.operatorName || '',
-              operatorId: item.operator._id || item.operator.operatorId || ''
+              operatorId: item.operator._id || item.operator.operatorId || '',
+              hourlyProduction: hourlyProduction
             };
           }
           // If operator is already a string
           return {
             ...item,
             operatorName: item.operator || '',
-            operatorId: ''
+            operatorId: '',
+            hourlyProduction: hourlyProduction
           };
         });
         
         setProductionData(processedData);
+        
+        // ডিফল্টভাবে সব row expand করে রাখো
+        const initialExpandedRows = {};
+        processedData.forEach((_, index) => {
+          initialExpandedRows[index] = true; // সব row ডিফল্টভাবে open থাকবে
+        });
+        setExpandedRows(initialExpandedRows);
         
         if (result.data && result.data.length === 0) {
           setMessage({ type: 'info', text: 'No data found for the selected criteria' });
@@ -213,13 +324,7 @@ export default function DailyProductionPage() {
     }
   };
 
-  // Handle form submission
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    await fetchProductionData();
-  };
-
-  // Update production data
+  // Prepare data for API submission
   const handleUpdate = async () => {
     if (productionData.length === 0) {
       setMessage({ type: 'error', text: 'No data to update' });
@@ -230,8 +335,18 @@ export default function DailyProductionPage() {
     setMessage({ type: '', text: '' });
 
     try {
-      // Prepare data for API - convert back to original structure
+      // Prepare data for API - ensure hourlyProduction is an array
       const apiData = productionData.map(item => {
+        // Ensure hourlyProduction is always an array
+        const hourlyProduction = Array.isArray(item.hourlyProduction) 
+          ? item.hourlyProduction 
+          : [];
+        
+        // Filter out empty entries
+        const filteredHourlyProduction = hourlyProduction.filter(
+          hp => hp.productionCount > 0 || (hp.defects && hp.defects.length > 0)
+        );
+
         const apiItem = {
           _id: item._id,
           process: item.process,
@@ -240,7 +355,7 @@ export default function DailyProductionPage() {
           smv: item.smv,
           target: item.target,
           workAs: item.workAs,
-          hourlyProduction: item.hourlyProduction
+          hourlyProduction: filteredHourlyProduction  // Send as array
         };
         
         // If operator was originally an object, keep the operatorId
@@ -279,6 +394,12 @@ export default function DailyProductionPage() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // Handle form submission
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    await fetchProductionData();
   };
 
   // Handle input changes in table
@@ -410,10 +531,9 @@ export default function DailyProductionPage() {
     }
   };
 
-  // Close dropdown when clicking outside (simplified version)
+  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // Check if click is outside all dropdown containers
       const isOutside = !event.target.closest('.dropdown-container');
       
       if (isOutside) {
@@ -565,7 +685,7 @@ export default function DailyProductionPage() {
 
         {/* Production Data Table */}
         {productionData.length > 0 && (
-          <div className="bg-white rounded-xl shadow-md overflow-hidden">
+          <div className="bg-white rounded-xl shadow-md overflow-hidden mb-8">
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
               <div>
                 <h2 className="text-xl font-semibold text-gray-800">
@@ -573,6 +693,7 @@ export default function DailyProductionPage() {
                 </h2>
                 <p className="text-gray-600 text-sm">
                   Showing {productionData.length} records for {searchParams.date}
+                  {hours.length > 0 && ` • ${hours.length} hours available`}
                 </p>
               </div>
               
@@ -594,8 +715,8 @@ export default function DailyProductionPage() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Row No
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+                      #
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Operator
@@ -619,302 +740,372 @@ export default function DailyProductionPage() {
                       Target
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Hourly Production
+                      Total
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+                      Hours
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {productionData.map((item, index) => (
-                    <tr key={item._id || index} className="hover:bg-gray-50 transition">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {item.rowNo || index + 1}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {/* {item.operatorName || item.operator || 'N/A'}- */}{item.operator.operatorId} 
-                      </td>
-                      
-                      {/* Machine Cell with Dropdown */}
-                      <td className="px-6 py-4 relative">
-                        <div className="flex items-center gap-2 dropdown-container">
-                          <input
-                            type="text"
-                            
-                            value={item.uniqueMachine || ''}
-                            onChange={(e) => handleInputChange(index, 'uniqueMachine', e.target.value)}
-                            className="w-32 text-[13px] px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
-                            placeholder="Type or select from dropdown"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => toggleDropdown('machine', index)}
-                            className="p-1.5 border border-gray-300 rounded-md hover:bg-gray-50 transition"
-                          >
-                            <ChevronDown className="w-4 h-4 text-gray-500" />
-                          </button>
-                        </div>
+                    <>
+                      <tr key={item._id || index} className="hover:bg-gray-50 transition">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {index + 1}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                          {item.operatorName || item.operator || 'N/A'}
+                        </td>
                         
-                        {/* Machine Dropdown with Search */}
-                        {showMachineDropdown === index && (
-                          <div className="absolute z-50 mt-1 w-80 bg-white border border-gray-200 rounded-lg shadow-xl dropdown-container">
-                            <div className="p-2 border-b border-gray-100">
-                              <div className="relative">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                <input
-                                  type="text"
-                                  value={machineSearch}
-                                  onChange={(e) => setMachineSearch(e.target.value)}
-                                  placeholder="Search machine by ID, status, or line..."
-                                  className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                  autoFocus
-                                />
-                                {machineSearch && (
-                                  <button
-                                    onClick={() => clearSearch('machine')}
-                                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                                  >
-                                    <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
-                                  </button>
-                                )}
-                              </div>
-                              <div className="mt-1 text-xs text-gray-500 flex justify-between">
-                                <span>{filteredMachines.length} machines found</span>
-                                <span>Click outside to close</span>
-                              </div>
-                            </div>
-                            <div className="max-h-60 overflow-y-auto">
-                              {filteredMachines.length === 0 ? (
-                                <div className="p-4 text-center text-sm text-gray-500">
-                                  No machines found matching {machineSearch}
-                                </div>
-                              ) : (
-                                filteredMachines.map((machine) => (
-                                  <button
-                                    key={machine._id}
-                                    type="button"
-                                    onClick={() => handleMachineSelect(index, machine._id)}
-                                    className="w-full text-left px-3 py-3 text-sm hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition dropdown-container"
-                                  >
-                                    <div className="font-medium text-gray-900">{machine.uniqueId}</div>
-                                    <div className="flex justify-between mt-1">
-                                      <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                        machine.currentStatus === 'idle' 
-                                          ? 'bg-green-100 text-green-800'
-                                          : 'bg-yellow-100 text-yellow-800'
-                                      }`}>
-                                        {machine.currentStatus}
-                                      </span>
-                                      {machine.lastLocation && (
-                                        <span className="text-xs text-gray-500">
-                                          {machine.lastLocation.line}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </button>
-                                ))
-                              )}
-                            </div>
+                        {/* Machine Cell with Dropdown */}
+                        <td className="px-6 py-4 relative">
+                          <div className="flex items-center gap-2 dropdown-container">
+                            <input
+                              type="text"
+                              value={item.uniqueMachine || ''}
+                              onChange={(e) => handleInputChange(index, 'uniqueMachine', e.target.value)}
+                              className="w-32 text-[13px] px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
+                              placeholder="Type or select"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => toggleDropdown('machine', index)}
+                              className="p-1.5 border border-gray-300 rounded-md hover:bg-gray-50 transition"
+                            >
+                              <ChevronDown className="w-4 h-4 text-gray-500" />
+                            </button>
                           </div>
-                        )}
-                      </td>
-                      
-                      {/* Process Cell with Dropdown */}
-                      <td className="px-6 py-4 relative">
-                        <div className="flex items-center gap-2 dropdown-container">
-                          <input
-                            type="text"
-                            value={item.process || ''}
-                            onChange={(e) => handleInputChange(index, 'process', e.target.value)}
-                            className="w-32 text-[13px] px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
-                            placeholder="Type or select from dropdown"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => toggleDropdown('process', index)}
-                            className="p-1.5 border border-gray-300 rounded-md hover:bg-gray-50 transition"
-                          >
-                            <ChevronDown className="w-4 h-4 text-gray-500" />
-                          </button>
-                        </div>
-                        
-                        {/* Process Dropdown with Search */}
-                        {showProcessDropdown === index && (
-                          <div className="absolute z-50 mt-1 w-96 bg-white border border-gray-200 rounded-lg shadow-xl dropdown-container">
-                            <div className="p-2 border-b border-gray-100">
-                              <div className="relative">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                <input
-                                  type="text"
-                                  value={processSearch}
-                                  onChange={(e) => setProcessSearch(e.target.value)}
-                                  placeholder="Search process by name, code, or machine type..."
-                                  className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                  autoFocus
-                                />
-                                {processSearch && (
-                                  <button
-                                    onClick={() => clearSearch('process')}
-                                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                                  >
-                                    <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
-                                  </button>
-                                )}
-                              </div>
-                              <div className="mt-1 text-xs text-gray-500 flex justify-between">
-                                <span>{filteredProcesses.length} processes found</span>
-                                <span>Click outside to close</span>
-                              </div>
-                            </div>
-                            <div className="max-h-60 overflow-y-auto">
-                              {filteredProcesses.length === 0 ? (
-                                <div className="p-4 text-center text-sm text-gray-500">
-                                  No processes found matching {processSearch}
+                          
+                          {/* Machine Dropdown with Search */}
+                          {showMachineDropdown === index && (
+                            <div className="absolute z-50 mt-1 w-80 bg-white border border-gray-200 rounded-lg shadow-xl dropdown-container">
+                              <div className="p-2 border-b border-gray-100">
+                                <div className="relative">
+                                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                  <input
+                                    type="text"
+                                    value={machineSearch}
+                                    onChange={(e) => setMachineSearch(e.target.value)}
+                                    placeholder="Search machine by ID, status, or line..."
+                                    className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    autoFocus
+                                  />
+                                  {machineSearch && (
+                                    <button
+                                      onClick={() => clearSearch('machine')}
+                                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                                    >
+                                      <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                                    </button>
+                                  )}
                                 </div>
-                              ) : (
-                                filteredProcesses.map((process) => (
-                                  <button
-                                    key={process._id}
-                                    type="button"
-                                    onClick={() => handleProcessSelect(index, process._id)}
-                                    className="w-full text-left px-3 py-3 text-sm hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition dropdown-container"
-                                  >
-                                    <div className="font-medium text-gray-900">{process.name}</div>
-                                    <div className="flex justify-between items-center mt-1">
-                                      <span className="text-xs text-gray-600">{process.code}</span>
-                                      <div className="flex items-center gap-3">
-                                        <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-800 rounded">
-                                          {process.machineType}
+                                <div className="mt-1 text-xs text-gray-500 flex justify-between">
+                                  <span>{filteredMachines.length} machines found</span>
+                                  <span>Click outside to close</span>
+                                </div>
+                              </div>
+                              <div className="max-h-60 overflow-y-auto">
+                                {filteredMachines.length === 0 ? (
+                                  <div className="p-4 text-center text-sm text-gray-500">
+                                    No machines found matching {machineSearch}
+                                  </div>
+                                ) : (
+                                  filteredMachines.map((machine) => (
+                                    <button
+                                      key={machine._id}
+                                      type="button"
+                                      onClick={() => handleMachineSelect(index, machine._id)}
+                                      className="w-full text-left px-3 py-3 text-sm hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition dropdown-container"
+                                    >
+                                      <div className="font-medium text-gray-900">{machine.uniqueId}</div>
+                                      <div className="flex justify-between mt-1">
+                                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                          machine.currentStatus === 'idle' 
+                                            ? 'bg-green-100 text-green-800'
+                                            : 'bg-yellow-100 text-yellow-800'
+                                        }`}>
+                                          {machine.currentStatus}
                                         </span>
-                                        <span className="text-xs font-medium text-blue-600">
-                                          SMV: {process.smv}
-                                        </span>
+                                        {machine.lastLocation && (
+                                          <span className="text-xs text-gray-500">
+                                            {machine.lastLocation.line}
+                                          </span>
+                                        )}
                                       </div>
-                                    </div>
-                                  </button>
-                                ))
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </td>
-                      
-                      {/* Breakdown Process Cell with Dropdown */}
-                      <td className="px-6 py-4 relative">
-                        <div className="flex items-center gap-2 dropdown-container">
-                          <input
-                            type="text"
-                            value={item.breakdownProcess || ''}
-                            onChange={(e) => handleInputChange(index, 'breakdownProcess', e.target.value)}
-                            className="w-32 text-[13px]  px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
-                            placeholder="Type or select from excel file"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => toggleDropdown('breakdown', index)}
-                            className="p-1.5 border border-gray-300 rounded-md hover:bg-gray-50 transition"
-                            disabled={!fileData || !fileData.data}
-                          >
-                            <ChevronDown className="w-4 h-4 text-gray-500" />
-                          </button>
-                        </div>
-                        
-                        {/* Breakdown Process Dropdown with Search */}
-                        {showBreakdownDropdown === index && fileData && fileData.data && (
-                          <div className="absolute z-50 mt-1 w-96 bg-white border border-gray-200 rounded-lg shadow-xl dropdown-container">
-                            <div className="p-2 border-b border-gray-100">
-                              <div className="mb-1 text-xs font-medium text-gray-700">
-                                From: {fileData.fileName}
-                              </div>
-                              <div className="relative">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                <input
-                                  type="text"
-                                  value={breakdownSearch}
-                                  onChange={(e) => setBreakdownSearch(e.target.value)}
-                                  placeholder="Search process, machine type, or SMV..."
-                                  className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                  autoFocus
-                                />
-                                {breakdownSearch && (
-                                  <button
-                                    onClick={() => clearSearch('breakdown')}
-                                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                                  >
-                                    <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
-                                  </button>
+                                    </button>
+                                  ))
                                 )}
                               </div>
-                              <div className="mt-1 text-xs text-gray-500 flex justify-between">
-                                <span>{filteredFileData.length} of {fileData.data.length} processes</span>
-                                <span>Click outside to close</span>
+                            </div>
+                          )}
+                        </td>
+                        
+                        {/* Process Cell with Dropdown */}
+                        <td className="px-6 py-4 relative">
+                          <div className="flex items-center gap-2 dropdown-container">
+                            <input
+                              type="text"
+                              value={item.process || ''}
+                              onChange={(e) => handleInputChange(index, 'process', e.target.value)}
+                              className="w-32 text-[13px] px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
+                              placeholder="Type or select"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => toggleDropdown('process', index)}
+                              className="p-1.5 border border-gray-300 rounded-md hover:bg-gray-50 transition"
+                            >
+                              <ChevronDown className="w-4 h-4 text-gray-500" />
+                            </button>
+                          </div>
+                          
+                          {/* Process Dropdown with Search */}
+                          {showProcessDropdown === index && (
+                            <div className="absolute z-50 mt-1 w-96 bg-white border border-gray-200 rounded-lg shadow-xl dropdown-container">
+                              <div className="p-2 border-b border-gray-100">
+                                <div className="relative">
+                                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                  <input
+                                    type="text"
+                                    value={processSearch}
+                                    onChange={(e) => setProcessSearch(e.target.value)}
+                                    placeholder="Search process by name, code, or machine type..."
+                                    className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    autoFocus
+                                  />
+                                  {processSearch && (
+                                    <button
+                                      onClick={() => clearSearch('process')}
+                                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                                    >
+                                      <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                                    </button>
+                                  )}
+                                </div>
+                                <div className="mt-1 text-xs text-gray-500 flex justify-between">
+                                  <span>{filteredProcesses.length} processes found</span>
+                                  <span>Click outside to close</span>
+                                </div>
+                              </div>
+                              <div className="max-h-60 overflow-y-auto">
+                                {filteredProcesses.length === 0 ? (
+                                  <div className="p-4 text-center text-sm text-gray-500">
+                                    No processes found matching {processSearch}
+                                  </div>
+                                ) : (
+                                  filteredProcesses.map((process) => (
+                                    <button
+                                      key={process._id}
+                                      type="button"
+                                      onClick={() => handleProcessSelect(index, process._id)}
+                                      className="w-full text-left px-3 py-3 text-sm hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition dropdown-container"
+                                    >
+                                      <div className="font-medium text-gray-900">{process.name}</div>
+                                      <div className="flex justify-between items-center mt-1">
+                                        <span className="text-xs text-gray-600">{process.code}</span>
+                                        <div className="flex items-center gap-3">
+                                          <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-800 rounded">
+                                            {process.machineType}
+                                          </span>
+                                          <span className="text-xs font-medium text-blue-600">
+                                            SMV: {process.smv}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </button>
+                                  ))
+                                )}
                               </div>
                             </div>
-                            <div className="max-h-60 overflow-y-auto">
-                              {filteredFileData.length === 0 ? (
-                                <div className="p-4 text-center text-sm text-gray-500">
-                                  No processes found matching {breakdownSearch}
-                                </div>
-                              ) : (
-                                filteredFileData.map((excelProcess, idx) => (
-                                  <button
-                                    key={excelProcess._id || idx}
-                                    type="button"
-                                    onClick={() => handleBreakdownSelect(index, excelProcess)}
-                                    className="w-full text-left px-3 py-3 text-sm hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition dropdown-container"
-                                  >
-                                    <div className="font-medium text-gray-900">
-                                      {excelProcess.sno}. {excelProcess.process}
-                                    </div>
-                                    <div className="flex justify-between items-center mt-1">
-                                      <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-800 rounded">
-                                        {excelProcess.mcTypeHp}
-                                      </span>
-                                      <div className="flex items-center gap-3">
-                                        <span className="text-xs text-gray-600">
-                                          Capacity: {excelProcess.capacity}
-                                        </span>
-                                        <span className="text-xs font-medium text-green-600">
-                                          SMV: {excelProcess.smv}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </button>
-                                ))
-                              )}
-                            </div>
+                          )}
+                        </td>
+                        
+                        {/* Breakdown Process Cell with Dropdown */}
+                        <td className="px-6 py-4 relative">
+                          <div className="flex items-center gap-2 dropdown-container">
+                            <input
+                              type="text"
+                              value={item.breakdownProcess || ''}
+                              onChange={(e) => handleInputChange(index, 'breakdownProcess', e.target.value)}
+                              className="w-32 text-[13px]  px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
+                              placeholder="Type or select"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => toggleDropdown('breakdown', index)}
+                              className="p-1.5 border border-gray-300 rounded-md hover:bg-gray-50 transition"
+                              disabled={!fileData || !fileData.data}
+                            >
+                              <ChevronDown className="w-4 h-4 text-gray-500" />
+                            </button>
                           </div>
-                        )}
-                      </td>
+                          
+                          {/* Breakdown Process Dropdown with Search */}
+                          {showBreakdownDropdown === index && fileData && fileData.data && (
+                            <div className="absolute z-50 mt-1 w-96 bg-white border border-gray-200 rounded-lg shadow-xl dropdown-container">
+                              <div className="p-2 border-b border-gray-100">
+                                <div className="mb-1 text-xs font-medium text-gray-700">
+                                  From: {fileData.fileName}
+                                </div>
+                                <div className="relative">
+                                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                  <input
+                                    type="text"
+                                    value={breakdownSearch}
+                                    onChange={(e) => setBreakdownSearch(e.target.value)}
+                                    placeholder="Search process, machine type, or SMV..."
+                                    className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    autoFocus
+                                  />
+                                  {breakdownSearch && (
+                                    <button
+                                      onClick={() => clearSearch('breakdown')}
+                                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                                    >
+                                      <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                                    </button>
+                                  )}
+                                </div>
+                                <div className="mt-1 text-xs text-gray-500 flex justify-between">
+                                  <span>{filteredFileData.length} of {fileData.data.length} processes</span>
+                                  <span>Click outside to close</span>
+                                </div>
+                              </div>
+                              <div className="max-h-60 overflow-y-auto">
+                                {filteredFileData.length === 0 ? (
+                                  <div className="p-4 text-center text-sm text-gray-500">
+                                    No processes found matching {breakdownSearch}
+                                  </div>
+                                ) : (
+                                  filteredFileData.map((excelProcess, idx) => (
+                                    <button
+                                      key={excelProcess._id || idx}
+                                      type="button"
+                                      onClick={() => handleBreakdownSelect(index, excelProcess)}
+                                      className="w-full text-left px-3 py-3 text-sm hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition dropdown-container"
+                                    >
+                                      <div className="font-medium text-gray-900">
+                                        {excelProcess.sno}. {excelProcess.process}
+                                      </div>
+                                      <div className="flex justify-between items-center mt-1">
+                                        <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-800 rounded">
+                                          {excelProcess.mcTypeHp}
+                                        </span>
+                                        <div className="flex items-center gap-3">
+                                          <span className="text-xs text-gray-600">
+                                            Capacity: {excelProcess.capacity}
+                                          </span>
+                                          <span className="text-xs font-medium text-green-600">
+                                            SMV: {excelProcess.smv}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </button>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                        
+                        <td className="px-6 py-4">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.smv || ''}
+                            onChange={(e) => handleInputChange(index, 'smv', e.target.value)}
+                            className="w-20 px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
+                          />
+                        </td>
+                        <td className="px-6 py-4">
+                          <input
+                            type="text"
+                            value={item.workAs || ''}
+                            onChange={(e) => handleInputChange(index, 'workAs', e.target.value)}
+                            className="w-24 px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
+                          />
+                        </td>
+                        <td className="px-6 py-4">
+                          <input
+                            type="number"
+                            value={item.target || ''}
+                            onChange={(e) => handleInputChange(index, 'target', e.target.value)}
+                            className="w-20 px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {calculateRowTotal(index)}
+                        </td>
+                        <td className="px-6 py-4">
+                          <button
+                            type="button"
+                            onClick={() => toggleRowExpansion(index)}
+                            className="flex items-center gap-1 px-3 py-1.5 text-sm bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition"
+                          >
+                            {expandedRows[index] ? (
+                              <>
+                                <Minus className="w-4 h-4" />
+                                <span>Hide Hours</span>
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="w-4 h-4" />
+                                <span>Add Hours</span>
+                              </>
+                            )}
+                          </button>
+                        </td>
+                      </tr>
                       
-                      <td className="px-6 py-4">
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={item.smv || ''}
-                          onChange={(e) => handleInputChange(index, 'smv', e.target.value)}
-                          className="w-24 px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
-                        />
-                      </td>
-                      <td className="px-6 py-4">
-                        <input
-                          type="text"
-                          value={item.workAs || ''}
-                          onChange={(e) => handleInputChange(index, 'workAs', e.target.value)}
-                          className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
-                        />
-                      </td>
-                      <td className="px-6 py-4">
-                        <input
-                          type="number"
-                          value={item.target || ''}
-                          onChange={(e) => handleInputChange(index, 'target', e.target.value)}
-                          className="w-24 px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
-                        />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {/* Hourly Production (calculated automatically) */}
-                        {/* {item.smv && item.target ? Math.round(item.target / item.smv) : 'N/A'} */}
-                      </td>
-                    </tr>
+                      {/* Expanded Hourly Production Section - ডিফল্টভাবে দেখাবে */}
+                      {(expandedRows[index] === undefined || expandedRows[index]) && hours.length > 0 && (
+                        <tr className="bg-blue-50">
+                          <td colSpan="10" className="px-6 py-4">
+                            <div className="mb-2">
+                              <h3 className="text-sm font-medium text-gray-700 mb-3">
+                                Hourly Production for Row {index + 1} - {item.operatorName || item.operator || 'N/A'}
+                              </h3>
+                              <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 xl:grid-cols-10 2xl:grid-cols-15 gap-3">
+                                {hours.map((hour) => (
+                                  <div key={hour._id} className="space-y-1">
+                                    <label className="block text-xs font-medium text-gray-600">
+                                      {hour.hour}
+                                    </label>
+                                    <input
+                                      type="number"
+                                      value={getHourlyValue(index, hour.hour)}
+                                      onChange={(e) => handleHourlyProductionChange(index, hour.hour, e.target.value)}
+                                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                                      placeholder="Qty"
+                                      min="0"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-center mt-3 pt-3 border-t border-blue-200">
+                              <div className="text-sm text-gray-600">
+                                <span className="font-medium">Total Production: </span>
+                                <span className="font-bold text-blue-700">{calculateRowTotal(index)}</span>
+                                <span className="ml-4 text-xs text-gray-500">
+                                  {Array.isArray(item.hourlyProduction) && item.hourlyProduction.length > 0 
+                                    ? `${item.hourlyProduction.length} hours saved as array format`
+                                    : 'Enter production quantity for each hour'}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => toggleRowExpansion(index)}
+                                className="text-xs text-blue-600 hover:text-blue-800"
+                              >
+                                Close
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
                   ))}
                 </tbody>
               </table>
@@ -927,7 +1118,7 @@ export default function DailyProductionPage() {
               </div>
               <div className="flex items-center gap-3">
                 <div className="text-sm text-gray-500">
-                  <span className="font-medium">Tips:</span> Click dropdown buttons (↓) to search and select
+                  <span className="font-medium">Tips:</span> Hourly inputs are visible by default
                 </div>
                 <button
                   onClick={fetchProductionData}
