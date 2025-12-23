@@ -638,9 +638,10 @@ export default function DailyProductionPage() {
                         <div className="flex items-center gap-2 dropdown-container">
                           <input
                             type="text"
+                            
                             value={item.uniqueMachine || ''}
                             onChange={(e) => handleInputChange(index, 'uniqueMachine', e.target.value)}
-                            className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
+                            className="w-32 text-[13px] px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
                             placeholder="Type or select from dropdown"
                           />
                           <button
@@ -683,7 +684,7 @@ export default function DailyProductionPage() {
                             <div className="max-h-60 overflow-y-auto">
                               {filteredMachines.length === 0 ? (
                                 <div className="p-4 text-center text-sm text-gray-500">
-                                  No machines found matching "{machineSearch}"
+                                  No machines found matching {machineSearch}
                                 </div>
                               ) : (
                                 filteredMachines.map((machine) => (
@@ -723,7 +724,7 @@ export default function DailyProductionPage() {
                             type="text"
                             value={item.process || ''}
                             onChange={(e) => handleInputChange(index, 'process', e.target.value)}
-                            className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
+                            className="w-32 text-[13px] px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
                             placeholder="Type or select from dropdown"
                           />
                           <button
@@ -766,7 +767,7 @@ export default function DailyProductionPage() {
                             <div className="max-h-60 overflow-y-auto">
                               {filteredProcesses.length === 0 ? (
                                 <div className="p-4 text-center text-sm text-gray-500">
-                                  No processes found matching "{processSearch}"
+                                  No processes found matching {processSearch}
                                 </div>
                               ) : (
                                 filteredProcesses.map((process) => (
@@ -803,7 +804,7 @@ export default function DailyProductionPage() {
                             type="text"
                             value={item.breakdownProcess || ''}
                             onChange={(e) => handleInputChange(index, 'breakdownProcess', e.target.value)}
-                            className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
+                            className="w-32 text-[13px]  px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
                             placeholder="Type or select from excel file"
                           />
                           <button
@@ -850,7 +851,7 @@ export default function DailyProductionPage() {
                             <div className="max-h-60 overflow-y-auto">
                               {filteredFileData.length === 0 ? (
                                 <div className="p-4 text-center text-sm text-gray-500">
-                                  No processes found matching "{breakdownSearch}"
+                                  No processes found matching {breakdownSearch}
                                 </div>
                               ) : (
                                 filteredFileData.map((excelProcess, idx) => (
@@ -922,7 +923,7 @@ export default function DailyProductionPage() {
             {/* Table Footer */}
             <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-between items-center">
               <div className="text-sm text-gray-600">
-                Edit values in the table and click "Save All Changes" to update
+                Edit values in the table and click Save All Changes to update
               </div>
               <div className="flex items-center gap-3">
                 <div className="text-sm text-gray-500">
