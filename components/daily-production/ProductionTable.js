@@ -35,9 +35,16 @@ export default function ProductionTable({
   };
 
   const handleMachineCellClick = (e, index) => {
-    e.stopPropagation();
-    onRowSelect(index);
-  };
+  e.stopPropagation();
+  
+  // চেক করুন যে row-এ অপারেটর আছে কিনা
+  if (!rows[index].operator) {
+    alert(`⚠️ Row ${index + 1} has no operator. Please assign an operator first before assigning a machine.`);
+    return;
+  }
+  
+  onRowSelect(index);
+};
 
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">

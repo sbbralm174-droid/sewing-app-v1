@@ -204,19 +204,110 @@ export default function Home() {
   };
 
   const handleScan = (data) => {
-    try {
-      const parsedData = JSON.parse(data);
+  try {
+    const parsedData = JSON.parse(data);
+    
+    if (parsedData.type === 'operator') {
+      // 1. Duplicate operator check - সম্পূর্ণ টেবিলে চেক
+      const isOperatorDuplicate = rows.some(row => 
+        row.operator && 
+        (row.operator.id === parsedData.id || 
+         row.operator.operatorId === parsedData.operatorId)
+      );
       
-      if (parsedData.type === 'operator') {
-        // Add new row with operator
+      if (isOperatorDuplicate) {
+        // ডুপ্লিকেট অপারেটর কোন row এ আছে তা খুঁজে বের করুন
+        const duplicateRowIndex = rows.findIndex(row => 
+          row.operator && 
+          (row.operator.id === parsedData.id || 
+           row.operator.operatorId === parsedData.operatorId)
+        );
+        
+        alert(`❌ Operator "${parsedData.name}" already exists in Row ${duplicateRowIndex + 1}. Duplicate operators are not allowed in the entire table.`);
+        return;
+      }
+      
+      // Add new row with operator
+      const newRow = {
+        operator: {
+          id: parsedData.id,
+          operatorId: parsedData.operatorId,
+          name: parsedData.name,
+          designation: parsedData.designation || 'Operator'
+        },
+        machine: null,
+        process: '',
+        breakdownProcess: '',
+        smv: '',
+        workAs: 'operator',
+        target: '',
+        isNew: true
+      };
+      
+      setRows(prev => [...prev, newRow]);
+      
+      // Remove new flag after 2 seconds
+      setTimeout(() => {
+        setRows(prev => prev.map(row => ({ ...row, isNew: false })));
+      }, 2000);
+      
+    } else if (parsedData.type === 'machine') {
+      // 2. Duplicate machine check - সম্পূর্ণ টেবিলে চেক
+      const isMachineDuplicate = rows.some(row => 
+        row.machine && 
+        (row.machine.id === parsedData.id || 
+         row.machine.uniqueId === parsedData.uniqueId)
+      );
+      
+      if (isMachineDuplicate) {
+        // ডুপ্লিকেট মেশিন কোন row এ আছে তা খুঁজে বের করুন
+        const duplicateRowIndex = rows.findIndex(row => 
+          row.machine && 
+          (row.machine.id === parsedData.id || 
+           row.machine.uniqueId === parsedData.uniqueId)
+        );
+        
+        alert(`❌ Machine "${parsedData.uniqueId}" already exists in Row ${duplicateRowIndex + 1}. Duplicate machines are not allowed in the entire table.`);
+        return;
+      }
+      
+      // Assign machine to selected row or last row
+      const targetRow = selectedRow !== null ? selectedRow : rows.length - 1;
+      
+      if (targetRow >= 0 && targetRow < rows.length) {
+        // 3. Check if selected row has operator
+        if (!rows[targetRow].operator) {
+          alert(`⚠️ Row ${targetRow + 1} has no operator. Please assign an operator first before assigning a machine.`);
+          return;
+        }
+        
+        setRows(prev => prev.map((row, index) => 
+          index === targetRow 
+            ? { ...row, machine: {
+                id: parsedData.id,
+                uniqueId: parsedData.uniqueId,
+                machineType: parsedData.machineType
+              }}
+            : row
+        ));
+        
+        // Reset selected row
+        setSelectedRow(null);
+      } else {
+        // 4. Check for machine without operator (new row scenario)
+        // অপারেটর ছাড়া মেশিন স্ক্যান করা যাবে না
+        alert(`⚠️ No operator assigned. Please scan an operator first before scanning a machine.`);
+        
+        // Alternative: নতুন row তৈরি করবেন কিন্তু শুধুমাত্র মেশিন দিয়ে
+        // যদি চান, তবে নিচের কোড আনকমেন্ট করুন:
+        /*
         const newRow = {
-          operator: {
+          operator: null,
+          machine: {
             id: parsedData.id,
-            operatorId: parsedData.operatorId,
-            name: parsedData.name,
-            designation: parsedData.designation || 'Operator'
+            uniqueId: parsedData.uniqueId,
+            machineType: parsedData.machineType
           },
-          machine: null,
           process: '',
           breakdownProcess: '',
           smv: '',
@@ -227,57 +318,17 @@ export default function Home() {
         
         setRows(prev => [...prev, newRow]);
         
-        // Remove new flag after 2 seconds
         setTimeout(() => {
           setRows(prev => prev.map(row => ({ ...row, isNew: false })));
         }, 2000);
-        
-      } else if (parsedData.type === 'machine') {
-        // Assign machine to selected row or last row
-        const targetRow = selectedRow !== null ? selectedRow : rows.length - 1;
-        
-        if (targetRow >= 0 && targetRow < rows.length) {
-          setRows(prev => prev.map((row, index) => 
-            index === targetRow 
-              ? { ...row, machine: {
-                  id: parsedData.id,
-                  uniqueId: parsedData.uniqueId,
-                  machineType: parsedData.machineType
-                }}
-              : row
-          ));
-          
-          // Reset selected row
-          setSelectedRow(null);
-        } else {
-          // Add new row with machine if no rows exist
-          const newRow = {
-            operator: null,
-            machine: {
-              id: parsedData.id,
-              uniqueId: parsedData.uniqueId,
-              machineType: parsedData.machineType
-            },
-            process: '',
-            breakdownProcess: '',
-            smv: '',
-            workAs: 'operator',
-            target: '',
-            isNew: true
-          };
-          
-          setRows(prev => [...prev, newRow]);
-          
-          setTimeout(() => {
-            setRows(prev => prev.map(row => ({ ...row, isNew: false })));
-          }, 2000);
-        }
+        */
       }
-    } catch (error) {
-      console.error('Invalid scan data:', error);
-      alert('Invalid scan data. Please check the format.');
     }
-  };
+  } catch (error) {
+    console.error('Invalid scan data:', error);
+    alert('Invalid scan data. Please check the format.');
+  }
+};
 
   const handleRowSelect = (index) => {
     setSelectedRow(index);
@@ -291,29 +342,59 @@ export default function Home() {
   };
 
   const handleAddRow = () => {
-    const newRow = {
-      operator: null,
-      machine: null,
-      process: '',
-      breakdownProcess: '',
-      smv: '',
-      workAs: 'operator',
-      target: '',
-      isNew: true
-    };
-    
-    setRows(prev => [...prev, newRow]);
-    
-    setTimeout(() => {
-      setRows(prev => prev.map(row => ({ ...row, isNew: false })));
-    }, 2000);
+  const newRow = {
+    operator: null,
+    machine: null,
+    process: '',
+    breakdownProcess: '',
+    smv: '',
+    workAs: 'operator',
+    target: '',
+    isNew: true
   };
+  
+  setRows(prev => [...prev, newRow]);
+  
+  setTimeout(() => {
+    setRows(prev => prev.map(row => ({ ...row, isNew: false })));
+  }, 2000);
+};
 
   const handleUpdateRow = (index, updatedData) => {
-    setRows(prev => prev.map((row, i) => 
-      i === index ? { ...row, ...updatedData } : row
-    ));
-  };
+  // যদি অপারেটর আপডেট করা হয়, ডুপ্লিকেট চেক করুন
+  if (updatedData.operator) {
+    const isOperatorDuplicate = rows.some((row, i) => 
+      i !== index && 
+      row.operator && 
+      (row.operator.id === updatedData.operator.id || 
+       row.operator.operatorId === updatedData.operator.operatorId)
+    );
+    
+    if (isOperatorDuplicate) {
+      alert(`❌ Operator "${updatedData.operator.name}" already exists in another row.`);
+      return;
+    }
+  }
+  
+  // যদি মেশিন আপডেট করা হয়, ডুপ্লিকেট চেক করুন
+  if (updatedData.machine) {
+    const isMachineDuplicate = rows.some((row, i) => 
+      i !== index && 
+      row.machine && 
+      (row.machine.id === updatedData.machine.id || 
+       row.machine.uniqueId === updatedData.machine.uniqueId)
+    );
+    
+    if (isMachineDuplicate) {
+      alert(`❌ Machine "${updatedData.machine.uniqueId}" already exists in another row.`);
+      return;
+    }
+  }
+  
+  setRows(prev => prev.map((row, i) => 
+    i === index ? { ...row, ...updatedData } : row
+  ));
+};
 
   const handleSaveToDatabase = async () => {
   if (!productionInfo) {
@@ -614,19 +695,7 @@ export default function Home() {
               <div className="bg-white rounded-lg shadow p-6">
                 <div className="flex flex-col space-y-4">
                   <div className="flex justify-between items-center">
-                    <div>
-                      <h3 className="text-lg font-medium text-gray-900">
-                        Production Data Summary
-                      </h3>
-                      <div className="text-sm text-gray-600 mt-1 space-y-1">
-                        <p><span className="font-semibold">Total entries:</span> {rows.length}</p>
-                        <p><span className="font-semibold">Buyer:</span> {productionInfo.buyerName}</p>
-                        <p><span className="font-semibold">Style:</span> {productionInfo.styleName}</p>
-                        <p><span className="font-semibold">Floor:</span> {productionInfo.floorName}</p>
-                        <p><span className="font-semibold">Line:</span> {productionInfo.lineNumber}</p>
-                        <p><span className="font-semibold">Supervisor:</span> {productionInfo.supervisorName}</p>
-                      </div>
-                    </div>
+                    
                     <div className="flex space-x-3">
                       <button
                         onClick={showDataPreview}
