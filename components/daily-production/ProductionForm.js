@@ -1,20 +1,17 @@
+// components/daily-production/ProductionForm.js
 'use client';
 
 export default function ProductionForm({ 
   formData, 
   onFormChange, 
-  onFormSubmit 
+  onFormSubmit,
+  buyers = [],
+  filteredStyles = [],
+  floors = [],
+  filteredLines = [],
+  supervisors = [],
+  breakdownFiles = []
 }) {
-  const fields = [
-    { id: 'buyer', label: 'Buyer', placeholder: 'Enter buyer name' },
-    { id: 'style', label: 'Style', placeholder: 'Enter style number' },
-    { id: 'breakdownProcesses', label: 'Breakdown Processes', placeholder: 'Enter processes (comma separated)' },
-    { id: 'supervisor', label: 'Supervisor', placeholder: 'Enter supervisor name' },
-    { id: 'date', label: 'Date', type: 'date' },
-    { id: 'floor', label: 'Floor', placeholder: 'Enter floor number' },
-    { id: 'line', label: 'Line', placeholder: 'Enter line number' },
-  ];
-
   const handleSubmit = (e) => {
     e.preventDefault();
     onFormSubmit();
@@ -27,23 +24,170 @@ export default function ProductionForm({
       </h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {fields.map((field) => (
-            <div key={field.id}>
-              <label htmlFor={field.id} className="block text-sm font-medium text-gray-700 mb-1">
-                {field.label}
-              </label>
-              <input
-                type={field.type || 'text'}
-                id={field.id}
-                name={field.id}
-                value={formData[field.id] || ''}
-                onChange={onFormChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder={field.placeholder}
-                required
-              />
-            </div>
-          ))}
+          {/* Buyer Dropdown */}
+          <div>
+            <label htmlFor="buyerId" className="block text-sm font-medium text-gray-700 mb-1">
+              Buyer *
+            </label>
+            <select
+              id="buyerId"
+              name="buyerId"
+              value={formData.buyerId || ''}
+              onChange={onFormChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              required
+            >
+              <option value="">Select Buyer</option>
+              {buyers.map(buyer => (
+                <option key={buyer._id} value={buyer._id}>
+                  {buyer.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Style Dropdown - Filtered by buyer */}
+          <div>
+            <label htmlFor="styleId" className="block text-sm font-medium text-gray-700 mb-1">
+              Style *
+            </label>
+            <select
+              id="styleId"
+              name="styleId"
+              value={formData.styleId || ''}
+              onChange={onFormChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              required
+              disabled={!formData.buyerId}
+            >
+              <option value="">{formData.buyerId ? 'Select Style' : 'First select Buyer'}</option>
+              {filteredStyles.map(style => (
+                <option key={style._id} value={style._id}>
+                  {style.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Breakdown Process Dropdown */}
+          <div>
+            <label htmlFor="breakdownProcess" className="block text-sm font-medium text-gray-700 mb-1">
+              Breakdown Process
+            </label>
+            <select
+              id="breakdownProcess"
+              name="breakdownProcess"
+              value={formData.breakdownProcess || ''}
+              onChange={onFormChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">Select File</option>
+              {breakdownFiles.map(file => (
+                <option key={file._id} value={file._id}>
+                  {file.fileName}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Supervisor Dropdown */}
+          <div>
+            <label htmlFor="supervisorId" className="block text-sm font-medium text-gray-700 mb-1">
+              Supervisor
+            </label>
+            <select
+              id="supervisorId"
+              name="supervisorId"
+              value={formData.supervisorId || ''}
+              onChange={onFormChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">Select Supervisor</option>
+              {supervisors.map(supervisor => (
+                <option key={supervisor._id} value={supervisor._id}>
+                  {supervisor.name} ({supervisor.supervisorId})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Date */}
+          <div>
+            <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-1">
+              Date
+            </label>
+            <input
+              type="date"
+              id="date"
+              name="date"
+              value={formData.date || ''}
+              onChange={onFormChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              required
+            />
+          </div>
+
+          {/* Floor Dropdown */}
+          <div>
+            <label htmlFor="floorId" className="block text-sm font-medium text-gray-700 mb-1">
+              Floor *
+            </label>
+            <select
+              id="floorId"
+              name="floorId"
+              value={formData.floorId || ''}
+              onChange={onFormChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              required
+            >
+              <option value="">Select Floor</option>
+              {floors.map(floor => (
+                <option key={floor._id} value={floor._id}>
+                  {floor.floorName}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Line Dropdown - Filtered by floor */}
+          <div>
+            <label htmlFor="lineId" className="block text-sm font-medium text-gray-700 mb-1">
+              Line *
+            </label>
+            <select
+              id="lineId"
+              name="lineId"
+              value={formData.lineId || ''}
+              onChange={onFormChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              required
+              disabled={!formData.floorId}
+            >
+              <option value="">{formData.floorId ? 'Select Line' : 'First select Floor'}</option>
+              {filteredLines.map(line => (
+                <option key={line._id} value={line._id}>
+                  {line.lineNumber}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Breakdown Process Title (read-only) */}
+          <div>
+            <label htmlFor="breakdownProcessTitle" className="block text-sm font-medium text-gray-700 mb-1">
+              Process Title
+            </label>
+            <input
+              type="text"
+              id="breakdownProcessTitle"
+              name="breakdownProcessTitle"
+              value={formData.breakdownProcessTitle || ''}
+              onChange={onFormChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50"
+              placeholder="Auto-filled from file"
+              readOnly
+            />
+          </div>
         </div>
         <div className="flex justify-end">
           <button

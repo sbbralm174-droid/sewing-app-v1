@@ -70,6 +70,7 @@ export async function PUT(request) {
         filter: { _id: item._id },
         update: { 
           $set: {
+            rowNo:  item.rowNo,
             process: item.process,
             breakdownProcess: item.breakdownProcess,
             uniqueMachine: item.uniqueMachine,

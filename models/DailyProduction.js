@@ -27,6 +27,7 @@ const DailyProductionSchema = new mongoose.Schema({
   floor: { type: String, required: true },
   line: { type: String, required: true },
   process: { type: String, required: false },
+  breakdownProcessTitle:{type: String, default: ""},
   breakdownProcess: { type: String, default: "" },
   status: { 
     type: String, 

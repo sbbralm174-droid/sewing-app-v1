@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Search, Save, Loader2, RefreshCw, ChevronDown, X, Plus, Minus } from 'lucide-react';
+import { Search, Save, Loader2, RefreshCw, ChevronDown, X, Plus, Minus, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 
 export default function DailyProductionPage() {
   const [searchParams, setSearchParams] = useState({
@@ -42,13 +42,44 @@ export default function DailyProductionPage() {
   const [breakdownProcessCounts, setBreakdownProcessCounts] = useState({});
   const [breakdownProcessManPower, setBreakdownProcessManPower] = useState({});
 
-  // Sample data for floors and lines
-  const sampleFloors = ['POODO', 'SEWING', 'CUTTING', 'FINISHING'];
-  const sampleLines = {
-    'POODO': ['PODDO-01', 'PODDO-02', 'PODDO-03'],
-    'SEWING': ['SEWING-01', 'SEWING-02', 'SEWING-03'],
-    'CUTTING': ['CUTTING-01', 'CUTTING-02'],
-    'FINISHING': ['FINISHING-01', 'FINISHING-02']
+  // Work As dropdown options
+  const workAsOptions = ['Operator', 'Helper'];
+  
+  // State for showing/hiding breakdown process status
+  const [showBreakdownStatus, setShowBreakdownStatus] = useState(false);
+
+  // Track duplicate rowNos
+  const [duplicateRowNos, setDuplicateRowNos] = useState({});
+  const [duplicateWarnings, setDuplicateWarnings] = useState({});
+
+  // Fetch floors from API
+  const fetchFloors = async () => {
+    try {
+      const response = await fetch('/api/floors');
+      if (!response.ok) throw new Error('Failed to fetch floors');
+      
+      const result = await response.json();
+      if (result.success) {
+        setFloors(result.data);
+      }
+    } catch (error) {
+      console.error('Error fetching floors:', error);
+    }
+  };
+
+  // Fetch lines based on selected floor
+  const fetchLinesByFloor = async (floorId) => {
+    if (!floorId) return;
+    
+    try {
+      const response = await fetch(`/api/floor-lines?floorId=${floorId}`);
+      if (!response.ok) throw new Error('Failed to fetch lines');
+      
+      const data = await response.json();
+      setLines(data);
+    } catch (error) {
+      console.error('Error fetching lines:', error);
+    }
   };
 
   // Filtered data based on search
@@ -69,32 +100,51 @@ export default function DailyProductionPage() {
     process.machineType?.toLowerCase().includes(processSearch.toLowerCase())
   );
 
- // Calculate breakdown process counts and get all available processes
-useEffect(() => {
-  const counts = {};
-  const manPowerMap = {};
-  
-  // First, store all available processes from fileData
-  if (fileData?.data) {
-    fileData.data.forEach(item => {
-      const processName = item.process;
-      if (processName && !manPowerMap[processName]) {
-        manPowerMap[processName] = parseInt(item.manPower) || 0;
+  // Calculate counts for live display
+  const calculateProcessCounts = () => {
+    let mainProcessCount = 0;
+    let breakdownProcessCount = 0;
+    
+    productionData.forEach(item => {
+      if (item.process && item.process.trim() !== '') {
+        mainProcessCount++;
+      }
+      if (item.breakdownProcess && item.breakdownProcess.trim() !== '') {
+        breakdownProcessCount++;
       }
     });
-  }
-  
-  // Count how many times each breakdown process is selected in the table
-  productionData.forEach(item => {
-    if (item.breakdownProcess && item.breakdownProcess.trim() !== '') {
-      const processName = item.breakdownProcess;
-      counts[processName] = (counts[processName] || 0) + 1;
+    
+    return { mainProcessCount, breakdownProcessCount };
+  };
+
+  const processCounts = calculateProcessCounts();
+
+  // Calculate breakdown process counts and get all available processes
+  useEffect(() => {
+    const counts = {};
+    const manPowerMap = {};
+    
+    // First, store all available processes from fileData
+    if (fileData?.data) {
+      fileData.data.forEach(item => {
+        const processName = item.process;
+        if (processName && !manPowerMap[processName]) {
+          manPowerMap[processName] = parseInt(item.manPower) || 0;
+        }
+      });
     }
-  });
-  
-  setBreakdownProcessCounts(counts);
-  setBreakdownProcessManPower(manPowerMap);
-}, [productionData, fileData]);
+    
+    // Count how many times each breakdown process is selected in the table
+    productionData.forEach(item => {
+      if (item.breakdownProcess && item.breakdownProcess.trim() !== '') {
+        const processName = item.breakdownProcess;
+        counts[processName] = (counts[processName] || 0) + 1;
+      }
+    });
+    
+    setBreakdownProcessCounts(counts);
+    setBreakdownProcessManPower(manPowerMap);
+  }, [productionData, fileData]);
 
   // Check if a breakdown process should be disabled
   const isBreakdownProcessDisabled = (processName) => {
@@ -106,6 +156,69 @@ useEffect(() => {
     
     // Disable if count is greater than or equal to manPower
     return count >= manPower;
+  };
+
+ // Check for duplicate rowNos
+const checkDuplicateRowNos = (data) => {
+  const rowNoCounts = {};
+  const duplicates = {};
+  const warnings = {};
+  
+  data.forEach((item, index) => {
+    const rowNo = item.rowNo;
+    
+    // Check if rowNo exists and is a string
+    if (rowNo !== null && rowNo !== undefined) {
+      // Convert to string if it's not already
+      const rowNoStr = typeof rowNo === 'string' ? rowNo : String(rowNo);
+      
+      // Trim only if it's a string
+      const trimmedRowNo = typeof rowNoStr === 'string' ? rowNoStr.trim() : rowNoStr;
+      
+      if (trimmedRowNo && trimmedRowNo !== '') {
+        if (!rowNoCounts[trimmedRowNo]) {
+          rowNoCounts[trimmedRowNo] = [index];
+        } else {
+          rowNoCounts[trimmedRowNo].push(index);
+        }
+      }
+    }
+  });
+  
+  // Mark duplicates
+  Object.keys(rowNoCounts).forEach(rowNo => {
+    if (rowNoCounts[rowNo].length > 1) {
+      rowNoCounts[rowNo].forEach(index => {
+        duplicates[index] = rowNo;
+      });
+    }
+  });
+  
+  setDuplicateRowNos(duplicates);
+  
+  // Generate warnings
+  Object.keys(rowNoCounts).forEach(rowNo => {
+    if (rowNoCounts[rowNo].length > 1) {
+      warnings[rowNo] = `Row No "${rowNo}" appears ${rowNoCounts[rowNo].length} times`;
+    }
+  });
+  
+  setDuplicateWarnings(warnings);
+};
+
+  // Handle rowNo change with duplicate check
+  const handleRowNoChange = (index, value) => {
+    const updatedData = [...productionData];
+    
+    // Update rowNo
+    updatedData[index].rowNo = value;
+    
+    setProductionData(updatedData);
+    
+    // Check for duplicates after a short delay
+    setTimeout(() => {
+      checkDuplicateRowNos(updatedData);
+    }, 100);
   };
 
   // Handle breakdown process selection from uploaded file
@@ -184,6 +297,13 @@ useEffect(() => {
       }
     }
     
+    setProductionData(updatedData);
+  };
+
+  // Handle Work As selection
+  const handleWorkAsSelect = (index, value) => {
+    const updatedData = [...productionData];
+    updatedData[index].workAs = value;
     setProductionData(updatedData);
   };
 
@@ -358,98 +478,151 @@ useEffect(() => {
   };
 
   // Handle search parameter changes
-  const handleParamChange = (field, value) => {
+const handleParamChange = async (field, value) => {
+  const updatedParams = {
+    ...searchParams,
+    [field]: value
+  };
+  
+  
+  setSearchParams(updatedParams);
+  
+  // Update lines when floor changes
+  if (field === 'floor') {
+    
+    await fetchLinesByFloor(value);
     setSearchParams(prev => ({
       ...prev,
-      [field]: value
+      [field]: value,
+      line: ''
     }));
     
-    // Update lines when floor changes
-    if (field === 'floor') {
-      setLines(sampleLines[value] || []);
-      setSearchParams(prev => ({
-        ...prev,
-        [field]: value,
-        line: ''
-      }));
-      
-      // Fetch hours for the selected floor
-      fetchHoursByFloor(value);
+    // Fetch hours for the selected floor
+    const selectedFloor = floors.find(f => f._id === value);
+    if (selectedFloor) {
+      fetchHoursByFloor(selectedFloor.floorName);
     }
-  };
+  }
+};
 
-  // Fetch production data
-  const fetchProductionData = async () => {
-    if (!searchParams.date || !searchParams.floor || !searchParams.line) {
-      setMessage({ type: 'error', text: 'Please select date, floor, and line' });
+ // Fetch production data
+const fetchProductionData = async () => {
+  if (!searchParams.date || !searchParams.floor || !searchParams.line) {
+    setMessage({ type: 'error', text: 'Please select date, floor, and line' });
+    return;
+  }
+
+  setIsLoading(true);
+  setMessage({ type: '', text: '' });
+
+  try {
+    // Find the selected floor to get floor name
+    const selectedFloor = floors.find(f => f._id === searchParams.floor);
+    
+    if (!selectedFloor) {
+      setMessage({ type: 'error', text: 'Selected floor not found' });
+      setIsLoading(false);
       return;
     }
-
-    setIsLoading(true);
-    setMessage({ type: '', text: '' });
-
-    try {
-      const params = new URLSearchParams(searchParams);
-      const response = await fetch(`/api/daily-production/update-production?${params}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch data');
-      }
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        // Process operator data if it's an object
-        const processedData = result.data.map(item => {
-          // Ensure hourlyProduction is always an array
-          const hourlyProduction = Array.isArray(item.hourlyProduction) 
-            ? item.hourlyProduction 
-            : [];
-          
-          // Check if operator is an object and extract name
-          if (item.operator && typeof item.operator === 'object') {
-            return {
-              ...item,
-              operatorName: item.operator.name || item.operator.operatorName || '',
-              operatorId: item.operator._id || item.operator.operatorId || '',
-              hourlyProduction: hourlyProduction
-            };
-          }
-          // If operator is already a string
+    
+    // Create params for API call - send floor NAME instead of ID
+    const params = new URLSearchParams({
+      date: searchParams.date,
+      floor: selectedFloor.floorName, // Send floor NAME, not ID
+      line: searchParams.line
+    });
+    
+    console.log('API Call Params:', params.toString()); // Debug log
+    
+    const response = await fetch(`/api/daily-production/update-production?${params}`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch data');
+    }
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      // Process operator data if it's an object
+      const processedData = result.data.map(item => {
+        // Ensure hourlyProduction is always an array
+        const hourlyProduction = Array.isArray(item.hourlyProduction) 
+          ? item.hourlyProduction 
+          : [];
+        
+        // Check if floor is an object in response and extract name
+        let floorName = selectedFloor.floorName;
+        if (item.floor && typeof item.floor === 'object') {
+          floorName = item.floor.floorName || selectedFloor.floorName;
+        } else if (item.floor && typeof item.floor === 'string') {
+          floorName = item.floor;
+        }
+        
+        // Check if operator is an object and extract name
+        if (item.operator && typeof item.operator === 'object') {
           return {
             ...item,
-            operatorName: item.operator || '',
-            operatorId: '',
-            hourlyProduction: hourlyProduction
+            operatorName: item.operator.name || item.operator.operatorName || '',
+            operatorId: item.operator._id || item.operator.operatorId || '',
+            floorName: floorName, // Add floor name
+            floorId: selectedFloor._id, // Keep floor ID for reference
+            workAs: item.workAs || 'Operator', // Default to Operator
+            hourlyProduction: hourlyProduction,
+            rowNo: item.rowNo || '' // Ensure rowNo is included
           };
-        });
-        
-        setProductionData(processedData);
-        
-        // ডিফল্টভাবে সব row expand করে রাখো
-        const initialExpandedRows = {};
-        processedData.forEach((_, index) => {
-          initialExpandedRows[index] = true; // সব row ডিফল্টভাবে open থাকবে
-        });
-        setExpandedRows(initialExpandedRows);
-        
-        if (result.data && result.data.length === 0) {
-          setMessage({ type: 'info', text: 'No data found for the selected criteria' });
         }
-      } else {
-        setMessage({ type: 'error', text: result.message || 'Failed to load data' });
+        // If operator is already a string
+        return {
+          ...item,
+          operatorName: item.operator || '',
+          operatorId: '',
+          floorName: floorName, // Add floor name
+          floorId: selectedFloor._id, // Keep floor ID for reference
+          workAs: item.workAs || 'Operator', // Default to Operator
+          hourlyProduction: hourlyProduction,
+          rowNo: item.rowNo || '' // Ensure rowNo is included
+        };
+      });
+      
+      setProductionData(processedData);
+      
+      // Check for duplicate rowNos
+      checkDuplicateRowNos(processedData);
+      
+      // ডিফল্টভাবে সব row expand করে রাখো
+      const initialExpandedRows = {};
+      processedData.forEach((_, index) => {
+        initialExpandedRows[index] = true; // সব row ডিফল্টভাবে open থাকবে
+      });
+      setExpandedRows(initialExpandedRows);
+      
+      if (result.data && result.data.length === 0) {
+        setMessage({ type: 'info', text: 'No data found for the selected criteria' });
       }
-    } catch (error) {
-      setMessage({ type: 'error', text: error.message });
-    } finally {
-      setIsLoading(false);
+    } else {
+      setMessage({ type: 'error', text: result.message || 'Failed to load data' });
     }
-  };
+  } catch (error) {
+    setMessage({ type: 'error', text: error.message });
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   // Prepare data for API submission
   const handleUpdate = async () => {
     if (productionData.length === 0) {
       setMessage({ type: 'error', text: 'No data to update' });
+      return;
+    }
+
+    // Check for duplicate rowNos before saving
+    const hasDuplicates = Object.keys(duplicateRowNos).length > 0;
+    if (hasDuplicates) {
+      setMessage({ 
+        type: 'error', 
+        text: 'Cannot save: Duplicate Row Nos found. Please fix them before saving.' 
+      });
       return;
     }
 
@@ -471,6 +644,7 @@ useEffect(() => {
 
         const apiItem = {
           _id: item._id,
+          rowNo: item.rowNo, // Include rowNo in API data
           process: item.process,
           breakdownProcess: item.breakdownProcess,
           uniqueMachine: item.uniqueMachine,
@@ -625,7 +799,7 @@ useEffect(() => {
 
   // Initialize data
   useEffect(() => {
-    setFloors(sampleFloors);
+    fetchFloors();
     fetchUploadedFiles();
     fetchMachines();
     fetchProcesses();
@@ -635,6 +809,7 @@ useEffect(() => {
   useEffect(() => {
     if (searchParams.date && searchParams.floor && searchParams.line) {
       fetchProductionData();
+    //  console.log(searchParams)
     }
   }, []);
 
@@ -677,8 +852,8 @@ useEffect(() => {
               >
                 <option value="">Select Floor</option>
                 {floors.map((floor) => (
-                  <option key={floor} value={floor}>
-                    {floor}
+                  <option key={floor._id} value={floor._id}>
+                    {floor.floorName}
                   </option>
                 ))}
               </select>
@@ -698,8 +873,8 @@ useEffect(() => {
               >
                 <option value="">Select Line</option>
                 {lines.map((line) => (
-                  <option key={line} value={line}>
-                    {line}
+                  <option key={line._id} value={line.lineNumber}>
+                    {line.lineNumber}
                   </option>
                 ))}
               </select>
@@ -753,51 +928,134 @@ useEffect(() => {
             </div>
           )}
 
-          
-{fileData?.data && (
-  <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-    <div className="text-sm font-medium text-blue-700 mb-1">Breakdown Process Status:</div>
-    <div className="flex flex-wrap gap-2">
-      {/* Group processes by status */}
-      {Object.entries(breakdownProcessManPower).map(([processName, manPower]) => {
-        const count = breakdownProcessCounts[processName] || 0;
-        const isDisabled = isBreakdownProcessDisabled(processName);
-        const percentage = manPower > 0 ? Math.min(100, (count / manPower) * 100) : 0;
-        
-        return (
-          <div 
-            key={processName}
-            className={`text-xs px-2 py-1 rounded-full flex items-center gap-1 ${
-              count === 0 ? 'bg-gray-100 text-gray-800' : 
-              isDisabled ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
-            }`}
-            title={`Process: ${processName}, Man Power: ${manPower}, Used: ${count}`}
-          >
-            <span className="font-medium">{processName}</span>
-            <span>: {count}/{manPower}</span>
-            {count > 0 && (
-              <span className="text-xs">({percentage.toFixed(0)}%)</span>
-            )}
-          </div>
-        );
-      })}
-    </div>
-    {/* <div className="mt-2 text-xs text-gray-600 flex gap-3">
-      <div className="flex items-center gap-1">
-        <div className="w-3 h-3 bg-gray-100 rounded"></div>
-        <span>Available (0/{breakdownProcessManPower[Object.keys(breakdownProcessManPower)[0]] || 0})</span>
-      </div>
-      <div className="flex items-center gap-1">
-        <div className="w-3 h-3 bg-green-100 rounded"></div>
-        <span>In use ({Object.keys(breakdownProcessCounts).filter(name => breakdownProcessCounts[name] > 0 && !isBreakdownProcessDisabled(name)).length})</span>
-      </div>
-      <div className="flex items-center gap-1">
-        <div className="w-3 h-3 bg-red-100 rounded"></div>
-        <span>Full ({Object.keys(breakdownProcessCounts).filter(isBreakdownProcessDisabled).length})</span>
-      </div>
-    </div> */}
-  </div>
-)}
+          {/* Duplicate Warnings */}
+          {Object.keys(duplicateWarnings).length > 0 && (
+            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+                <h3 className="font-medium text-red-800">Duplicate Row Nos Found</h3>
+              </div>
+              <div className="text-sm text-red-700">
+                {Object.entries(duplicateWarnings).map(([rowNo, warning]) => (
+                  <div key={rowNo} className="mb-1">⚠️ {warning}</div>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-red-600">
+                Please fix duplicate row numbers before saving. Duplicate rows are highlighted in red.
+              </p>
+            </div>
+          )}
+
+          {/* Live Process Counts */}
+          {productionData.length > 0 && (
+            <div className="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-sm font-medium text-yellow-800">
+                  Live Process Selection Status
+                </div>
+                <div className="text-xs text-yellow-600">
+                  Updates automatically
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-white p-3 rounded border border-yellow-100">
+                  <div className="text-xs font-medium text-gray-600 mb-1">Beyond the breakdown process:</div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-lg font-bold text-blue-600">
+                      {processCounts.mainProcessCount}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      out of {productionData.length} rows
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-white p-3 rounded border border-yellow-100">
+                  <div className="text-xs font-medium text-gray-600 mb-1">Breakdown Process</div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-lg font-bold text-purple-600">
+                      {processCounts.breakdownProcessCount}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      out of {productionData.length} rows
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Breakdown Process Status Section - Hide/Show Option */}
+          {fileData?.data && (
+            <div className="mt-4">
+              <div className="flex items-center justify-between mb-2">
+                <button
+                  type="button"
+                  onClick={() => setShowBreakdownStatus(!showBreakdownStatus)}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition"
+                >
+                  {showBreakdownStatus ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                  Breakdown Process Status
+                  <span className={`px-2 py-0.5 text-xs rounded-full ${showBreakdownStatus ? 'bg-blue-200' : 'bg-gray-200'}`}>
+                    {showBreakdownStatus ? 'Visible' : 'Hidden'}
+                  </span>
+                </button>
+                <div className="text-xs text-gray-500">
+                  {showBreakdownStatus ? 'Click to hide' : 'Click to show'}
+                </div>
+              </div>
+              
+              {showBreakdownStatus && (
+                <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="text-sm font-medium text-blue-700 mb-1">Breakdown Process Status:</div>
+                  <div className="flex flex-wrap gap-2">
+                    {/* Group processes by status */}
+                    {Object.entries(breakdownProcessManPower).map(([processName, manPower]) => {
+                      const count = breakdownProcessCounts[processName] || 0;
+                      const isDisabled = isBreakdownProcessDisabled(processName);
+                      const percentage = manPower > 0 ? Math.min(100, (count / manPower) * 100) : 0;
+                      
+                      return (
+                        <div 
+                          key={processName}
+                          className={`text-xs px-2 py-1 rounded-full flex items-center gap-1 ${
+                            count === 0 ? 'bg-gray-100 text-gray-800' : 
+                            isDisabled ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                          }`}
+                          title={`Process: ${processName}, Man Power: ${manPower}, Used: ${count}`}
+                        >
+                          <span className="font-medium">{processName}</span>
+                          <span>: {count}/{manPower}</span>
+                          {count > 0 && (
+                            <span className="text-xs">({percentage.toFixed(0)}%)</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-blue-200">
+                    <div className="flex flex-wrap gap-4 text-xs">
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded-full bg-green-100 border border-green-300"></div>
+                        <span className="text-gray-600">Available ({Object.keys(breakdownProcessManPower).length})</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded-full bg-green-200 border border-green-400"></div>
+                        <span className="text-gray-600">In Use</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded-full bg-red-200 border border-red-400"></div>
+                        <span className="text-gray-600">Max Reached</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Production Data Table */}
@@ -811,20 +1069,31 @@ useEffect(() => {
                 <p className="text-gray-600 text-sm">
                   Showing {productionData.length} records for {searchParams.date}
                   {hours.length > 0 && ` • ${hours.length} hours available`}
+                  {Object.keys(duplicateRowNos).length > 0 && (
+                    <span className="ml-2 text-red-600 font-medium">
+                      • {Object.keys(duplicateRowNos).length} rows have duplicate Row Nos
+                    </span>
+                  )}
                 </p>
               </div>
               
               <button
                 onClick={handleUpdate}
-                disabled={isSaving}
-                className="flex items-center gap-2 px-6 py-2.5 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 focus:ring-4 focus:ring-green-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isSaving || Object.keys(duplicateRowNos).length > 0}
+                className={`flex items-center gap-2 px-6 py-2.5 font-medium rounded-lg focus:ring-4 transition ${
+                  Object.keys(duplicateRowNos).length > 0
+                    ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
+                    : 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-200'
+                }`}
               >
                 {isSaving ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
                   <Save className="w-5 h-5" />
                 )}
-                {isSaving ? 'Saving...' : 'Save All Changes'}
+                {Object.keys(duplicateRowNos).length > 0 
+                  ? 'Fix Duplicates First' 
+                  : isSaving ? 'Saving...' : 'Save All Changes'}
               </button>
             </div>
 
@@ -832,8 +1101,9 @@ useEffect(() => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
-                      #
+                    
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Row No
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Operator
@@ -856,377 +1126,410 @@ useEffect(() => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Target
                     </th>
-                    {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Total
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
-                      Hours
-                    </th> */}
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {productionData.map((item, index) => (
-                    <>
-                      <tr key={item._id || index} className="hover:bg-gray-50 transition">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {index + 1}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                          {item.operatorName || item.operator || 'N/A'}
-                        </td>
-                        
-                        {/* Machine Cell with Dropdown */}
-                        <td className="px-6 py-4 relative">
-                          <div className="flex items-center gap-2 dropdown-container">
+                  {productionData.map((item, index) => {
+                    const isDuplicate = duplicateRowNos[index];
+                    
+                    return (
+                      <>
+                        <tr 
+                          key={item._id || index} 
+                          className={`hover:bg-gray-50 transition ${isDuplicate ? 'bg-red-50' : ''}`}
+                        >
+                          
+                          
+                          {/* Row No Cell with Duplicate Highlight */}
+                          <td className="px-6 py-4">
                             <input
                               type="text"
-                              value={item.uniqueMachine || ''}
-                              onChange={(e) => handleInputChange(index, 'uniqueMachine', e.target.value)}
-                              className="w-32 text-[13px] px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
-                              placeholder="Type or select"
+                              value={item.rowNo || ''}
+                              onChange={(e) => handleRowNoChange(index, e.target.value)}
+                              className={`w-24 px-3 py-1.5 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm ${
+                                isDuplicate 
+                                  ? 'border-red-500 bg-red-100 text-red-700' 
+                                  : 'border-gray-300'
+                              }`}
+                              placeholder="Enter Row No"
                             />
-                            <button
-                              type="button"
-                              onClick={() => toggleDropdown('machine', index)}
-                              className="p-1.5 border border-gray-300 rounded-md hover:bg-gray-50 transition"
-                            >
-                              <ChevronDown className="w-4 h-4 text-gray-500" />
-                            </button>
-                          </div>
+                            {isDuplicate && (
+                              <div className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3" />
+                                Duplicate
+                              </div>
+                            )}
+                          </td>
                           
-                          {/* Machine Dropdown with Search */}
-                          {showMachineDropdown === index && (
-                            <div className="absolute z-50 mt-1 w-80 bg-white border border-gray-200 rounded-lg shadow-xl dropdown-container">
-                              <div className="p-2 border-b border-gray-100">
-                                <div className="relative">
-                                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                  <input
-                                    type="text"
-                                    value={machineSearch}
-                                    onChange={(e) => setMachineSearch(e.target.value)}
-                                    placeholder="Search machine by ID, status, or line..."
-                                    className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    autoFocus
-                                  />
-                                  {machineSearch && (
-                                    <button
-                                      onClick={() => clearSearch('machine')}
-                                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                                    >
-                                      <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
-                                    </button>
-                                  )}
-                                </div>
-                                <div className="mt-1 text-xs text-gray-500 flex justify-between">
-                                  <span>{filteredMachines.length} machines found</span>
-                                  <span>Click outside to close</span>
-                                </div>
-                              </div>
-                              <div className="max-h-60 overflow-y-auto">
-                                {filteredMachines.length === 0 ? (
-                                  <div className="p-4 text-center text-sm text-gray-500">
-                                    No machines found matching {machineSearch}
-                                  </div>
-                                ) : (
-                                  filteredMachines.map((machine) => (
-                                    <button
-                                      key={machine._id}
-                                      type="button"
-                                      onClick={() => handleMachineSelect(index, machine._id)}
-                                      className="w-full text-left px-3 py-3 text-sm hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition dropdown-container"
-                                    >
-                                      <div className="font-medium text-gray-900">{machine.uniqueId}</div>
-                                      <div className="flex justify-between mt-1">
-                                        <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                          machine.currentStatus === 'idle' 
-                                            ? 'bg-green-100 text-green-800'
-                                            : 'bg-yellow-100 text-yellow-800'
-                                        }`}>
-                                          {machine.currentStatus}
-                                        </span>
-                                        {machine.lastLocation && (
-                                          <span className="text-xs text-gray-500">
-                                            {machine.lastLocation.line}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </button>
-                                  ))
-                                )}
-                              </div>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                            {item.operatorName || item.operator || 'N/A'}
+                          </td>
+                          
+                          {/* Machine Cell with Dropdown */}
+                          <td className="px-6 py-4 relative">
+                            <div className="flex items-center gap-2 dropdown-container">
+                              <input
+                                type="text"
+                                value={item.uniqueMachine || ''}
+                                onChange={(e) => handleInputChange(index, 'uniqueMachine', e.target.value)}
+                                className="w-32 text-[13px] px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
+                                placeholder="Type or select"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => toggleDropdown('machine', index)}
+                                className="p-1.5 border border-gray-300 rounded-md hover:bg-gray-50 transition"
+                              >
+                                <ChevronDown className="w-4 h-4 text-gray-500" />
+                              </button>
                             </div>
-                          )}
-                        </td>
-                        
-                        {/* Process Cell with Dropdown */}
-                        <td className="px-6 py-4 relative">
-                          <div className="flex items-center gap-2 dropdown-container">
-                            <input
-                              type="text"
-                              value={item.process || ''}
-                              onChange={(e) => handleInputChange(index, 'process', e.target.value)}
-                              className="w-32 text-[13px] px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
-                              placeholder="Type or select"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => toggleDropdown('process', index)}
-                              className="p-1.5 border border-gray-300 rounded-md hover:bg-gray-50 transition"
-                            >
-                              <ChevronDown className="w-4 h-4 text-gray-500" />
-                            </button>
-                          </div>
-                          
-                          {/* Process Dropdown with Search */}
-                          {showProcessDropdown === index && (
-                            <div className="absolute z-50 mt-1 w-96 bg-white border border-gray-200 rounded-lg shadow-xl dropdown-container">
-                              <div className="p-2 border-b border-gray-100">
-                                <div className="relative">
-                                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                  <input
-                                    type="text"
-                                    value={processSearch}
-                                    onChange={(e) => setProcessSearch(e.target.value)}
-                                    placeholder="Search process by name, code, or machine type..."
-                                    className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    autoFocus
-                                  />
-                                  {processSearch && (
-                                    <button
-                                      onClick={() => clearSearch('process')}
-                                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                                    >
-                                      <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
-                                    </button>
-                                  )}
-                                </div>
-                                <div className="mt-1 text-xs text-gray-500 flex justify-between">
-                                  <span>{filteredProcesses.length} processes found</span>
-                                  <span>Click outside to close</span>
-                                </div>
-                              </div>
-                              <div className="max-h-60 overflow-y-auto">
-                                {filteredProcesses.length === 0 ? (
-                                  <div className="p-4 text-center text-sm text-gray-500">
-                                    No processes found matching {processSearch}
-                                  </div>
-                                ) : (
-                                  filteredProcesses.map((process) => (
-                                    <button
-                                      key={process._id}
-                                      type="button"
-                                      onClick={() => handleProcessSelect(index, process._id)}
-                                      className="w-full text-left px-3 py-3 text-sm hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition dropdown-container"
-                                    >
-                                      <div className="font-medium text-gray-900">{process.name}</div>
-                                      <div className="flex justify-between items-center mt-1">
-                                        <span className="text-xs text-gray-600">{process.code}</span>
-                                        <div className="flex items-center gap-3">
-                                          <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-800 rounded">
-                                            {process.machineType}
-                                          </span>
-                                          <span className="text-xs font-medium text-blue-600">
-                                            SMV: {process.smv}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    </button>
-                                  ))
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </td>
-                        
-                        {/* Breakdown Process Cell with Dropdown */}
-                        <td className="px-6 py-4 relative">
-                          <div className="flex items-center gap-2 dropdown-container">
-                            <input
-                              type="text"
-                              value={item.breakdownProcess || ''}
-                              onChange={(e) => handleInputChange(index, 'breakdownProcess', e.target.value)}
-                              className="w-32 text-[13px]  px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
-                              placeholder="Type or select"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => toggleDropdown('breakdown', index)}
-                              className="p-1.5 border border-gray-300 rounded-md hover:bg-gray-50 transition"
-                              disabled={!fileData || !fileData.data}
-                            >
-                              <ChevronDown className="w-4 h-4 text-gray-500" />
-                            </button>
-                          </div>
-                          
-                          {/* Breakdown Process Dropdown with Search */}
-                          {showBreakdownDropdown === index && fileData && fileData.data && (
-                            <div className="absolute z-50 mt-1 w-96 bg-white border border-gray-200 rounded-lg shadow-xl dropdown-container">
-                              <div className="p-2 border-b border-gray-100">
-                                <div className="mb-1 text-xs font-medium text-gray-700">
-                                  From: {fileData.fileName}
-                                </div>
-                                <div className="relative">
-                                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                  <input
-                                    type="text"
-                                    value={breakdownSearch}
-                                    onChange={(e) => setBreakdownSearch(e.target.value)}
-                                    placeholder="Search process, machine type, or SMV..."
-                                    className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    autoFocus
-                                  />
-                                  {breakdownSearch && (
-                                    <button
-                                      onClick={() => clearSearch('breakdown')}
-                                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                                    >
-                                      <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
-                                    </button>
-                                  )}
-                                </div>
-                                <div className="mt-1 text-xs text-gray-500 flex justify-between">
-                                  <span>{filteredFileData.length} of {fileData.data.length} processes</span>
-                                  <span>Click outside to close</span>
-                                </div>
-                              </div>
-                              <div className="max-h-60 overflow-y-auto">
-                                {filteredFileData.length === 0 ? (
-                                  <div className="p-4 text-center text-sm text-gray-500">
-                                    No processes found matching {breakdownSearch}
-                                  </div>
-                                ) : (
-                                  filteredFileData.map((excelProcess, idx) => {
-                                    const processName = excelProcess.process;
-                                    const manPower = parseInt(excelProcess.manPower) || 0;
-                                    const isDisabled = isBreakdownProcessDisabled(processName);
-                                    const currentCount = breakdownProcessCounts[processName] || 0;
-                                    
-                                    return (
+                            
+                            {/* Machine Dropdown with Search */}
+                            {showMachineDropdown === index && (
+                              <div className="absolute z-50 mt-1 w-80 bg-white border border-gray-200 rounded-lg shadow-xl dropdown-container">
+                                <div className="p-2 border-b border-gray-100">
+                                  <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                    <input
+                                      type="text"
+                                      value={machineSearch}
+                                      onChange={(e) => setMachineSearch(e.target.value)}
+                                      placeholder="Search machine by ID, status, or line..."
+                                      className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                      autoFocus
+                                    />
+                                    {machineSearch && (
                                       <button
-                                        key={excelProcess._id || idx}
-                                        type="button"
-                                        onClick={() => !isDisabled && handleBreakdownSelect(index, excelProcess)}
-                                        disabled={isDisabled}
-                                        className={`w-full text-left px-3 py-3 text-sm hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition dropdown-container ${
-                                          isDisabled 
-                                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                                            : 'hover:bg-blue-50'
-                                        }`}
+                                        onClick={() => clearSearch('machine')}
+                                        className="absolute right-3 top-1/2 transform -translate-y-1/2"
                                       >
-                                        <div className="font-medium">
-                                          {excelProcess.sno}. {excelProcess.process} 
-                                          <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${
-                                            isDisabled ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
+                                        <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                                      </button>
+                                    )}
+                                  </div>
+                                  <div className="mt-1 text-xs text-gray-500 flex justify-between">
+                                    <span>{filteredMachines.length} machines found</span>
+                                    <span>Click outside to close</span>
+                                  </div>
+                                </div>
+                                <div className="max-h-60 overflow-y-auto">
+                                  {filteredMachines.length === 0 ? (
+                                    <div className="p-4 text-center text-sm text-gray-500">
+                                      No machines found matching {machineSearch}
+                                    </div>
+                                  ) : (
+                                    filteredMachines.map((machine) => (
+                                      <button
+                                        key={machine._id}
+                                        type="button"
+                                        onClick={() => handleMachineSelect(index, machine._id)}
+                                        className="w-full text-left px-3 py-3 text-sm hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition dropdown-container"
+                                      >
+                                        <div className="font-medium text-gray-900">{machine.uniqueId}</div>
+                                        <div className="flex justify-between mt-1">
+                                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                            machine.currentStatus === 'idle' 
+                                              ? 'bg-green-100 text-green-800'
+                                              : 'bg-yellow-100 text-yellow-800'
                                           }`}>
-                                            Man Power: {manPower}
+                                            {machine.currentStatus}
                                           </span>
+                                          {machine.lastLocation && (
+                                            <span className="text-xs text-gray-500">
+                                              {machine.lastLocation.line}
+                                            </span>
+                                          )}
                                         </div>
+                                      </button>
+                                    ))
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </td>
+                          
+                          {/* Process Cell with Dropdown */}
+                          <td className="px-6 py-4 relative">
+                            <div className="flex items-center gap-2 dropdown-container">
+                              <input
+                                type="text"
+                                value={item.process || ''}
+                                onChange={(e) => handleInputChange(index, 'process', e.target.value)}
+                                className="w-32 text-red-700 text-[13px] px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
+                                
+                              />
+                              <button
+                                type="button"
+                                onClick={() => toggleDropdown('process', index)}
+                                className="p-1.5 border border-gray-300 rounded-md hover:bg-gray-50 transition"
+                              >
+                                <ChevronDown className="w-4 h-4 text-gray-500" />
+                              </button>
+                            </div>
+                            
+                            {/* Process Dropdown with Search */}
+                            {showProcessDropdown === index && (
+                              <div className="absolute z-50 mt-1 w-96 bg-white border border-gray-200 rounded-lg shadow-xl dropdown-container">
+                                <div className="p-2 border-b border-gray-100">
+                                  <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                    <input
+                                      type="text"
+                                      value={processSearch}
+                                      onChange={(e) => setProcessSearch(e.target.value)}
+                                      placeholder="Search process by name, code, or machine type..."
+                                      className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                      autoFocus
+                                    />
+                                    {processSearch && (
+                                      <button
+                                        onClick={() => clearSearch('process')}
+                                        className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                                      >
+                                        <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                                      </button>
+                                    )}
+                                  </div>
+                                  <div className="mt-1 text-xs text-gray-500 flex justify-between">
+                                    <span>{filteredProcesses.length} processes found</span>
+                                    <span>Click outside to close</span>
+                                  </div>
+                                </div>
+                                <div className="max-h-60 overflow-y-auto">
+                                  {filteredProcesses.length === 0 ? (
+                                    <div className="p-4 text-center text-sm text-gray-500">
+                                      No processes found matching {processSearch}
+                                    </div>
+                                  ) : (
+                                    filteredProcesses.map((process) => (
+                                      <button
+                                        key={process._id}
+                                        type="button"
+                                        onClick={() => handleProcessSelect(index, process._id)}
+                                        className="w-full text-left px-3 py-3 text-sm hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition dropdown-container"
+                                      >
+                                        <div className="font-medium text-gray-900">{process.name}</div>
                                         <div className="flex justify-between items-center mt-1">
-                                          <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-800 rounded">
-                                            {excelProcess.mcTypeHp}
-                                          </span>
+                                          <span className="text-xs text-gray-600">{process.code}</span>
                                           <div className="flex items-center gap-3">
-                                            {isDisabled ? (
-                                              <span className="text-xs font-medium text-red-600">
-                                                Max reached ({currentCount}/{manPower})
-                                              </span>
-                                            ) : (
-                                              <>
-                                                <span className="text-xs text-gray-600">
-                                                  Used: {currentCount}/{manPower}
-                                                </span>
-                                                <span className="text-xs font-medium text-green-600">
-                                                  SMV: {excelProcess.smv}
-                                                </span>
-                                              </>
-                                            )}
+                                            <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-800 rounded">
+                                              {process.machineType}
+                                            </span>
+                                            <span className="text-xs font-medium text-blue-600">
+                                              SMV: {process.smv}
+                                            </span>
                                           </div>
                                         </div>
                                       </button>
-                                    );
-                                  })
-                                )}
+                                    ))
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          )}
-                        </td>
-                        
-                        <td className="px-6 py-4">
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={item.smv || ''}
-                            onChange={(e) => handleInputChange(index, 'smv', e.target.value)}
-                            className="w-20 px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
-                          />
-                        </td>
-                        <td className="px-6 py-4">
-                          <input
-                            type="text"
-                            value={item.workAs || ''}
-                            onChange={(e) => handleInputChange(index, 'workAs', e.target.value)}
-                            className="w-24 px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
-                          />
-                        </td>
-                        <td className="px-6 py-4">
-                          <input
-                            type="number"
-                            value={item.target || ''}
-                            onChange={(e) => handleInputChange(index, 'target', e.target.value)}
-                            className="w-20 px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
-                          />
-                        </td>
-                      </tr>
-                      
-                      {/* Expanded Hourly Production Section - ডিফল্টভাবে দেখাবে */}
-                      {(expandedRows[index] === undefined || expandedRows[index]) && hours.length > 0 && (
-                        <tr className="bg-blue-50">
-                          <td colSpan="10" className="px-6 py-4">
-                            <div className="mb-2">
-                              <h3 className="text-sm font-medium text-gray-700 mb-3">
-                                Hourly Production for Row {index + 1} - {item.operatorName || item.operator || 'N/A'} {item.operator.operatorId}
-                              </h3>
-                              <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-15 xl:grid-cols-15 2xl:grid-cols-15 gap-3">
-                                {hours.map((hour) => (
-                                  <div key={hour._id} className="space-y-1">
-                                    <label className="block text-xs font-medium text-gray-600">
-                                      {hour.hour}
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={getHourlyValue(index, hour.hour)}
-                                      onChange={(e) => handleHourlyProductionChange(index, hour.hour, e.target.value)}
-                                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                                      placeholder="Qty"
-                                      min="0"
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                            <div className="flex justify-between items-center mt-3 pt-3 border-t border-blue-200">
-                              <div className="text-sm text-gray-600">
-                                <span className="font-medium">Total Production: </span>
-                                <span className="font-bold text-blue-700">{calculateRowTotal(index)}</span>
-                                <span className="ml-4 text-xs text-gray-500">
-                                  {Array.isArray(item.hourlyProduction) && item.hourlyProduction.length > 0 
-                                    ? `${item.hourlyProduction.length} hours saved as array format`
-                                    : 'Enter production quantity for each hour'}
-                                </span>
-                              </div>
+                            )}
+                          </td>
+                          
+                          {/* Breakdown Process Cell with Dropdown */}
+                          <td className="px-6 py-4 relative">
+                            <div className="flex items-center gap-2 dropdown-container">
+                              <input
+                                type="text"
+                                value={item.breakdownProcess || ''}
+                                onChange={(e) => handleInputChange(index, 'breakdownProcess', e.target.value)}
+                                className="w-32 text-[13px] px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
+                                placeholder="Type or select"
+                              />
                               <button
                                 type="button"
-                                onClick={() => toggleRowExpansion(index)}
-                                className="text-xs text-blue-600 hover:text-blue-800"
+                                onClick={() => toggleDropdown('breakdown', index)}
+                                className="p-1.5 border border-gray-300 rounded-md hover:bg-gray-50 transition"
+                                disabled={!fileData || !fileData.data}
                               >
-                                Close
+                                <ChevronDown className="w-4 h-4 text-gray-500" />
                               </button>
                             </div>
+                            
+                            {/* Breakdown Process Dropdown with Search */}
+                            {showBreakdownDropdown === index && fileData && fileData.data && (
+                              <div className="absolute z-50 mt-1 w-96 bg-white border border-gray-200 rounded-lg shadow-xl dropdown-container">
+                                <div className="p-2 border-b border-gray-100">
+                                  <div className="mb-1 text-xs font-medium text-gray-700">
+                                    From: {fileData.fileName}
+                                  </div>
+                                  <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                    <input
+                                      type="text"
+                                      value={breakdownSearch}
+                                      onChange={(e) => setBreakdownSearch(e.target.value)}
+                                      placeholder="Search process, machine type, or SMV..."
+                                      className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                      autoFocus
+                                    />
+                                    {breakdownSearch && (
+                                      <button
+                                        onClick={() => clearSearch('breakdown')}
+                                        className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                                      >
+                                        <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                                      </button>
+                                    )}
+                                  </div>
+                                  <div className="mt-1 text-xs text-gray-500 flex justify-between">
+                                    <span>{filteredFileData.length} of {fileData.data.length} processes</span>
+                                    <span>Click outside to close</span>
+                                  </div>
+                                </div>
+                                <div className="max-h-60 overflow-y-auto">
+                                  {filteredFileData.length === 0 ? (
+                                    <div className="p-4 text-center text-sm text-gray-500">
+                                      No processes found matching {breakdownSearch}
+                                    </div>
+                                  ) : (
+                                    filteredFileData.map((excelProcess, idx) => {
+                                      const processName = excelProcess.process;
+                                      const manPower = parseInt(excelProcess.manPower) || 0;
+                                      const isDisabled = isBreakdownProcessDisabled(processName);
+                                      const currentCount = breakdownProcessCounts[processName] || 0;
+                                      
+                                      return (
+                                        <button
+                                          key={excelProcess._id || idx}
+                                          type="button"
+                                          onClick={() => !isDisabled && handleBreakdownSelect(index, excelProcess)}
+                                          disabled={isDisabled}
+                                          className={`w-full text-left px-3 py-3 text-sm hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition dropdown-container ${
+                                            isDisabled 
+                                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                                              : 'hover:bg-blue-50'
+                                          }`}
+                                        >
+                                          <div className="font-medium">
+                                            {excelProcess.sno}. {excelProcess.process} 
+                                            <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${
+                                              isDisabled ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
+                                            }`}>
+                                              Man Power: {manPower}
+                                            </span>
+                                          </div>
+                                          <div className="flex justify-between items-center mt-1">
+                                            <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-800 rounded">
+                                              {excelProcess.mcTypeHp}
+                                            </span>
+                                            <div className="flex items-center gap-3">
+                                              {isDisabled ? (
+                                                <span className="text-xs font-medium text-red-600">
+                                                  Max reached ({currentCount}/{manPower})
+                                                </span>
+                                              ) : (
+                                                <>
+                                                  <span className="text-xs text-gray-600">
+                                                    Used: {currentCount}/{manPower}
+                                                  </span>
+                                                  <span className="text-xs font-medium text-green-600">
+                                                    SMV: {excelProcess.smv}
+                                                  </span>
+                                                </>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </button>
+                                      );
+                                    })
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </td>
+                          
+                          {/* SMV Cell */}
+                          <td className="px-6 py-4">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={item.smv || ''}
+                              onChange={(e) => handleInputChange(index, 'smv', e.target.value)}
+                              className="w-20 px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
+                            />
+                          </td>
+                          
+                          {/* Work As Cell with Dropdown */}
+                          <td className="px-6 py-4 relative">
+                            <div className="flex items-center gap-2 dropdown-container">
+                              <select
+                                value={item.workAs || 'Operator'}
+                                onChange={(e) => handleWorkAsSelect(index, e.target.value)}
+                                className="w-24 px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
+                              >
+                                {workAsOptions.map((option) => (
+                                  <option key={option} value={option}>
+                                    {option}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </td>
+                          
+                          {/* Target Cell */}
+                          <td className="px-6 py-4">
+                            <input
+                              type="number"
+                              value={item.target || ''}
+                              onChange={(e) => handleInputChange(index, 'target', e.target.value)}
+                              className="w-20 px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
+                            />
                           </td>
                         </tr>
-                      )}
-                    </>
-                  ))}
+                        
+                        {/* Expanded Hourly Production Section - ডিফল্টভাবে দেখাবে */}
+                        {(expandedRows[index] === undefined || expandedRows[index]) && hours.length > 0 && (
+                          <tr className={isDuplicate ? 'bg-red-50' : 'bg-blue-50'}>
+                            <td colSpan="10" className="px-6 py-4">
+                              <div className="mb-2">
+                                <h3 className="text-sm font-medium text-gray-700 mb-3">
+                                  {item.operatorName || item.operator || 'N/A'} -------- Hourly Production
+                                </h3>
+                                <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-15 xl:grid-cols-15 2xl:grid-cols-15 gap-3">
+                                  {hours.map((hour) => (
+                                    <div key={hour._id} className="space-y-1">
+                                      <label className="block text-xs font-medium text-gray-600">
+                                        {hour.hour}
+                                      </label>
+                                      <input
+                                        type="number"
+                                        value={getHourlyValue(index, hour.hour)}
+                                        onChange={(e) => handleHourlyProductionChange(index, hour.hour, e.target.value)}
+                                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                                        placeholder="Qty"
+                                        min="0"
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="flex justify-between items-center mt-3 pt-3 border-t border-blue-200">
+                                <div className="text-sm text-gray-600">
+                                  <span className="font-medium">Total Production: </span>
+                                  <span className="font-bold text-blue-700">{calculateRowTotal(index)}</span>
+                                  <span className="ml-4 text-xs text-gray-500">
+                                    {Array.isArray(item.hourlyProduction) && item.hourlyProduction.length > 0 
+                                      ? `${item.hourlyProduction.length} hours saved as array format`
+                                      : 'Enter production quantity for each hour'}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleRowExpansion(index)}
+                                  className="text-xs text-blue-600 hover:text-blue-800"
+                                >
+                                  Close
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1234,7 +1537,14 @@ useEffect(() => {
             {/* Table Footer */}
             <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-between items-center">
               <div className="text-sm text-gray-600">
-                Edit values in the table and click Save All Changes to update
+                {Object.keys(duplicateRowNos).length > 0 ? (
+                  <div className="flex items-center gap-2 text-red-600">
+                    <AlertTriangle className="w-4 h-4" />
+                    Fix duplicate Row Nos (highlighted in red) before saving
+                  </div>
+                ) : (
+                  'Edit values in the table and click Save All Changes to update'
+                )}
               </div>
               <div className="flex items-center gap-3">
                 <div className="text-sm text-gray-500">
