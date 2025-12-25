@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import QRCode from "qrcode";
 import { useReactToPrint } from "react-to-print";
+import Select from 'react-select';
 
 export default function QRBulkGeneratorPage() {
-  const [operators, setOperators] = useState([]);
-  const [machines, setMachines] = useState([]);
+  const [allOperators, setAllOperators] = useState([]);
+  const [allMachines, setAllMachines] = useState([]);
+  const [selectedOperators, setSelectedOperators] = useState([]);
+  const [selectedMachines, setSelectedMachines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [generatedQRCodes, setGeneratedQRCodes] = useState({
@@ -18,7 +21,7 @@ export default function QRBulkGeneratorPage() {
   const [scanTestResult, setScanTestResult] = useState(null);
   const printRef = useRef();
 
-  // Fetch operators and machines
+  // Fetch all operators and machines
   useEffect(() => {
     fetchAllData();
   }, []);
@@ -30,12 +33,12 @@ export default function QRBulkGeneratorPage() {
       // Fetch operators
       const operatorsRes = await fetch("/api/operators");
       const operatorsData = await operatorsRes.json();
-      setOperators(operatorsData);
+      setAllOperators(operatorsData);
 
       // Fetch machines
       const machinesRes = await fetch("/api/machines");
       const machinesData = await machinesRes.json();
-      setMachines(machinesData);
+      setAllMachines(machinesData);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -43,7 +46,25 @@ export default function QRBulkGeneratorPage() {
     }
   };
 
-  const generateAllQRCodes = async () => {
+  // Prepare operator options for select
+  const operatorOptions = useMemo(() => {
+    return allOperators.map(operator => ({
+      value: operator._id,
+      label: `${operator.operatorId} - ${operator.name} (${operator.designation})`,
+      operator: operator
+    }));
+  }, [allOperators]);
+
+  // Prepare machine options for select
+  const machineOptions = useMemo(() => {
+    return allMachines.map(machine => ({
+      value: machine._id,
+      label: `${machine.uniqueId} - ${machine.machineType?.name || 'Unknown'} (${machine.currentStatus})`,
+      machine: machine
+    }));
+  }, [allMachines]);
+
+  const generateSelectedQRCodes = async () => {
     setGenerating(true);
     setScanTestResult(null);
 
@@ -51,8 +72,9 @@ export default function QRBulkGeneratorPage() {
       const operatorQRCodes = [];
       const machineQRCodes = [];
 
-      // Generate operator QR codes
-      for (const operator of operators) {
+      // Generate QR codes for selected operators
+      for (const option of selectedOperators) {
+        const operator = option.operator;
         const qrData = {
           type: "operator",
           id: operator._id,
@@ -70,8 +92,9 @@ export default function QRBulkGeneratorPage() {
         });
       }
 
-      // Generate machine QR codes
-      for (const machine of machines) {
+      // Generate QR codes for selected machines
+      for (const option of selectedMachines) {
+        const machine = option.machine;
         const qrData = {
           type: "machine",
           id: machine._id,
@@ -99,6 +122,78 @@ export default function QRBulkGeneratorPage() {
     } finally {
       setGenerating(false);
     }
+  };
+
+  const generateAllQRCodes = async () => {
+    // Select all operators and machines
+    setSelectedOperators(operatorOptions);
+    setSelectedMachines(machineOptions);
+    
+    // Generate QR codes for all
+    setGenerating(true);
+    setScanTestResult(null);
+
+    try {
+      const operatorQRCodes = [];
+      const machineQRCodes = [];
+
+      // Generate QR codes for all operators
+      for (const operator of allOperators) {
+        const qrData = {
+          type: "operator",
+          id: operator._id,
+          operatorId: operator.operatorId,
+          name: operator.name,
+          designation: operator.designation,
+        };
+
+        const qrCode = await QRCode.toDataURL(JSON.stringify(qrData));
+        
+        operatorQRCodes.push({
+          ...operator,
+          qrCode,
+          qrData: JSON.stringify(qrData),
+        });
+      }
+
+      // Generate QR codes for all machines
+      for (const machine of allMachines) {
+        const qrData = {
+          type: "machine",
+          id: machine._id,
+          uniqueId: machine.uniqueId,
+          machineType: machine.machineType?.name || "Unknown",
+        };
+
+        const qrCode = await QRCode.toDataURL(JSON.stringify(qrData));
+        
+        machineQRCodes.push({
+          ...machine,
+          qrCode,
+          qrData: JSON.stringify(qrData),
+        });
+      }
+
+      setGeneratedQRCodes({
+        operators: operatorQRCodes,
+        machines: machineQRCodes,
+      });
+
+    } catch (error) {
+      console.error("Error generating QR codes:", error);
+      alert("Error generating QR codes");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedOperators([]);
+    setSelectedMachines([]);
+    setGeneratedQRCodes({
+      operators: [],
+      machines: [],
+    });
   };
 
   const handlePrint = useReactToPrint({
@@ -180,7 +275,7 @@ export default function QRBulkGeneratorPage() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "all_qr_codes.csv");
+    link.setAttribute("download", "selected_qr_codes.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -201,33 +296,106 @@ export default function QRBulkGeneratorPage() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            Bulk QR Code Generator
+            Selective QR Code Generator
           </h1>
           <p className="text-gray-600">
-            Generate QR codes for all operators and machines at once
+            Select operators and machines to generate QR codes
           </p>
+        </div>
+
+        {/* Stats and Selection */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Operators Selection */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-semibold text-blue-700 mb-4">
+              Select Operators ({selectedOperators.length} selected)
+            </h2>
+            <div className="mb-4">
+              <Select
+                isMulti
+                options={operatorOptions}
+                value={selectedOperators}
+                onChange={setSelectedOperators}
+                placeholder="Search and select operators..."
+                className="react-select-container"
+                classNamePrefix="react-select"
+                isLoading={loading}
+                isClearable={true}
+                closeMenuOnSelect={false}
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setSelectedOperators(operatorOptions)}
+                className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+              >
+                Select All Operators
+              </button>
+              <button
+                onClick={() => setSelectedOperators([])}
+                className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+              >
+                Clear Selection
+              </button>
+            </div>
+          </div>
+
+          {/* Machines Selection */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-semibold text-green-700 mb-4">
+              Select Machines ({selectedMachines.length} selected)
+            </h2>
+            <div className="mb-4">
+              <Select
+                isMulti
+                options={machineOptions}
+                value={selectedMachines}
+                onChange={setSelectedMachines}
+                placeholder="Search and select machines..."
+                className="react-select-container"
+                classNamePrefix="react-select"
+                isLoading={loading}
+                isClearable={true}
+                closeMenuOnSelect={false}
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setSelectedMachines(machineOptions)}
+                className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200"
+              >
+                Select All Machines
+              </button>
+              <button
+                onClick={() => setSelectedMachines([])}
+                className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+              >
+                Clear Selection
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Stats and Controls */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <div className="bg-white rounded-lg shadow p-4">
             <div className="text-sm text-gray-500">Total Operators</div>
-            <div className="text-2xl font-bold text-blue-600">{operators.length}</div>
+            <div className="text-2xl font-bold text-blue-600">{allOperators.length}</div>
           </div>
           <div className="bg-white rounded-lg shadow p-4">
             <div className="text-sm text-gray-500">Total Machines</div>
-            <div className="text-2xl font-bold text-green-600">{machines.length}</div>
+            <div className="text-2xl font-bold text-green-600">{allMachines.length}</div>
           </div>
           <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-sm text-gray-500">Generated QR Codes</div>
+            <div className="text-sm text-gray-500">Selected Items</div>
             <div className="text-2xl font-bold text-purple-600">
-              {generatedQRCodes.operators.length + generatedQRCodes.machines.length}
+              {selectedOperators.length + selectedMachines.length}
             </div>
           </div>
           <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-sm text-gray-500">Status</div>
-            <div className="text-lg font-semibold">
-              {loading ? "Loading..." : generating ? "Generating..." : "Ready"}
+            <div className="text-sm text-gray-500">Generated QR Codes</div>
+            <div className="text-2xl font-bold text-orange-600">
+              {generatedQRCodes.operators.length + generatedQRCodes.machines.length}
             </div>
           </div>
         </div>
@@ -245,13 +413,15 @@ export default function QRBulkGeneratorPage() {
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setShowOperators(!showOperators)}
-                  className={`px-4 py-2 rounded-md ${showOperators ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                  disabled={generatedQRCodes.operators.length === 0}
+                  className={`px-4 py-2 rounded-md ${showOperators ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'} ${generatedQRCodes.operators.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   {showOperators ? 'Hide' : 'Show'} Operators ({generatedQRCodes.operators.length})
                 </button>
                 <button
                   onClick={() => setShowMachines(!showMachines)}
-                  className={`px-4 py-2 rounded-md ${showMachines ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                  disabled={generatedQRCodes.machines.length === 0}
+                  className={`px-4 py-2 rounded-md ${showMachines ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'} ${generatedQRCodes.machines.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   {showMachines ? 'Hide' : 'Show'} Machines ({generatedQRCodes.machines.length})
                 </button>
@@ -265,25 +435,42 @@ export default function QRBulkGeneratorPage() {
               </label>
               <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={generateAllQRCodes}
-                  disabled={loading || generating || (operators.length === 0 && machines.length === 0)}
+                  onClick={generateSelectedQRCodes}
+                  disabled={loading || generating || (selectedOperators.length === 0 && selectedMachines.length === 0)}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {generating ? 'Generating...' : 'Generate All QR Codes'}
+                  {generating ? 'Generating...' : 'Generate Selected QR Codes'}
                 </button>
                 
                 <button
-                  onClick={handlePrint}
-                  disabled={generatedQRCodes.operators.length === 0 && generatedQRCodes.machines.length === 0}
+                  onClick={generateAllQRCodes}
+                  disabled={loading || generating}
                   className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Print All
+                  Generate All QR Codes
+                </button>
+                
+                <button
+                  onClick={clearSelection}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+                >
+                  Clear All
+                </button>
+              </div>
+              
+              <div className="flex flex-wrap gap-2 mt-2">
+                <button
+                  onClick={handlePrint}
+                  disabled={generatedQRCodes.operators.length === 0 && generatedQRCodes.machines.length === 0}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Print Selected
                 </button>
                 
                 <button
                   onClick={downloadAllQRCodes}
                   disabled={generatedQRCodes.operators.length === 0 && generatedQRCodes.machines.length === 0}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Download CSV
                 </button>
@@ -330,8 +517,10 @@ export default function QRBulkGeneratorPage() {
           <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
             <h3 className="font-semibold text-yellow-800 mb-2">Instructions:</h3>
             <ol className="list-decimal pl-5 text-yellow-700 text-sm space-y-1">
-              <li>Click Generate All QR Codes to create QR codes for all operators and machines</li>
-              <li>Click Print All to print all QR codes for physical distribution</li>
+              <li>Select operators and machines from the dropdowns above</li>
+              <li>Click Generate Selected QR Codes to create QR codes for selected items</li>
+              <li>Click Generate All QR Codes to create QR codes for all items</li>
+              <li>Click Print Selected to print all generated QR codes</li>
               <li>Use a QR scanner app on your phone to test each code</li>
               <li>Click on any QR code to simulate scanning and test functionality</li>
               <li>Download individual QR codes by clicking the download button on each card</li>
@@ -482,16 +671,28 @@ export default function QRBulkGeneratorPage() {
                 </svg>
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">No QR Codes Generated</h3>
-              <p className="text-gray-500 mb-6">
-                Click the Generate All QR Codes button to create QR codes for all operators and machines.
+              <p className="text-gray-500 mb-4">
+                Select operators and machines from the dropdowns above, then click Generate Selected QR Codes.
               </p>
-              <button
-                onClick={generateAllQRCodes}
-                disabled={loading || generating || (operators.length === 0 && machines.length === 0)}
-                className="px-6 py-3 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Generate All QR Codes
-              </button>
+              <p className="text-gray-400 text-sm mb-6">
+                Selected: {selectedOperators.length} operators, {selectedMachines.length} machines
+              </p>
+              <div className="flex justify-center gap-4">
+                <button
+                  onClick={generateSelectedQRCodes}
+                  disabled={loading || generating || (selectedOperators.length === 0 && selectedMachines.length === 0)}
+                  className="px-6 py-3 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Generate Selected QR Codes
+                </button>
+                <button
+                  onClick={generateAllQRCodes}
+                  disabled={loading || generating}
+                  className="px-6 py-3 bg-green-600 text-white font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Generate All QR Codes
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -500,7 +701,8 @@ export default function QRBulkGeneratorPage() {
         <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4 no-print">
           <h3 className="text-lg font-semibold text-blue-800 mb-2">Printing Instructions:</h3>
           <ul className="list-disc pl-5 text-blue-700 space-y-1">
-            <li>Click Print All button to print all generated QR codes</li>
+            <li>Select items from dropdowns and generate QR codes</li>
+            <li>Click Print Selected button to print generated QR codes</li>
             <li>For best results, use A4 paper size</li>
             <li>Each QR code is designed to be cut and pasted on machines/operator cards</li>
             <li>Test each QR code with a scanner before permanent placement</li>

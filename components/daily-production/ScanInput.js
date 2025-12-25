@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react'; // useEffect add kora hoise
+import { useState, useEffect, useRef } from 'react';
 
 export default function ScanInput({ 
   onScan, 
@@ -10,258 +10,252 @@ export default function ScanInput({
 }) {
   const [scanData, setScanData] = useState('');
   const [isManual, setIsManual] = useState(false);
-  const [manualData, setManualData] = useState({
+  const [pendingScans, setPendingScans] = useState([]); // ✅ পেন্ডিং স্ক্যান সংরক্ষণ
+
+  const manualData = {
     id: '',
     operatorId: '',
     name: '',
     designation: '',
     uniqueId: '',
     machineType: ''
-  });
+  };
 
-  // Auto-submit effect
-  useEffect(() => {
-    if (scanData.trim() && !disabled && !isManual) {
-      const timer = setTimeout(() => {
-        // Create a synthetic event
-        const syntheticEvent = { preventDefault: () => {} };
-        handleScanSubmit(syntheticEvent);
-      }, 500); // 500ms delay for user to see what was scanned
-      
-      return () => clearTimeout(timer);
+  // ===============================
+  // Parse multiple JSON safely
+  // ===============================
+  const parseMultipleJSON = (data) => {
+    const objects = [];
+    let brace = 0;
+    let start = -1;
+
+    for (let i = 0; i < data.length; i++) {
+      if (data[i] === '{') {
+        if (brace === 0) start = i;
+        brace++;
+      } else if (data[i] === '}') {
+        brace--;
+        if (brace === 0 && start !== -1) {
+          try {
+            const obj = JSON.parse(data.slice(start, i + 1));
+            objects.push(obj);
+          } catch {}
+          start = -1;
+        }
+      }
     }
+    return objects;
+  };
+
+  // ===============================
+  // Auto submit (QR scanner)
+  // ===============================
+  useEffect(() => {
+    if (!scanData.trim() || disabled || isManual) return;
+
+    const t = setTimeout(() => {
+      handleScanSubmit({ preventDefault: () => {} });
+    }, 400);
+
+    return () => clearTimeout(t);
   }, [scanData, disabled, isManual]);
 
-  const handleScanSubmit = (e) => {
-    if (e.preventDefault) e.preventDefault();
-    
-    if (isManual && scanType === 'operator') {
-      const operatorData = {
-        type: 'operator',
-        id: manualData.id || 'manual-id',
-        operatorId: manualData.operatorId,
-        name: manualData.name,
-        designation: manualData.designation
+  // ===============================
+  // Process pending scans sequentially
+  // ===============================
+  useEffect(() => {
+    if (pendingScans.length > 0) {
+      const processNext = async () => {
+        const scan = pendingScans[0];
+        
+        // অপারেটর স্ক্যান হলে তাকে প্রথমে প্রসেস করবে
+        if (scan.type === 'operator') {
+          onScan(JSON.stringify(scan));
+          setPendingScans(prev => prev.slice(1));
+        } 
+        // মেশিন স্ক্যান হলে অপারেটরের জন্য অপেক্ষা করবে
+        else if (scan.type === 'machine') {
+  setTimeout(() => {
+    onScan(JSON.stringify(scan));
+    setPendingScans(prev => prev.slice(1));
+  }, 700); // operator state settle করার সময় দিন
+}
+
       };
-      onScan(JSON.stringify(operatorData));
-    } else if (isManual && scanType === 'machine') {
-      const machineData = {
-        type: 'machine',
-        id: manualData.id || 'manual-id',
-        uniqueId: manualData.uniqueId,
-        machineType: manualData.machineType || 'Unknown'
-      };
-      onScan(JSON.stringify(machineData));
-    } else if (scanData.trim()) {
-      onScan(scanData);
+
+      processNext();
     }
+  }, [pendingScans, onScan]);
+
+  // ===============================
+  // MAIN SUBMIT HANDLER
+  // ===============================
+  const handleScanSubmit = (e) => {
+    e.preventDefault?.();
+
+    // ---------- MANUAL ----------
+    if (isManual) {
+      if (scanType === 'operator') {
+        onScan(JSON.stringify({
+          type: 'operator',
+          id: manualData.id || 'manual_' + Date.now(),
+          operatorId: manualData.operatorId,
+          name: manualData.name,
+          designation: manualData.designation
+        }));
+      } else if (scanType === 'machine') {
+        onScan(JSON.stringify({
+          type: 'machine',
+          id: manualData.id || 'manual_' + Date.now(),
+          uniqueId: manualData.uniqueId,
+          machineType: manualData.machineType || 'Unknown'
+        }));
+      }
+    }
+
+    // ---------- QR SCAN ----------
+    else {
+      const parsed = parseMultipleJSON(scanData);
+
+      if (parsed.length === 0) {
+        // যদি JSON না থাকে, সাধারণ টেক্সট হিসেবে প্রসেস করুন
+        onScan(scanData);
+      } else if (parsed.length === 1) {
+        // একটিমাত্র JSON থাকলে সরাসরি প্রসেস করুন
+        onScan(JSON.stringify(parsed[0]));
+      } else {
+        // একাধিক JSON থাকলে পেন্ডিং তালিকায় যোগ করুন
+        // প্রথমে অপারেটর, তারপর মেশিন - এই অর্ডারে সাজান
+        const sortedScans = parsed.sort((a, b) => {
+          if (a.type === 'operator' && b.type !== 'operator') return -1;
+          if (a.type !== 'operator' && b.type === 'operator') return 1;
+          return 0;
+        });
+
+        setPendingScans(sortedScans);
+      }
+    }
+
     setScanData('');
-    setManualData({
-      id: '',
-      operatorId: '',
-      name: '',
-      designation: '',
-      uniqueId: '',
-      machineType: ''
-    });
   };
 
-  const handleManualDataChange = (e) => {
-    const { name, value } = e.target;
-    setManualData(prev => ({ ...prev, [name]: value }));
-  };
-
+  // ===============================
+  // UI
+  // ===============================
   return (
     <div className="bg-white rounded-lg shadow p-6 mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">QR Code Scanner</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-semibold">QR Code Scanner</h2>
         <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <label className="text-sm font-medium text-gray-700">Scan Type:</label>
-            <select
-              value={scanType}
-              onChange={(e) => onScanTypeChange(e.target.value)}
-              className="border border-gray-300 rounded-md px-3 py-1 text-sm"
-            >
-              <option value="operator">Operator</option>
-              <option value="machine">Machine</option>
-            </select>
+          <div className="flex items-center">
+            <input
+              type="radio"
+              id="operator"
+              name="scanType"
+              checked={scanType === 'operator'}
+              onChange={() => onScanTypeChange('operator')}
+              className="mr-2"
+            />
+            <label htmlFor="operator" className="text-sm">Operator</label>
+          </div>
+          <div className="flex items-center">
+            <input
+              type="radio"
+              id="machine"
+              name="scanType"
+              checked={scanType === 'machine'}
+              onChange={() => onScanTypeChange('machine')}
+              className="mr-2"
+            />
+            <label htmlFor="machine" className="text-sm">Machine</label>
           </div>
           <button
-            type="button"
             onClick={() => setIsManual(!isManual)}
-            className="text-sm text-blue-600 hover:text-blue-800"
+            className="text-sm px-3 py-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200"
           >
-            {isManual ? 'Use QR Scan' : 'Manual Entry'}
+            {isManual ? 'QR Scan' : 'Manual Entry'}
           </button>
         </div>
       </div>
 
       {isManual ? (
-        <form onSubmit={handleScanSubmit} className="space-y-4">
+        <div className="space-y-3 mb-4">
           {scanType === 'operator' ? (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Operator ID
-                  </label>
-                  <input
-                    type="text"
-                    name="operatorId"
-                    value={manualData.operatorId}
-                    onChange={handleManualDataChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    placeholder="TGS-005754"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Name
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={manualData.name}
-                    onChange={handleManualDataChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    placeholder="MST. ASMA AKTER"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Designation
-                  </label>
-                  <input
-                    type="text"
-                    name="designation"
-                    value={manualData.designation}
-                    onChange={handleManualDataChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    placeholder="OPERATOR"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    ID
-                  </label>
-                  <input
-                    type="text"
-                    name="id"
-                    value={manualData.id}
-                    onChange={handleManualDataChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    placeholder="6947bef508ac0c7b97ac99d8"
-                  />
-                </div>
-              </div>
+              <input
+                type="text"
+                name="operatorId"
+                placeholder="Operator ID"
+                onChange={(e) => manualData.operatorId = e.target.value}
+                className="w-full border rounded p-2"
+              />
+              <input
+                type="text"
+                name="name"
+                placeholder="Operator Name"
+                onChange={(e) => manualData.name = e.target.value}
+                className="w-full border rounded p-2"
+              />
+              <input
+                type="text"
+                name="designation"
+                placeholder="Designation"
+                onChange={(e) => manualData.designation = e.target.value}
+                className="w-full border rounded p-2"
+              />
             </>
           ) : (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Machine Unique ID
-                  </label>
-                  <input
-                    type="text"
-                    name="uniqueId"
-                    value={manualData.uniqueId}
-                    onChange={handleManualDataChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    placeholder="GT-BTK-40"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Machine Type
-                  </label>
-                  <input
-                    type="text"
-                    name="machineType"
-                    value={manualData.machineType}
-                    onChange={handleManualDataChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    placeholder="Unknown"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    ID
-                  </label>
-                  <input
-                    type="text"
-                    name="id"
-                    value={manualData.id}
-                    onChange={handleManualDataChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    placeholder="6947cd7108ac0c7b97ac9a2c"
-                  />
-                </div>
-              </div>
+              <input
+                type="text"
+                name="uniqueId"
+                placeholder="Machine ID"
+                onChange={(e) => manualData.uniqueId = e.target.value}
+                className="w-full border rounded p-2"
+              />
+              <input
+                type="text"
+                name="machineType"
+                placeholder="Machine Type"
+                onChange={(e) => manualData.machineType = e.target.value}
+                className="w-full border rounded p-2"
+              />
             </>
           )}
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={disabled}
-              className={`px-4 py-2 rounded-md ${
-                disabled 
-                  ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-green-600 hover:bg-green-700'
-              } text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors`}
-            >
-              Add {scanType === 'operator' ? 'Operator' : 'Machine'}
-            </button>
-          </div>
-        </form>
+        </div>
       ) : (
-        <form onSubmit={handleScanSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="scanData" className="block text-sm font-medium text-gray-700 mb-1">
-              {scanType === 'operator' ? 'Operator' : 'Machine'} QR Code Data
-            </label>
-            <textarea
-              id="scanData"
-              value={scanData}
-              onChange={(e) => setScanData(e.target.value)}
-              onPaste={(e) => {
-                const pastedData = e.clipboardData.getData('text');
-                setScanData(pastedData);
-                // Auto-submit for all pasted data (not just JSON)
-                setTimeout(() => {
-                  handleScanSubmit(e);
-                }, 100);
-              }}
-              disabled={disabled}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-              placeholder={`Paste ${scanType === 'operator' ? 'operator' : 'machine'} QR code data here...`}
-              rows="3"
-              required
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Data paste korle 500ms er moddhe auto scan hobe
-            </p>
-          </div>
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={disabled || !scanData.trim()}
-              className={`px-4 py-2 rounded-md ${
-                disabled || !scanData.trim()
-                  ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-green-600 hover:bg-green-700'
-              } text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors`}
-            >
-              Scan {scanType === 'operator' ? 'Operator' : 'Machine'} QR
-            </button>
-          </div>
-        </form>
+        <textarea
+          value={scanData}
+          onChange={(e) => setScanData(e.target.value)}
+          disabled={disabled}
+          placeholder="Scan operator and machine QR codes together..."
+          rows={3}
+          className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
       )}
+
+      <div className="flex justify-between items-center mt-4">
+        <div className="text-sm text-gray-600">
+          {pendingScans.length > 0 && (
+            <span className="text-yellow-600">
+              ⏳ Processing {pendingScans.length} scan(s)...
+            </span>
+          )}
+        </div>
+        <button
+          onClick={handleScanSubmit}
+          disabled={disabled || (!scanData.trim() && !isManual)}
+          className={`px-6 py-2 rounded-lg font-medium ${
+            disabled || (!scanData.trim() && !isManual)
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              : 'bg-green-600 text-white hover:bg-green-700 transition-colors'
+          }`}
+        >
+          {isManual ? 'Add' : 'Scan'}
+        </button>
+      </div>
+
+      
     </div>
   );
 }

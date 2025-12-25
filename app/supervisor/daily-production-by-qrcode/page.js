@@ -206,28 +206,31 @@ export default function Home() {
   const handleScan = (data) => {
   try {
     const parsedData = JSON.parse(data);
-    
+
+    // ===============================
+    // OPERATOR SCAN
+    // ===============================
     if (parsedData.type === 'operator') {
-      // 1. Duplicate operator check - সম্পূর্ণ টেবিলে চেক
-      const isOperatorDuplicate = rows.some(row => 
-        row.operator && 
-        (row.operator.id === parsedData.id || 
+
+      // ❌ Duplicate operator check (whole table)
+      const isDuplicate = rows.some(row =>
+        row.operator &&
+        (row.operator.id === parsedData.id ||
          row.operator.operatorId === parsedData.operatorId)
       );
-      
-      if (isOperatorDuplicate) {
-        // ডুপ্লিকেট অপারেটর কোন row এ আছে তা খুঁজে বের করুন
-        const duplicateRowIndex = rows.findIndex(row => 
-          row.operator && 
-          (row.operator.id === parsedData.id || 
+
+      if (isDuplicate) {
+        const index = rows.findIndex(row =>
+          row.operator &&
+          (row.operator.id === parsedData.id ||
            row.operator.operatorId === parsedData.operatorId)
         );
-        
-        alert(`❌ Operator "${parsedData.name}" already exists in Row ${duplicateRowIndex + 1}. Duplicate operators are not allowed in the entire table.`);
+
+        alert(`❌ Operator "${parsedData.name}" already exists in Row ${index + 1}`);
         return;
       }
-      
-      // Add new row with operator
+
+      // ✅ Create new row with operator
       const newRow = {
         operator: {
           id: parsedData.id,
@@ -243,92 +246,89 @@ export default function Home() {
         target: '',
         isNew: true
       };
-      
+
       setRows(prev => [...prev, newRow]);
-      
-      // Remove new flag after 2 seconds
+
+      // auto highlight remove
       setTimeout(() => {
-        setRows(prev => prev.map(row => ({ ...row, isNew: false })));
-      }, 2000);
-      
-    } else if (parsedData.type === 'machine') {
-      // 2. Duplicate machine check - সম্পূর্ণ টেবিলে চেক
-      const isMachineDuplicate = rows.some(row => 
-        row.machine && 
-        (row.machine.id === parsedData.id || 
+        setRows(prev => prev.map(r => ({ ...r, isNew: false })));
+      }, 1500);
+
+      return;
+    }
+
+    // ===============================
+    // MACHINE SCAN
+    // ===============================
+    if (parsedData.type === 'machine') {
+
+      // ❌ Duplicate machine check
+      const isMachineDuplicate = rows.some(row =>
+        row.machine &&
+        (row.machine.id === parsedData.id ||
          row.machine.uniqueId === parsedData.uniqueId)
       );
-      
+
       if (isMachineDuplicate) {
-        // ডুপ্লিকেট মেশিন কোন row এ আছে তা খুঁজে বের করুন
-        const duplicateRowIndex = rows.findIndex(row => 
-          row.machine && 
-          (row.machine.id === parsedData.id || 
+        const index = rows.findIndex(row =>
+          row.machine &&
+          (row.machine.id === parsedData.id ||
            row.machine.uniqueId === parsedData.uniqueId)
         );
-        
-        alert(`❌ Machine "${parsedData.uniqueId}" already exists in Row ${duplicateRowIndex + 1}. Duplicate machines are not allowed in the entire table.`);
+
+        alert(`❌ Machine "${parsedData.uniqueId}" already exists in Row ${index + 1}`);
         return;
       }
-      
-      // Assign machine to selected row or last row
-      const targetRow = selectedRow !== null ? selectedRow : rows.length - 1;
-      
-      if (targetRow >= 0 && targetRow < rows.length) {
-        // 3. Check if selected row has operator
-        if (!rows[targetRow].operator) {
-          alert(`⚠️ Row ${targetRow + 1} has no operator. Please assign an operator first before assigning a machine.`);
-          return;
-        }
-        
-        setRows(prev => prev.map((row, index) => 
-          index === targetRow 
-            ? { ...row, machine: {
-                id: parsedData.id,
-                uniqueId: parsedData.uniqueId,
-                machineType: parsedData.machineType
-              }}
-            : row
-        ));
-        
-        // Reset selected row
-        setSelectedRow(null);
-      } else {
-        // 4. Check for machine without operator (new row scenario)
-        // অপারেটর ছাড়া মেশিন স্ক্যান করা যাবে না
-        alert(`⚠️ No operator assigned. Please scan an operator first before scanning a machine.`);
-        
-        // Alternative: নতুন row তৈরি করবেন কিন্তু শুধুমাত্র মেশিন দিয়ে
-        // যদি চান, তবে নিচের কোড আনকমেন্ট করুন:
-        /*
-        const newRow = {
-          operator: null,
-          machine: {
-            id: parsedData.id,
-            uniqueId: parsedData.uniqueId,
-            machineType: parsedData.machineType
-          },
-          process: '',
-          breakdownProcess: '',
-          smv: '',
-          workAs: 'operator',
-          target: '',
-          isNew: true
-        };
-        
-        setRows(prev => [...prev, newRow]);
-        
-        setTimeout(() => {
-          setRows(prev => prev.map(row => ({ ...row, isNew: false })));
-        }, 2000);
-        */
+
+      // ✅ Find target row
+      let targetRowIndex = null;
+
+      // 1️⃣ selected row priority
+      if (selectedRow !== null && rows[selectedRow]?.operator) {
+        targetRowIndex = selectedRow;
       }
+      // 2️⃣ last row with operator but no machine
+      else {
+        for (let i = rows.length - 1; i >= 0; i--) {
+          if (rows[i].operator && !rows[i].machine) {
+            targetRowIndex = i;
+            break;
+          }
+        }
+      }
+
+      // ❌ still no operator
+      if (targetRowIndex === null) {
+        alert('⚠️ No operator found. Please scan operator first.');
+        return;
+      }
+
+      // ✅ Assign machine
+      setRows(prev =>
+        prev.map((row, index) =>
+          index === targetRowIndex
+            ? {
+                ...row,
+                machine: {
+                  id: parsedData.id,
+                  uniqueId: parsedData.uniqueId,
+                  machineType: parsedData.machineType
+                }
+              }
+            : row
+        )
+      );
+
+      setSelectedRow(null);
+      return;
     }
-  } catch (error) {
-    console.error('Invalid scan data:', error);
-    alert('Invalid scan data. Please check the format.');
+
+  } catch (err) {
+    console.error(err);
+    alert('Invalid scan data. Please check QR format.');
   }
 };
+
 
   const handleRowSelect = (index) => {
     setSelectedRow(index);
