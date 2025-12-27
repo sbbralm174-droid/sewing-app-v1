@@ -5,7 +5,6 @@ import { connectDB } from '@/lib/db';
 import DailyProduction from '@/models/DailyProduction';
 
 // ১. ডেটা খোঁজার এপিআই (GET)
-// ১. ডেটা খোঁজার এপিআই (GET)
 export async function GET(request) {
   try {
     await connectDB();
@@ -29,7 +28,7 @@ export async function GET(request) {
       floor,
       line
     })
-    .select('rowNo operator uniqueMachine process breakdownProcess smv workAs target hourlyProduction')
+    .select('rowNo operator uniqueMachine process breakdownProcess smv workAs target hourlyProduction hourlyTarget')
     .sort({ rowNo: 1 })
     .lean();
 
@@ -42,7 +41,9 @@ export async function GET(request) {
         : [],
       // Extract operator information
       operatorName: prod.operator?.name || prod.operator || '',
-      operatorId: prod.operator?._id || prod.operator || ''
+      operatorId: prod.operator?._id || prod.operator || '',
+      // Ensure hourlyTarget is included
+      hourlyTarget: prod.hourlyTarget || ''
     }));
 
     return NextResponse.json({ 
@@ -54,7 +55,6 @@ export async function GET(request) {
   }
 }
 
-// ২. ডেটা আপডেট করার এপিআই (PUT)
 // ২. ডেটা আপডেট করার এপিআই (PUT)
 export async function PUT(request) {
   try {
@@ -70,13 +70,14 @@ export async function PUT(request) {
         filter: { _id: item._id },
         update: { 
           $set: {
-            rowNo:  item.rowNo,
+            rowNo: item.rowNo,
             process: item.process,
             breakdownProcess: item.breakdownProcess,
             uniqueMachine: item.uniqueMachine,
             smv: item.smv,
             target: item.target,
             workAs: item.workAs,
+            hourlyTarget: item.hourlyTarget || '', // Add hourlyTarget field
             // Ensure hourlyProduction is always an array
             hourlyProduction: Array.isArray(item.hourlyProduction) 
               ? item.hourlyProduction 
@@ -96,6 +97,47 @@ export async function PUT(request) {
 
   } catch (error) {
     console.error("Update Error:", error);
+    return NextResponse.json({ message: error.message }, { status: 500 });
+  }
+}
+
+// ৩. Hourly Target update করার জন্য আলাদা API (PUT)
+export async function POST(request) {
+  try {
+    await connectDB();
+    const body = await request.json();
+    
+    const { data, date, floor, line } = body;
+    
+    if (!Array.isArray(data)) {
+      return NextResponse.json({ message: "Data must be an array" }, { status: 400 });
+    }
+    
+    if (!date || !floor || !line) {
+      return NextResponse.json({ message: "Missing required parameters" }, { status: 400 });
+    }
+    
+    const updateOperations = data.map((item) => ({
+      updateOne: {
+        filter: { _id: item._id },
+        update: { 
+          $set: {
+            hourlyTarget: item.hourlyTarget || '',
+            updatedAt: new Date()
+          } 
+        }
+      }
+    }));
+
+    const result = await DailyProduction.bulkWrite(updateOperations);
+
+    return NextResponse.json({ 
+      success: true, 
+      message: `Hourly target updated for ${result.modifiedCount} items successfully!` 
+    });
+
+  } catch (error) {
+    console.error("Hourly Target Update Error:", error);
     return NextResponse.json({ message: error.message }, { status: 500 });
   }
 }

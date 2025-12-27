@@ -451,7 +451,8 @@ export default function Home() {
     },
     rows: rows.map(row => {
       // Make sure operator has required fields
-      const operatorId = row.operator?.id || '';
+      const operatorMongoId = row.operator?.id || '';
+      const operatorId = row.operator?.operatorId || '';
       const operatorName = row.operator?.name || '';
       
       if (!operatorId || !operatorName) {
@@ -460,6 +461,7 @@ export default function Home() {
 
       return {
         operatorId: operatorId,
+        operatorMongoId :operatorMongoId,
         operatorName: operatorName,
         operatorDesignation: row.operator?.designation || 'Operator',
         machineUniqueId: row.machine?.uniqueId || '',

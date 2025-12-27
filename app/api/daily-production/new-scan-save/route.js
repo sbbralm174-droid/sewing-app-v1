@@ -1,3 +1,5 @@
+
+
 import { connectDB } from '@/lib/db';
 import DailyProduction from '@/models/DailyProduction';
 import mongoose from 'mongoose';
@@ -35,57 +37,15 @@ export async function POST(request) {
       );
     }
 
-    // Validate and convert ObjectId fields
-    const buyerId = productionInfo.buyerId;
-    const styleId = productionInfo.styleId;
-    const supervisorId = productionInfo.supervisorId;
-    const floorId = productionInfo.floorId;
-    const lineId = productionInfo.lineId;
+    // Convert IDs to ObjectId
+    const buyerId = new mongoose.Types.ObjectId(productionInfo.buyerId);
+    const styleId = new mongoose.Types.ObjectId(productionInfo.styleId);
+    const supervisorId = new mongoose.Types.ObjectId(productionInfo.supervisorId);
+    const floorId = new mongoose.Types.ObjectId(productionInfo.floorId);
+    const lineId = new mongoose.Types.ObjectId(productionInfo.lineId);
 
-    // Check if IDs are valid ObjectId
-    if (!mongoose.Types.ObjectId.isValid(buyerId)) {
-      return Response.json(
-        { success: false, message: 'Invalid buyerId format' },
-        { status: 400 }
-      );
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(styleId)) {
-      return Response.json(
-        { success: false, message: 'Invalid styleId format' },
-        { status: 400 }
-      );
-    }
-
-    // Validate each row
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      
-      if (!row.operatorId || !row.operatorName) {
-        return Response.json(
-          { 
-            success: false, 
-            message: `Row ${i + 1}: operatorId and operatorName are required` 
-          },
-          { status: 400 }
-        );
-      }
-      
-      // Check if operatorId is valid ObjectId
-      if (row.operatorId && !mongoose.Types.ObjectId.isValid(row.operatorId)) {
-        return Response.json(
-          { 
-            success: false, 
-            message: `Row ${i + 1}: Invalid operatorId format` 
-          },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Prepare daily production documents
+    // Prepare daily production documents (operator validation removed)
     const dailyProductions = rows.map((row, index) => {
-      // Determine SMV type based on breakdownProcess
       let smvType = '';
       if (row.smv) {
         if (row.breakdownProcess && row.breakdownProcess.trim() !== '') {
@@ -95,11 +55,10 @@ export async function POST(request) {
         }
       }
 
-      // Create document
-      const productionDoc = {
+      return {
         date: new Date(productionInfo.date),
         operator: {
-          _id: row.operatorId || null,
+          _id: row.operatorMongoId ? new mongoose.Types.ObjectId(row.operatorMongoId) : undefined,
           operatorId: row.operatorId || '',
           name: row.operatorName || '',
           designation: row.operatorDesignation || 'Operator'
@@ -114,38 +73,25 @@ export async function POST(request) {
         machineType: row.machineType || '',
         uniqueMachine: row.machineUniqueId || '',
         target: row.target ? parseInt(row.target) : 0,
-        buyerId: new mongoose.Types.ObjectId(buyerId), // Convert to ObjectId
+        buyerId,
         buyerName: productionInfo.buyerName || '',
-        styleId: new mongoose.Types.ObjectId(styleId), // Convert to ObjectId
+        styleId,
         styleName: productionInfo.styleName || '',
-        supervisorId: new mongoose.Types.ObjectId(supervisorId),
-        floorId: new mongoose.Types.ObjectId(floorId),
-        lineId: new mongoose.Types.ObjectId(lineId),
+        supervisorId,
+        floorId,
+        lineId,
         workAs: row.workAs || 'operator',
         smv: row.smv?.toString() || '',
-        smvType: smvType,
+        smvType,
         rowNo: index + 1,
         hourlyProduction: [],
         createdAt: new Date(),
         updatedAt: new Date()
       };
-
-      // Log each document for debugging
-      console.log(`Document ${index + 1}:`, {
-        operator: productionDoc.operator,
-        buyerId: productionDoc.buyerId,
-        styleId: productionDoc.styleId,
-        supervisor: productionDoc.supervisor,
-        floor: productionDoc.floor,
-        line: productionDoc.line
-      });
-
-      return productionDoc;
     });
 
     console.log(`Attempting to save ${dailyProductions.length} documents`);
 
-    // Save to database
     const savedProductions = await DailyProduction.insertMany(dailyProductions);
 
     console.log(`Successfully saved ${savedProductions.length} documents`);
@@ -158,21 +104,8 @@ export async function POST(request) {
     }, { status: 201 });
 
   } catch (error) {
-    console.error('=== ERROR DETAILS ===');
-    console.error('Error name:', error.name);
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
-    
-    if (error.errors) {
-      console.error('Validation errors:', Object.keys(error.errors).map(key => ({
-        field: key,
-        message: error.errors[key].message,
-        value: error.errors[key].value
-      })));
-    }
-    
-    console.error('=== END ERROR ===');
-    
+    console.error('=== ERROR DETAILS ===', error);
+
     return Response.json(
       { 
         success: false, 

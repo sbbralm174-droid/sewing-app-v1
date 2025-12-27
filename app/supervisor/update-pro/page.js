@@ -52,6 +52,10 @@ export default function DailyProductionPage() {
   const [duplicateRowNos, setDuplicateRowNos] = useState({});
   const [duplicateWarnings, setDuplicateWarnings] = useState({});
 
+  // Hourly Target state - new addition
+  const [hourlyTargets, setHourlyTargets] = useState({});
+  const [isSavingHourlyTarget, setIsSavingHourlyTarget] = useState(false);
+
   // Fetch floors from API
   const fetchFloors = async () => {
     try {
@@ -158,53 +162,53 @@ export default function DailyProductionPage() {
     return count >= manPower;
   };
 
- // Check for duplicate rowNos
-const checkDuplicateRowNos = (data) => {
-  const rowNoCounts = {};
-  const duplicates = {};
-  const warnings = {};
-  
-  data.forEach((item, index) => {
-    const rowNo = item.rowNo;
+  // Check for duplicate rowNos
+  const checkDuplicateRowNos = (data) => {
+    const rowNoCounts = {};
+    const duplicates = {};
+    const warnings = {};
     
-    // Check if rowNo exists and is a string
-    if (rowNo !== null && rowNo !== undefined) {
-      // Convert to string if it's not already
-      const rowNoStr = typeof rowNo === 'string' ? rowNo : String(rowNo);
+    data.forEach((item, index) => {
+      const rowNo = item.rowNo;
       
-      // Trim only if it's a string
-      const trimmedRowNo = typeof rowNoStr === 'string' ? rowNoStr.trim() : rowNoStr;
-      
-      if (trimmedRowNo && trimmedRowNo !== '') {
-        if (!rowNoCounts[trimmedRowNo]) {
-          rowNoCounts[trimmedRowNo] = [index];
-        } else {
-          rowNoCounts[trimmedRowNo].push(index);
+      // Check if rowNo exists and is a string
+      if (rowNo !== null && rowNo !== undefined) {
+        // Convert to string if it's not already
+        const rowNoStr = typeof rowNo === 'string' ? rowNo : String(rowNo);
+        
+        // Trim only if it's a string
+        const trimmedRowNo = typeof rowNoStr === 'string' ? rowNoStr.trim() : rowNoStr;
+        
+        if (trimmedRowNo && trimmedRowNo !== '') {
+          if (!rowNoCounts[trimmedRowNo]) {
+            rowNoCounts[trimmedRowNo] = [index];
+          } else {
+            rowNoCounts[trimmedRowNo].push(index);
+          }
         }
       }
-    }
-  });
-  
-  // Mark duplicates
-  Object.keys(rowNoCounts).forEach(rowNo => {
-    if (rowNoCounts[rowNo].length > 1) {
-      rowNoCounts[rowNo].forEach(index => {
-        duplicates[index] = rowNo;
-      });
-    }
-  });
-  
-  setDuplicateRowNos(duplicates);
-  
-  // Generate warnings
-  Object.keys(rowNoCounts).forEach(rowNo => {
-    if (rowNoCounts[rowNo].length > 1) {
-      warnings[rowNo] = `Row No "${rowNo}" appears ${rowNoCounts[rowNo].length} times`;
-    }
-  });
-  
-  setDuplicateWarnings(warnings);
-};
+    });
+    
+    // Mark duplicates
+    Object.keys(rowNoCounts).forEach(rowNo => {
+      if (rowNoCounts[rowNo].length > 1) {
+        rowNoCounts[rowNo].forEach(index => {
+          duplicates[index] = rowNo;
+        });
+      }
+    });
+    
+    setDuplicateRowNos(duplicates);
+    
+    // Generate warnings
+    Object.keys(rowNoCounts).forEach(rowNo => {
+      if (rowNoCounts[rowNo].length > 1) {
+        warnings[rowNo] = `Row No "${rowNo}" appears ${rowNoCounts[rowNo].length} times`;
+      }
+    });
+    
+    setDuplicateWarnings(warnings);
+  };
 
   // Handle rowNo change with duplicate check
   const handleRowNoChange = (index, value) => {
@@ -478,136 +482,136 @@ const checkDuplicateRowNos = (data) => {
   };
 
   // Handle search parameter changes
-const handleParamChange = async (field, value) => {
-  const updatedParams = {
-    ...searchParams,
-    [field]: value
-  };
-  
-  
-  setSearchParams(updatedParams);
-  
-  // Update lines when floor changes
-  if (field === 'floor') {
+  const handleParamChange = async (field, value) => {
+    const updatedParams = {
+      ...searchParams,
+      [field]: value
+    };
     
-    await fetchLinesByFloor(value);
-    setSearchParams(prev => ({
-      ...prev,
-      [field]: value,
-      line: ''
-    }));
+    setSearchParams(updatedParams);
     
-    // Fetch hours for the selected floor
-    const selectedFloor = floors.find(f => f._id === value);
-    if (selectedFloor) {
-      fetchHoursByFloor(selectedFloor.floorName);
+    // Update lines when floor changes
+    if (field === 'floor') {
+      await fetchLinesByFloor(value);
+      setSearchParams(prev => ({
+        ...prev,
+        [field]: value,
+        line: ''
+      }));
+      
+      // Fetch hours for the selected floor
+      const selectedFloor = floors.find(f => f._id === value);
+      if (selectedFloor) {
+        fetchHoursByFloor(selectedFloor.floorName);
+      }
     }
-  }
-};
+  };
 
- // Fetch production data
-const fetchProductionData = async () => {
-  if (!searchParams.date || !searchParams.floor || !searchParams.line) {
-    setMessage({ type: 'error', text: 'Please select date, floor, and line' });
-    return;
-  }
-
-  setIsLoading(true);
-  setMessage({ type: '', text: '' });
-
-  try {
-    // Find the selected floor to get floor name
-    const selectedFloor = floors.find(f => f._id === searchParams.floor);
-    
-    if (!selectedFloor) {
-      setMessage({ type: 'error', text: 'Selected floor not found' });
-      setIsLoading(false);
+  // Fetch production data
+  const fetchProductionData = async () => {
+    if (!searchParams.date || !searchParams.floor || !searchParams.line) {
+      setMessage({ type: 'error', text: 'Please select date, floor, and line' });
       return;
     }
-    
-    // Create params for API call - send floor NAME instead of ID
-    const params = new URLSearchParams({
-      date: searchParams.date,
-      floor: selectedFloor.floorName, // Send floor NAME, not ID
-      line: searchParams.line
-    });
-    
-    console.log('API Call Params:', params.toString()); // Debug log
-    
-    const response = await fetch(`/api/daily-production/update-production?${params}`);
-    
-    if (!response.ok) {
-      throw new Error('Failed to fetch data');
-    }
-    
-    const result = await response.json();
-    
-    if (result.success) {
-      // Process operator data if it's an object
-      const processedData = result.data.map(item => {
-        // Ensure hourlyProduction is always an array
-        const hourlyProduction = Array.isArray(item.hourlyProduction) 
-          ? item.hourlyProduction 
-          : [];
-        
-        // Check if floor is an object in response and extract name
-        let floorName = selectedFloor.floorName;
-        if (item.floor && typeof item.floor === 'object') {
-          floorName = item.floor.floorName || selectedFloor.floorName;
-        } else if (item.floor && typeof item.floor === 'string') {
-          floorName = item.floor;
-        }
-        
-        // Check if operator is an object and extract name
-        if (item.operator && typeof item.operator === 'object') {
+
+    setIsLoading(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      // Find the selected floor to get floor name
+      const selectedFloor = floors.find(f => f._id === searchParams.floor);
+      
+      if (!selectedFloor) {
+        setMessage({ type: 'error', text: 'Selected floor not found' });
+        setIsLoading(false);
+        return;
+      }
+      
+      // Create params for API call - send floor NAME instead of ID
+      const params = new URLSearchParams({
+        date: searchParams.date,
+        floor: selectedFloor.floorName, // Send floor NAME, not ID
+        line: searchParams.line
+      });
+      
+      console.log('API Call Params:', params.toString()); // Debug log
+      
+      const response = await fetch(`/api/daily-production/update-production?${params}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch data');
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        // Process operator data if it's an object
+        const processedData = result.data.map(item => {
+          // Ensure hourlyProduction is always an array
+          const hourlyProduction = Array.isArray(item.hourlyProduction) 
+            ? item.hourlyProduction 
+            : [];
+          
+          // Check if floor is an object in response and extract name
+          let floorName = selectedFloor.floorName;
+          if (item.floor && typeof item.floor === 'object') {
+            floorName = item.floor.floorName || selectedFloor.floorName;
+          } else if (item.floor && typeof item.floor === 'string') {
+            floorName = item.floor;
+          }
+          
+          // Check if operator is an object and extract name
+          if (item.operator && typeof item.operator === 'object') {
+            return {
+              ...item,
+              operatorName: item.operator.name || item.operator.operatorName || '',
+              operatorId: item.operator._id || item.operator.operatorId || '',
+              floorName: floorName, // Add floor name
+              floorId: selectedFloor._id, // Keep floor ID for reference
+              workAs: item.workAs || 'Operator', // Default to Operator
+              hourlyProduction: hourlyProduction,
+              rowNo: item.rowNo || '', // Ensure rowNo is included
+              hourlyTarget: item.hourlyTarget || '' // Add hourlyTarget field
+            };
+          }
+          // If operator is already a string
           return {
             ...item,
-            operatorName: item.operator.name || item.operator.operatorName || '',
-            operatorId: item.operator._id || item.operator.operatorId || '',
+            operatorName: item.operator || '',
+            operatorId: '',
             floorName: floorName, // Add floor name
             floorId: selectedFloor._id, // Keep floor ID for reference
             workAs: item.workAs || 'Operator', // Default to Operator
             hourlyProduction: hourlyProduction,
-            rowNo: item.rowNo || '' // Ensure rowNo is included
+            rowNo: item.rowNo || '', // Ensure rowNo is included
+            hourlyTarget: item.hourlyTarget || '' // Add hourlyTarget field
           };
+        });
+        
+        setProductionData(processedData);
+        
+        // Check for duplicate rowNos
+        checkDuplicateRowNos(processedData);
+        
+        // ডিফল্টভাবে সব row expand করে রাখো
+        const initialExpandedRows = {};
+        processedData.forEach((_, index) => {
+          initialExpandedRows[index] = true; // সব row ডিফল্টভাবে open থাকবে
+        });
+        setExpandedRows(initialExpandedRows);
+        
+        if (result.data && result.data.length === 0) {
+          setMessage({ type: 'info', text: 'No data found for the selected criteria' });
         }
-        // If operator is already a string
-        return {
-          ...item,
-          operatorName: item.operator || '',
-          operatorId: '',
-          floorName: floorName, // Add floor name
-          floorId: selectedFloor._id, // Keep floor ID for reference
-          workAs: item.workAs || 'Operator', // Default to Operator
-          hourlyProduction: hourlyProduction,
-          rowNo: item.rowNo || '' // Ensure rowNo is included
-        };
-      });
-      
-      setProductionData(processedData);
-      
-      // Check for duplicate rowNos
-      checkDuplicateRowNos(processedData);
-      
-      // ডিফল্টভাবে সব row expand করে রাখো
-      const initialExpandedRows = {};
-      processedData.forEach((_, index) => {
-        initialExpandedRows[index] = true; // সব row ডিফল্টভাবে open থাকবে
-      });
-      setExpandedRows(initialExpandedRows);
-      
-      if (result.data && result.data.length === 0) {
-        setMessage({ type: 'info', text: 'No data found for the selected criteria' });
+      } else {
+        setMessage({ type: 'error', text: result.message || 'Failed to load data' });
       }
-    } else {
-      setMessage({ type: 'error', text: result.message || 'Failed to load data' });
+    } catch (error) {
+      setMessage({ type: 'error', text: error.message });
+    } finally {
+      setIsLoading(false);
     }
-  } catch (error) {
-    setMessage({ type: 'error', text: error.message });
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   // Prepare data for API submission
   const handleUpdate = async () => {
@@ -651,7 +655,8 @@ const fetchProductionData = async () => {
           smv: item.smv,
           target: item.target,
           workAs: item.workAs,
-          hourlyProduction: filteredHourlyProduction  // Send as array
+          hourlyProduction: filteredHourlyProduction, // Send as array
+          hourlyTarget: item.hourlyTarget || '' // Include hourlyTarget
         };
         
         // If operator was originally an object, keep the operatorId
@@ -689,6 +694,69 @@ const fetchProductionData = async () => {
       setMessage({ type: 'error', text: error.message });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Handle hourly target save for all rows
+  const handleHourlyTargetSave = async () => {
+    if (!searchParams.date || !searchParams.floor || !searchParams.line) {
+      setMessage({ type: 'error', text: 'Please select date, floor, and line first' });
+      return;
+    }
+
+    setIsSavingHourlyTarget(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      // Find the selected floor to get floor name
+      const selectedFloor = floors.find(f => f._id === searchParams.floor);
+      
+      if (!selectedFloor) {
+        setMessage({ type: 'error', text: 'Selected floor not found' });
+        setIsSavingHourlyTarget(false);
+        return;
+      }
+
+      // Prepare data for API - update hourlyTarget for all rows
+      const apiData = productionData.map(item => {
+        return {
+          _id: item._id,
+          hourlyTarget: item.hourlyTarget || ''
+        };
+      });
+
+      const response = await fetch('/api/daily-production/update-hourly-target', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          data: apiData,
+          date: searchParams.date,
+          floor: selectedFloor.floorName,
+          line: searchParams.line
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setMessage({ 
+          type: 'success', 
+          text: result.message || 'Hourly Target updated successfully for all rows!' 
+        });
+        
+        // Refresh data after update
+        setTimeout(() => {
+          fetchProductionData();
+        }, 1000);
+      } else {
+        setMessage({ type: 'error', text: result.message });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: error.message });
+    } finally {
+      setIsSavingHourlyTarget(false);
     }
   };
 
@@ -809,7 +877,6 @@ const fetchProductionData = async () => {
   useEffect(() => {
     if (searchParams.date && searchParams.floor && searchParams.line) {
       fetchProductionData();
-    //  console.log(searchParams)
     }
   }, []);
 
@@ -920,6 +987,111 @@ const fetchProductionData = async () => {
               </button>
             </div>
           </form>
+
+          {/* Hourly Target Section */}
+          {productionData.length > 0 && (
+            <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-green-800">Hourly Target Management</h3>
+                <div className="flex items-center gap-3">
+                  <div className="text-sm text-green-700">
+                    <span className="font-medium">{productionData.length}</span> rows to update
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-green-700 mb-2">
+                    Set Hourly Target for All Rows
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      placeholder="Enter hourly target value"
+                      className="flex-1 px-4 py-2 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                      value={hourlyTargets.all || ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setHourlyTargets(prev => ({ ...prev, all: value }));
+                        
+                        // Apply to all rows
+                        if (value !== '') {
+                          const updatedData = productionData.map(item => ({
+                            ...item,
+                            hourlyTarget: value
+                          }));
+                          setProductionData(updatedData);
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleHourlyTargetSave}
+                      disabled={isSavingHourlyTarget}
+                      className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 focus:ring-4 focus:ring-green-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isSavingHourlyTarget ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <Save className="w-5 h-5" />
+                      )}
+                      {isSavingHourlyTarget ? 'Saving...' : 'Save for All'}
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-green-600">
+                    This will update the hourly target for all {productionData.length} rows in the table below.
+                  </p>
+                </div>
+                
+                <div className="border-l border-green-200 pl-4">
+                  <div className="text-sm font-medium text-green-700 mb-1">Quick Actions</div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updatedData = productionData.map(item => ({
+                          ...item,
+                          hourlyTarget: ''
+                        }));
+                        setProductionData(updatedData);
+                        setHourlyTargets(prev => ({ ...prev, all: '' }));
+                      }}
+                      className="px-4 py-2 text-sm border border-red-300 text-red-700 rounded-lg hover:bg-red-50 transition"
+                    >
+                      Clear All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetValue = prompt("Enter hourly target value:");
+                        if (targetValue !== null && targetValue !== '') {
+                          const updatedData = productionData.map(item => ({
+                            ...item,
+                            hourlyTarget: targetValue
+                          }));
+                          setProductionData(updatedData);
+                          setHourlyTargets(prev => ({ ...prev, all: targetValue }));
+                        }
+                      }}
+                      className="px-4 py-2 text-sm border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50 transition"
+                    >
+                      Set Specific
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              {productionData.some(item => item.hourlyTarget) && (
+                <div className="mt-3 pt-3 border-t border-green-200">
+                  <div className="text-sm text-green-700">
+                    <span className="font-medium">Applied to: </span>
+                    {productionData.filter(item => item.hourlyTarget).length} of {productionData.length} rows
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Message Display */}
           {message.text && (
@@ -1101,7 +1273,6 @@ const fetchProductionData = async () => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Row No
                     </th>
@@ -1126,6 +1297,9 @@ const fetchProductionData = async () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Target
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Hourly Target
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -1138,8 +1312,6 @@ const fetchProductionData = async () => {
                           key={item._id || index} 
                           className={`hover:bg-gray-50 transition ${isDuplicate ? 'bg-red-50' : ''}`}
                         >
-                          
-                          
                           {/* Row No Cell with Duplicate Highlight */}
                           <td className="px-6 py-4">
                             <input
@@ -1256,7 +1428,6 @@ const fetchProductionData = async () => {
                                 value={item.process || ''}
                                 onChange={(e) => handleInputChange(index, 'process', e.target.value)}
                                 className="w-32 text-red-700 text-[13px] px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
-                                
                               />
                               <button
                                 type="button"
@@ -1478,6 +1649,17 @@ const fetchProductionData = async () => {
                               className="w-20 px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-sm"
                             />
                           </td>
+                          
+                          {/* Hourly Target Cell */}
+                          <td className="px-6 py-4">
+                            <input
+                              type="number"
+                              value={item.hourlyTarget || ''}
+                              onChange={(e) => handleInputChange(index, 'hourlyTarget', e.target.value)}
+                              className="w-24 px-3 py-1.5 border border-green-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500 transition text-sm bg-green-50"
+                              placeholder="Hourly target"
+                            />
+                          </td>
                         </tr>
                         
                         {/* Expanded Hourly Production Section - ডিফল্টভাবে দেখাবে */}
@@ -1486,7 +1668,7 @@ const fetchProductionData = async () => {
                             <td colSpan="10" className="px-6 py-4">
                               <div className="mb-2">
                                 <h3 className="text-sm font-medium text-gray-700 mb-3">
-                                  {item.operatorName || item.operator || 'N/A'} -------- Hourly Production
+                                  {item.operatorName || item.operator || 'N/A'} -------- {item.operatorId  || 'N/A'}
                                 </h3>
                                 <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-15 xl:grid-cols-15 2xl:grid-cols-15 gap-3">
                                   {hours.map((hour) => (

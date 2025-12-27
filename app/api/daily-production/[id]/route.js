@@ -1,3 +1,6 @@
+// api/daily-production/[id]
+import mongoose from 'mongoose';
+
 import DailyProduction from '@/models/DailyProduction';
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
@@ -6,7 +9,8 @@ export async function PUT(request, { params }) {
   try {
     await connectDB();
     
-    const { id } = params;
+    const { id } = await params;
+
     const updateData = await request.json();
     
     // Validate ID
