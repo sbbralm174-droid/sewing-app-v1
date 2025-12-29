@@ -30,6 +30,7 @@ export default function Home() {
     buyerName: '',
     styleId: '',
     styleName: '',
+    jobNo: '', // New Job Number field
     breakdownProcessTitle: '',
     breakdownProcess: '',
     supervisorId: '',
@@ -108,7 +109,8 @@ export default function Home() {
         setFormData(prev => ({
           ...prev,
           styleId: '',
-          styleName: ''
+          styleName: '',
+          jobNo: '' // Also reset job number when style changes
         }));
       }
     } else {
@@ -131,7 +133,8 @@ export default function Home() {
         buyerId: value,
         buyerName: selectedBuyer ? selectedBuyer.name : '',
         styleId: '',
-        styleName: ''
+        styleName: '',
+        jobNo: '' // Reset job number when buyer changes
       }));
     }
     else if (name === 'styleId') {
@@ -139,7 +142,8 @@ export default function Home() {
       setFormData(prev => ({
         ...prev,
         styleId: value,
-        styleName: selectedStyle ? selectedStyle.name : ''
+        styleName: selectedStyle ? selectedStyle.name : '',
+        jobNo: selectedStyle && selectedStyle.jobNo ? selectedStyle.jobNo : prev.jobNo // Auto-fill jobNo from style if available
       }));
     }
     else if (name === 'floorId') {
@@ -174,6 +178,12 @@ export default function Home() {
         ...prev,
         breakdownProcess: value,
         breakdownProcessTitle: selectedFile ? selectedFile.fileName : ''
+      }));
+    }
+    else if (name === 'jobNo') {
+      setFormData(prev => ({
+        ...prev,
+        jobNo: value
       }));
     }
     else {
@@ -428,6 +438,7 @@ export default function Home() {
 
   // Debug: Show what we're sending
   console.log('=== DEBUG: Current Production Info ===');
+  console.log('Job No:', productionInfo.jobNo);
   console.log('Buyer ID:', productionInfo.buyerId, 'Type:', typeof productionInfo.buyerId);
   console.log('Style ID:', productionInfo.styleId, 'Type:', typeof productionInfo.styleId);
   console.log('Operator IDs:', rows.map(r => r.operator?.id));
@@ -439,6 +450,7 @@ export default function Home() {
       supervisor: productionInfo.supervisorName,
       floor: productionInfo.floorName,
       line: productionInfo.lineNumber,
+      jobNo: productionInfo.jobNo || '', // Job Number added here
       buyerId: productionInfo.buyerId,
       buyerName: productionInfo.buyerName,
       styleId: productionInfo.styleId,
@@ -461,7 +473,7 @@ export default function Home() {
 
       return {
         operatorId: operatorId,
-        operatorMongoId :operatorMongoId,
+        operatorMongoId: operatorMongoId,
         operatorName: operatorName,
         operatorDesignation: row.operator?.designation || 'Operator',
         machineUniqueId: row.machine?.uniqueId || '',
@@ -504,6 +516,7 @@ export default function Home() {
         buyerName: '',
         styleId: '',
         styleName: '',
+        jobNo: '', // Reset job number
         breakdownProcessTitle: '',
         breakdownProcess: '',
         supervisorId: '',
@@ -556,6 +569,7 @@ export default function Home() {
     const previewData = {
       productionInfo: {
         ...productionInfo,
+        jobNo: productionInfo.jobNo || 'Not provided',
         date: new Date(productionInfo.date).toLocaleDateString()
       },
       rows: rows.map((row, index) => ({
@@ -600,6 +614,7 @@ export default function Home() {
             
             <div class="summary">
               <h2>Summary</h2>
+              <p><strong>Job Number:</strong> ${productionInfo.jobNo || 'Not provided'}</p>
               <p><strong>Total Rows:</strong> ${rows.length}</p>
               <p><strong>Buyer:</strong> ${productionInfo.buyerName}</p>
               <p><strong>Style:</strong> ${productionInfo.styleName}</p>
@@ -656,7 +671,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen mt-18 bg-gray-50">
       <Header />
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

@@ -1,5 +1,3 @@
-
-
 import { connectDB } from '@/lib/db';
 import DailyProduction from '@/models/DailyProduction';
 import mongoose from 'mongoose';
@@ -24,7 +22,7 @@ export async function POST(request) {
     }
 
     // Validate required fields from productionInfo
-    const requiredFields = ['supervisor', 'floor', 'line', 'buyerId', 'styleId', 'supervisorId', 'floorId', 'lineId'];
+    const requiredFields = ['supervisor', 'floor', 'line', 'buyerId', 'styleId', 'supervisorId', 'floorId', 'lineId', 'jobNo', 'date'];
     const missingFields = requiredFields.filter(field => !productionInfo[field]);
     
     if (missingFields.length > 0) {
@@ -44,8 +42,26 @@ export async function POST(request) {
     const floorId = new mongoose.Types.ObjectId(productionInfo.floorId);
     const lineId = new mongoose.Types.ObjectId(productionInfo.lineId);
 
-    // Prepare daily production documents (operator validation removed)
-    const dailyProductions = rows.map((row, index) => {
+    const date = new Date(productionInfo.date);
+
+    const dailyProductions = [];
+
+    for (let index = 0; index < rows.length; index++) {
+      const row = rows[index];
+
+      if (!row.operatorMongoId && !row.operatorId) continue; // skip if no operator
+
+      // Check if this operator already has a record for this date
+      const exists = await DailyProduction.findOne({
+        date: date,
+        'operator._id': row.operatorMongoId ? new mongoose.Types.ObjectId(row.operatorMongoId) : undefined
+      });
+
+      if (exists) {
+        console.log(`Skipping duplicate operator: ${row.operatorName || row.operatorId} on ${date.toDateString()}`);
+        continue; // skip duplicate
+      }
+
       let smvType = '';
       if (row.smv) {
         if (row.breakdownProcess && row.breakdownProcess.trim() !== '') {
@@ -55,8 +71,8 @@ export async function POST(request) {
         }
       }
 
-      return {
-        date: new Date(productionInfo.date),
+      dailyProductions.push({
+        date,
         operator: {
           _id: row.operatorMongoId ? new mongoose.Types.ObjectId(row.operatorMongoId) : undefined,
           operatorId: row.operatorId || '',
@@ -66,6 +82,7 @@ export async function POST(request) {
         supervisor: productionInfo.supervisor,
         floor: productionInfo.floor,
         line: productionInfo.line,
+        jobNo: productionInfo.jobNo,
         process: row.process || '',
         breakdownProcessTitle: productionInfo.breakdownProcessTitle || '',
         breakdownProcess: row.breakdownProcess || '',
@@ -87,8 +104,15 @@ export async function POST(request) {
         hourlyProduction: [],
         createdAt: new Date(),
         updatedAt: new Date()
-      };
-    });
+      });
+    }
+
+    if (dailyProductions.length === 0) {
+      return Response.json({
+        success: false,
+        message: 'No new production records to save. All operators already exist for this date.'
+      }, { status: 400 });
+    }
 
     console.log(`Attempting to save ${dailyProductions.length} documents`);
 

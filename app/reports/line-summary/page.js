@@ -26,7 +26,7 @@ export default function LineSummaryPage() {
   }, []);
 
   return (
-    <div className="p-6">
+    <div className="p-6 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">
       <h1 className="text-2xl font-semibold mb-4">
         Line Wise Production Summary
       </h1>
@@ -37,35 +37,47 @@ export default function LineSummaryPage() {
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="border rounded px-3 py-1 text-sm"
+          className="
+            border rounded px-3 py-1 text-sm
+            bg-white dark:bg-gray-800
+            text-gray-900 dark:text-gray-100
+            border-gray-300 dark:border-gray-700
+          "
         />
         <button
           onClick={fetchReport}
-          className="bg-blue-600 text-white px-4 py-1.5 rounded hover:bg-blue-700 text-sm"
+          className="
+            bg-blue-600 text-white px-4 py-1.5 rounded text-sm
+            hover:bg-blue-700
+          "
         >
           Load
         </button>
       </div>
 
       {/* 📊 Table */}
-      <div className="overflow-x-auto border rounded">
+      <div className="overflow-x-auto border rounded border-gray-300 dark:border-gray-700">
         <table className="min-w-full text-sm border-collapse">
-          <thead className="bg-gray-100 text-gray-700">
+          <thead className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200">
             <tr>
-              <th className="border px-3 py-2 text-left">Line</th>
-              <th className="border px-3 py-2 text-left">Buyer</th>
-              <th className="border px-3 py-2 text-left">Style</th>
-              <th className="border px-3 py-2 text-right">SMV</th>
-              <th className="border px-3 py-2 text-right">Operator</th>
-              <th className="border px-3 py-2 text-right">Helper</th>
-              <th className="border px-3 py-2 text-right">Manpower</th>
-              <th className="border px-3 py-2 text-right">Hourly Target</th>
-              <th className="border px-3 py-2 text-right">
-                Avg Working Hour
-              </th>
-              <th className="border px-3 py-2 text-right">Efficiency</th>
-              <th className="border px-3 py-2 text-right">Performance</th>
-              
+              {[
+                'Line',
+                'Buyer',
+                'Style',
+                'SMV',
+                'Operator',
+                'Helper',
+                'Manpower',
+                'Hourly Target',
+                'Avg Working Hour',
+              ].map((h) => (
+                <th
+                  key={h}
+                  className="border border-gray-300 dark:border-gray-700 px-3 py-2 text-left"
+                >
+                  {h}
+                </th>
+              ))}
             </tr>
           </thead>
 
@@ -80,7 +92,10 @@ export default function LineSummaryPage() {
 
             {!loading && data.length === 0 && (
               <tr>
-                <td colSpan="9" className="text-center py-4 text-gray-500">
+                <td
+                  colSpan="9"
+                  className="text-center py-4 text-gray-500 dark:text-gray-400"
+                >
                   No data found
                 </td>
               </tr>
@@ -90,27 +105,36 @@ export default function LineSummaryPage() {
               data.map((row, index) => (
                 <tr
                   key={index}
-                  className="hover:bg-gray-50 transition"
+                  className="
+                    hover:bg-gray-50 dark:hover:bg-gray-800
+                    transition
+                  "
                 >
-                  <td className="border px-3 py-2">{row.line}</td>
-                  <td className="border px-3 py-2">{row.buyer}</td>
-                  <td className="border px-3 py-2">{row.style}</td>
-                  <td className="border px-3 py-2 text-right">
+                  <td className="border border-gray-300 dark:border-gray-700 px-3 py-2">
+                    {row.line}
+                  </td>
+                  <td className="border border-gray-300 dark:border-gray-700 px-3 py-2">
+                    {row.buyer}
+                  </td>
+                  <td className="border border-gray-300 dark:border-gray-700 px-3 py-2">
+                    {row.style}
+                  </td>
+                  <td className="border border-gray-300 dark:border-gray-700 px-3 py-2 text-right">
                     {row.totalSmv}
                   </td>
-                  <td className="border px-3 py-2 text-right">
+                  <td className="border border-gray-300 dark:border-gray-700 px-3 py-2 text-right">
                     {row.operator}
                   </td>
-                  <td className="border px-3 py-2 text-right">
+                  <td className="border border-gray-300 dark:border-gray-700 px-3 py-2 text-right">
                     {row.helper}
                   </td>
-                  <td className="border px-3 py-2 text-right font-medium">
+                  <td className="border border-gray-300 dark:border-gray-700 px-3 py-2 text-right font-medium">
                     {row.totalManpower}
                   </td>
-                  <td className="border px-3 py-2 text-right">
+                  <td className="border border-gray-300 dark:border-gray-700 px-3 py-2 text-right">
                     {row.hourlyTarget}
                   </td>
-                  <td className="border px-3 py-2 text-right">
+                  <td className="border border-gray-300 dark:border-gray-700 px-3 py-2 text-right">
                     {row.avgWorkingHour}
                   </td>
                 </tr>

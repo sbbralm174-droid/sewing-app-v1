@@ -1,7 +1,7 @@
-// models/DailyProduction.js
+// models/HistoryDailyProduction.js
 const mongoose = require('mongoose');
 
-const HourlyProductionSchema = new mongoose.Schema({
+const HistoryHourlyProductionSchema = new mongoose.Schema({
   hour: { type: String, required: true },
   productionCount: { type: Number, required: true, min: 0, default: 0 },
   defects: [{
@@ -13,7 +13,9 @@ const HourlyProductionSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
-const DailyProductionSchema = new mongoose.Schema({
+const HistoryDailyProductionSchema = new mongoose.Schema({
+  // মূল ডকুমেন্টের সকল fields
+  originalId: { type: mongoose.Schema.Types.ObjectId, required: true },
   date: { type: Date, required: true },
   operator: { 
     type: {
@@ -47,30 +49,27 @@ const DailyProductionSchema = new mongoose.Schema({
   smv: { type: String, default: "" },
   smvType: { type: String, enum: ['process', 'breakdown', ''], default: "" },
   rowNo: { type: Number, default: 0 },
-  hourlyProduction: { type: [HourlyProductionSchema], default: [] },
-  
-  // নতুন field যোগ করা হলো
+  hourlyProduction: { type: [HistoryHourlyProductionSchema], default: [] },
   previousLineWorkingTime: { type: Number, default: 0 },
   
-  // Common fields for auto-fill
+  // Common fields
   supervisorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Supervisor' },
   floorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Floor' },
   lineId: { type: mongoose.Schema.Types.ObjectId, ref: 'Line' },
   
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
+  // History specific fields
+  action: { type: String, enum: ['line_change'], required: true },
+  actionDate: { type: Date, default: Date.now },
+  movedToLine: { type: String }, // নতুন লাইন নম্বর
+  movedAt: { type: Date, default: Date.now },
+  transferredBy: { type: String }, // কে transfer করলো
+  
+  createdAt: { type: Date, default: Date.now }
 });
 
-// --- INDEXING STRATEGY ---
-DailyProductionSchema.index({ date: -1, floor: 1, line: 1 });
-DailyProductionSchema.index({ supervisor: 1, process: 1, breakdownProcess: 1 });
-DailyProductionSchema.index({ "operator.operatorId": 1, date: -1 });
-DailyProductionSchema.index({ date: 1, line: 1 }); // নতুন index যোগ করা হলো
+// Indexing
+HistoryDailyProductionSchema.index({ originalId: 1 });
+HistoryDailyProductionSchema.index({ "operator.operatorId": 1, date: -1 });
+HistoryDailyProductionSchema.index({ actionDate: -1 });
 
-// Update the updatedAt field before saving
-DailyProductionSchema.pre('save', function(next) {
-  this.updatedAt = new Date();
-  next();
-});
-
-module.exports = mongoose.models.DailyProduction || mongoose.model('DailyProduction', DailyProductionSchema);
+module.exports = mongoose.models.HistoryDailyProduction || mongoose.model('HistoryDailyProduction', HistoryDailyProductionSchema);

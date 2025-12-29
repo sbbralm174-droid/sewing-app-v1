@@ -1,4 +1,3 @@
-// components/daily-production/ProductionForm.js
 'use client';
 
 export default function ProductionForm({ 
@@ -67,6 +66,22 @@ export default function ProductionForm({
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Job Number Input */}
+          <div>
+            <label htmlFor="jobNo" className="block text-sm font-medium text-gray-700 mb-1">
+              Job Number
+            </label>
+            <input
+              type="text"
+              id="jobNo"
+              name="jobNo"
+              value={formData.jobNo || ''}
+              onChange={onFormChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Enter Job Number"
+            />
           </div>
 
           {/* Breakdown Process Dropdown */}

@@ -32,6 +32,7 @@ export async function POST(req) {
         target = 0,
         operatorId,
         operatorCode,
+        jobNo,
         operatorName,
         designation,
         uniqueMachine,
@@ -89,6 +90,7 @@ export async function POST(req) {
         supervisor: supervisor || null,
         floor: floor || null,
         line: line || null,
+        jobNo: jobNo || null,
 
         process: process || null,
         breakdownProcess: breakdownProcess || null,
