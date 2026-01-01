@@ -9,7 +9,7 @@ import Machine from '@/models/Machine';
 export async function POST(request, { params }) {
     await connectDB();
 
-    const { machineId } = params;
+    const { machineId } = await params;
 
     if (!machineId) {
         return NextResponse.json({ error: 'Machine ID is required in the path.' }, { status: 400 });
@@ -61,11 +61,15 @@ export async function POST(request, { params }) {
 
         if (existingMachine) {
             const duplicatePart = existingMachine.parts.find(part => {
-                const existingPartNormalized = part.uniquePartId
-                    .toLowerCase()
-                    .replace(/\s+/g, '');
-                return existingPartNormalized === normalizedUniquePartId;
-            });
+  if (!part.uniquePartId) return false; // ✅ safeguard
+
+  const existingPartNormalized = part.uniquePartId
+    .toLowerCase()
+    .replace(/\s+/g, '');
+
+  return existingPartNormalized === normalizedUniquePartId;
+});
+
 
             if (duplicatePart) {
                 return NextResponse.json({ 

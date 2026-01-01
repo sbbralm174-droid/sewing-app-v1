@@ -12,6 +12,21 @@ const LastLocationSchema = new mongoose.Schema({
 
 // Part configuration schema (যেমন আছে তেমনই রাখুন)
 const PartConfigSchema = new mongoose.Schema({
+partName: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  uniquePartId: {
+    type: String,
+    required: true
+  },
+  nextServiceDate: {
+    type: Date,
+    required: true
+  }
+
+
 // ... (পার্ট কনফিগ স্কিমা) ...
 }, { _id: false });
 
