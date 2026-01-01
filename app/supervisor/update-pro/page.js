@@ -1668,7 +1668,7 @@ export default function DailyProductionPage() {
                             <td colSpan="10" className="px-6 py-4">
                               <div className="mb-2">
                                 <h3 className="text-sm font-medium text-gray-700 mb-3">
-                                  {item.operatorName || item.operator || 'N/A'} -------- {item.operatorId  || 'N/A'}
+                                  {item.operatorName || item.operator || 'N/A'} -------- {item.operator.operatorId  || 'N/A'}
                                 </h3>
                                 <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-15 xl:grid-cols-15 2xl:grid-cols-15 gap-3">
                                   {hours.map((hour) => (

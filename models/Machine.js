@@ -39,9 +39,7 @@ const MachineSchema = new mongoose.Schema({
     lastLocation: {
         type: LastLocationSchema, 
         default: () => ({ 
-             // default: null এর বদলে default function ব্যবহার করা হলো
-             // যাতে Mongoose এটিকে সঠিকভাবে ইনিশিয়ালাইজ করতে পারে
-             date: new Date('2000-01-01T00:00:00.000Z'), // একটি ইনিশিয়াল ডামি ডেট
+             
              line: 'N/A',
              supervisor: 'N/A',
              floor: 'N/A',

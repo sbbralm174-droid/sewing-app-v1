@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import DailyProduction from '@/models/DailyProduction';
+import HistoryDailyProduction from '@/models/HistoryDailyProduction';
 import '@/models/Buyer';
 import '@/models/Style';
 
@@ -22,21 +23,21 @@ export async function GET(req) {
       return NextResponse.json({ message: 'date query is required' }, { status: 400 });
     }
 
+    const startDate = new Date(dateParam);
+    const endDate = new Date(dateParam);
+    endDate.setHours(23, 59, 59, 999);
+
     // --- ১. আন্ডন এপিআই থেকে NPT ক্যালকুলেশন ---
     let nptMap = {};
     try {
       const andonRes = await fetch(`https://andon-microcontroller-project-two.vercel.app/api/table?startDate=${dateParam}&endDate=${dateParam}`);
       const andonJson = await andonRes.json();
-
       if (andonJson.success && andonJson.data) {
         andonJson.data.forEach(item => {
           const parts = item.deviceId.split('-');
           if (parts.length >= 4) {
-            // "ESP32-ACS712-1-5-1" -> parts[3] হচ্ছে লাইন নম্বর (5)
             const lineNumber = parts[3].padStart(2, '0'); 
             const formattedLine = `PODDO-${lineNumber}`; 
-            
-            // অফ ডিউরেশন বা অন ডিউরেশন (আপনার রিকোয়ারমেন্ট অনুযায়ী onDuration যোগ করা হলো)
             const duration = parseFloat(item.onDuration) || 0;
             nptMap[formattedLine] = (nptMap[formattedLine] || 0) + duration;
           }
@@ -46,69 +47,80 @@ export async function GET(req) {
       console.error("Andon API Error:", err);
     }
 
-    // --- ২. প্রোডাকশন ডাটা ফেচিং ---
-    const startDate = new Date(dateParam);
-    const endDate = new Date(dateParam);
-    endDate.setHours(23, 59, 59, 999);
-
-    const records = await DailyProduction.find({
-      date: { $gte: startDate, $lte: endDate }
-    })
-      .populate('buyerId', 'name')
-      .populate('styleId', 'name')
-      .lean();
+    // --- ২. ডাটা ফেচিং (Main Production & History) ---
+    const [mainRecords, historyRecords] = await Promise.all([
+      DailyProduction.find({ date: { $gte: startDate, $lte: endDate } })
+        .populate('buyerId', 'name').populate('styleId', 'name').lean(),
+      HistoryDailyProduction.find({ date: { $gte: startDate, $lte: endDate } }).lean()
+    ]);
 
     const lineMap = {};
 
-    records.forEach(doc => {
-      const lineKey = doc.line; // যেমন: PODDO-02, PODDO-05
-
+    // হেল্পার ফাংশন লাইন অবজেক্ট তৈরি করতে
+    const getLineObj = (lineKey, doc) => {
       if (!lineMap[lineKey]) {
         lineMap[lineKey] = {
           line: lineKey,
-          buyer: doc.buyerId?.name || '',
-          style: doc.styleId?.name || '',
+          buyer: doc?.buyerId?.name || '',
+          style: doc?.styleId?.name || '',
           totalSmv: 0,
           operatorCount: 0,
           helperCount: 0,
           hourlyTarget: 0,
-          workingHours: []
+          totalWorkingMinutes: 0
         };
       }
+      return lineMap[lineKey];
+    };
 
-      // SMV যোগফল
-      lineMap[lineKey].totalSmv += parseFloat(doc.smv) || 0;
+    // --- ৩. হিস্ট্রি প্রসেসিং (পুরানো লাইনের সময় যোগ করা) ---
+    historyRecords.forEach(hist => {
+      const lineKey = hist.line;
+      const lineObj = getLineObj(lineKey, hist);
+
+      // হিস্ট্রি থেকে ওই লাইনের কাজের সময় (মিনিটে)
+      const workMinutes = parseFloat(hist.previousLineWorkingTime) || 0;
+      lineObj.totalWorkingMinutes += workMinutes;
+
+      // ম্যানপাওয়ার কাউন্ট
+      if (hist.workAs === 'operator') lineObj.operatorCount += 1;
+      else if (hist.workAs === 'helper') lineObj.helperCount += 1;
       
-      // গুরুত্বপূর্ণ: Operator এবং Helper কাউন্ট লজিক
-      const workAs = (doc.workAs || '').trim().toLowerCase();
-      if (workAs === 'operator') {
-        lineMap[lineKey].operatorCount += 1;
-      } else if (workAs === 'helper') {
-        lineMap[lineKey].helperCount += 1;
-      }
-
-      // Hourly Target (সর্বশেষ এন্ট্রি থেকে নেয়া ভালো)
-      if (doc.hourlyTarget) {
-        lineMap[lineKey].hourlyTarget = doc.hourlyTarget;
-      }
-
-      // Working Hour Calculation
-      if (doc.hourlyProduction && doc.hourlyProduction.length > 0) {
-        const lastEntry = doc.hourlyProduction[doc.hourlyProduction.length - 1];
-        const hourValue = HOUR_MAP[lastEntry.hour];
-        if (hourValue) {
-          lineMap[lineKey].workingHours.push(hourValue);
-        }
-      }
+      lineObj.totalSmv += parseFloat(hist.smv) || 0;
     });
 
-    // --- ৩. ফাইনাল আউটপুট প্রোসেসিং ---
-    const result = Object.values(lineMap).map(line => {
-      const totalHours = line.workingHours.reduce((a, b) => a + b, 0);
-      const avgWorkingHour = line.workingHours.length > 0 
-        ? Number((totalHours / line.workingHours.length).toFixed(2)) 
-        : 0;
+    // --- ৪. মেইন প্রোডাকশন প্রসেসিং (বর্তমান লাইনের সময় থেকে হিস্ট্রি বিয়োগ) ---
+    mainRecords.forEach(doc => {
+      const lineKey = doc.line;
+      const lineObj = getLineObj(lineKey, doc);
 
+      // ১ নম্বর পয়েন্ট লজিক: বর্তমান লাইনের মোট সময় থেকে অন্য লাইনের সময় বিয়োগ
+      let totalMinutesThisOperatorWorkedToday = 0;
+      if (doc.hourlyProduction && doc.hourlyProduction.length > 0) {
+        const lastEntry = doc.hourlyProduction[doc.hourlyProduction.length - 1];
+        const hoursWorked = HOUR_MAP[lastEntry.hour] || 0;
+        totalMinutesThisOperatorWorkedToday = hoursWorked * 60;
+      }
+
+      // এই অপারেটরের হিস্ট্রি রেকর্ডগুলো খুঁজে বের করা (সে অন্য লাইনে কতক্ষণ ছিল)
+      const operatorHistory = historyRecords.filter(h => 
+        h.operator.operatorId === doc.operator.operatorId
+      );
+      const minutesSpentInOtherLines = operatorHistory.reduce((sum, h) => sum + (parseFloat(h.previousLineWorkingTime) || 0), 0);
+
+      // বর্তমান লাইনের একচুয়াল সময়
+      const actualMinutesInCurrentLine = Math.max(0, totalMinutesThisOperatorWorkedToday - minutesSpentInOtherLines);
+      lineObj.totalWorkingMinutes += actualMinutesInCurrentLine;
+
+      // ম্যানপাওয়ার ও অন্যান্য ডাটা
+      if (doc.workAs === 'operator') lineObj.operatorCount += 1;
+      else if (doc.workAs === 'helper') lineObj.helperCount += 1;
+      if (doc.hourlyTarget) lineObj.hourlyTarget = doc.hourlyTarget;
+      lineObj.totalSmv += parseFloat(doc.smv) || 0;
+    });
+
+    // --- ৫. ফাইনাল আউটপুট প্রোসেসিং ---
+    const result = Object.values(lineMap).map(line => {
       return {
         line: line.line,
         buyer: line.buyer,
@@ -118,9 +130,8 @@ export async function GET(req) {
         helper: line.helperCount,
         totalManpower: line.operatorCount + line.helperCount,
         hourlyTarget: line.hourlyTarget,
-        avgWorkingHour: avgWorkingHour,
-        // আন্ডন ম্যাপ থেকে NPT নিয়ে আসা
-        npt: nptMap[line.line] ? Number((nptMap[line.line] / 60).toFixed(2)) : 0 // সেকেন্ড থেকে মিনিটে কনভার্ট করা হয়েছে (/60)
+        avgWorkingHour: Number((line.totalWorkingMinutes / 60).toFixed(2)), // মিনিট থেকে ঘণ্টায় কনভার্ট
+        npt: nptMap[line.line] ? Number((nptMap[line.line] / 60).toFixed(2)) : 0
       };
     });
 

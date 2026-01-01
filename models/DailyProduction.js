@@ -49,7 +49,7 @@ const DailyProductionSchema = new mongoose.Schema({
   rowNo: { type: Number, default: 0 },
   hourlyProduction: { type: [HourlyProductionSchema], default: [] },
   
-  // নতুন field যোগ করা হলো
+  
   previousLineWorkingTime: { type: Number, default: 0 },
   
   // Common fields for auto-fill

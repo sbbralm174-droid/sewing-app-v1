@@ -1,9 +1,7 @@
-// app/api/operator-line-transfer/transfer/route.js
 import { connectDB } from "@/lib/db";
 import DailyProduction from "@/models/DailyProduction";
 import HistoryDailyProduction from "@/models/HistoryDailyProduction";
 import mongoose from 'mongoose';
-
 
 export async function POST(request) {
   const session = await mongoose.startSession();
@@ -17,30 +15,60 @@ export async function POST(request) {
       operatorId, 
       date, 
       newLine, 
-      workingHoursInPreviousLine,
+      workingHoursInPreviousLine, // ফ্রন্টেন্ড থেকে পাঠানো মোট মিনিট (যেমন: ১৮০)
       transferredBy 
     } = body;
-    console.log("Creating new production data with previousLineWorkingTime:", workingHoursInPreviousLine);
-
     
-    if (!operatorId || !date || !newLine || !workingHoursInPreviousLine) {
+    // ১. ফিল্ড ভ্যালিডেশন
+    if (!operatorId || !date || !newLine || workingHoursInPreviousLine === undefined) {
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: 'Missing required fields' 
-        }),
+        JSON.stringify({ success: false, message: 'সবগুলো তথ্য প্রদান করা হয়নি।' }), 
         { status: 400 }
       );
     }
     
     const transferDate = new Date(date);
-    
-    // Step 1: Find existing operator data
-    const existingData = await DailyProduction.findOne({
-      date: {
-        $gte: new Date(transferDate.setHours(0, 0, 0, 0)),
-        $lt: new Date(transferDate.setHours(23, 59, 59, 999))
+    const startOfDay = new Date(new Date(transferDate).setHours(0, 0, 0, 0));
+    const endOfDay = new Date(new Date(transferDate).setHours(23, 59, 59, 999));
+
+    // ২. হিস্ট্রি থেকে ওই অপারেটরের আজকের আগের জমানো মিনিট বের করা
+    const historyStats = await HistoryDailyProduction.aggregate([
+      {
+        $match: {
+          "operator.operatorId": operatorId,
+          date: { $gte: startOfDay, $lte: endOfDay },
+          action: 'line_change'
+        }
       },
+      {
+        $group: {
+          _id: null,
+          totalMinutes: { $sum: "$previousLineWorkingTime" }
+        }
+      }
+    ]).session(session);
+
+    const alreadySavedMinutes = historyStats.length > 0 ? historyStats[0].totalMinutes : 0;
+    
+    // ৩. নিট মিনিট ক্যালকুলেশন (যেমন: ১৮০ - ১২০ = ৬০)
+    const netMinutesToSave = workingHoursInPreviousLine - alreadySavedMinutes;
+
+    // ৪. জিরো বা নেগেটিভ ভ্যালু চেক (ট্রান্সফার বন্ধ করার লজিক)
+    if (netMinutesToSave <= 0) {
+      await session.abortTransaction();
+      session.endSession();
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: `ট্রান্সফার ব্যর্থ! অপারেটর ইতিমধ্যে ${alreadySavedMinutes} মিনিট কাজ করেছেন। বর্তমান সময় অনুযায়ী নতুন কোনো কাজের সময় অবশিষ্ট নেই।` 
+        }), 
+        { status: 400 }
+      );
+    }
+
+    // ৫. বর্তমান DailyProduction ডাটা খুঁজে বের করা
+    const existingData = await DailyProduction.findOne({
+      date: { $gte: startOfDay, $lte: endOfDay },
       "operator.operatorId": operatorId
     }).session(session);
     
@@ -48,110 +76,80 @@ export async function POST(request) {
       await session.abortTransaction();
       session.endSession();
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: 'Operator data not found' 
-        }),
+        JSON.stringify({ success: false, message: 'এই অপারেটরের কোনো প্রোডাকশন ডাটা পাওয়া যায়নি।' }), 
         { status: 404 }
       );
     }
     
-    // Step 2: Find common fields from another operator in the new line
+    // ৬. নতুন লাইনের কমন ডাটা সংগ্রহ করা (Auto-fill এর জন্য)
     const commonFieldData = await DailyProduction.findOne({
-      date: {
-        $gte: new Date(transferDate.setHours(0, 0, 0, 0)),
-        $lt: new Date(transferDate.setHours(23, 59, 59, 999))
-      },
+      date: { $gte: startOfDay, $lte: endOfDay },
       line: newLine,
-      "operator.operatorId": { $ne: operatorId } // অন্য operator
+      "operator.operatorId": { $ne: operatorId }
     }).session(session);
     
     if (!commonFieldData) {
       await session.abortTransaction();
       session.endSession();
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: 'No data found in the new line to get common fields' 
-        }),
+        JSON.stringify({ success: false, message: 'টার্গেট লাইনে (New Line) কোনো ডাটা পাওয়া যায়নি।' }), 
         { status: 404 }
       );
     }
     
-    // Step 3: Save to history before deletion
+    // ৭. হিস্ট্রিতে ডাটা সেভ করা (শুধুমাত্র নিট মিনিটটুকু)
     const historyDoc = new HistoryDailyProduction({
-      originalId: existingData._id,
       ...existingData.toObject(),
+      originalId: existingData._id,
+      previousLineWorkingTime: netMinutesToSave, 
       action: 'line_change',
       movedToLine: newLine,
       movedAt: new Date(),
       transferredBy: transferredBy || 'system'
     });
-    
     await historyDoc.save({ session });
     
-    // Step 4: Delete old record
+    // ৮. পুরনো রেকর্ড ডিলিট করা
     await DailyProduction.findByIdAndDelete(existingData._id).session(session);
     
-    // Step 5: Create new record in new line with common fields
+    // ৯. নতুন লাইনে নতুন রেকর্ড তৈরি করা
     const newProductionData = new DailyProduction({
-      date: existingData.date,
-      operator: existingData.operator,
+      ...existingData.toObject(),
+      _id: new mongoose.Types.ObjectId(), // নতুন আইডি নিশ্চিত করা
+      line: newLine,
       supervisor: commonFieldData.supervisor,
       floor: commonFieldData.floor,
-      line: newLine,
-      process: existingData.process,
       jobNo: commonFieldData.jobNo,
-      breakdownProcessTitle: existingData.breakdownProcessTitle,
-      breakdownProcess: existingData.breakdownProcess,
-      status: existingData.status,
-      machineType: existingData.machineType,
-      uniqueMachine: existingData.uniqueMachine,
-      target: existingData.target,
-      hourlyTarget: existingData.hourlyTarget,
       buyerId: commonFieldData.buyerId,
       styleId: commonFieldData.styleId,
-      workAs: existingData.workAs,
-      smv: existingData.smv,
-      smvType: existingData.smvType,
-      rowNo: existingData.rowNo,
-      hourlyProduction: existingData.hourlyProduction,
-      
-      // New fields
-      previousLineWorkingTime: workingHoursInPreviousLine,
       supervisorId: commonFieldData.supervisorId,
       floorId: commonFieldData.floorId,
-      lineId: commonFieldData.lineId
+      lineId: commonFieldData.lineId,
+      previousLineWorkingTime: 0, // মেইন টেবিলে এখন ০ থাকবে
+      hourlyProduction: [] // নতুন লাইনে নতুন করে প্রোডাকশন শুরু হবে
     });
     
     await newProductionData.save({ session });
     
+    // ট্রানজ্যাকশন সম্পন্ন করা
     await session.commitTransaction();
     session.endSession();
     
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Operator line transfer completed successfully',
-        data: {
-          newLine: newLine,
-          previousLine: existingData.line,
-          transferDate: new Date()
-        }
-      }),
+        message: 'সাফল্যের সাথে লাইন ট্রান্সফার হয়েছে।',
+        netMinutesSaved: netMinutesToSave 
+      }), 
       { status: 200 }
     );
     
   } catch (error) {
-    await session.abortTransaction();
+    if (session.inTransaction()) await session.abortTransaction();
     session.endSession();
-    
-    console.error('Transfer error:', error);
+    console.error('Transfer API Error:', error);
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        message: 'Internal server error during transfer' 
-      }),
+      JSON.stringify({ success: false, message: 'সার্ভারে সমস্যা হয়েছে। আবার চেষ্টা করুন।' }), 
       { status: 500 }
     );
   }

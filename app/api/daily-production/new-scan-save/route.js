@@ -1,5 +1,6 @@
 import { connectDB } from '@/lib/db';
 import DailyProduction from '@/models/DailyProduction';
+import Machine from '@/models/Machine'; // Machine model import করুন
 import mongoose from 'mongoose';
 
 export async function POST(request) {
@@ -45,6 +46,7 @@ export async function POST(request) {
     const date = new Date(productionInfo.date);
 
     const dailyProductions = [];
+    const machineUpdates = []; // Machine update তথ্য রাখার জন্য
 
     for (let index = 0; index < rows.length; index++) {
       const row = rows[index];
@@ -105,6 +107,20 @@ export async function POST(request) {
         createdAt: new Date(),
         updatedAt: new Date()
       });
+
+      // Machine last location update করতে হবে যদি machineUniqueId থাকে
+      if (row.machineUniqueId && row.machineUniqueId.trim() !== '') {
+        machineUpdates.push({
+          uniqueId: row.machineUniqueId,
+          lastLocation: {
+            date: date,
+            line: productionInfo.line,
+            supervisor: productionInfo.supervisor,
+            floor: productionInfo.floor,
+            updatedAt: new Date()
+          }
+        });
+      }
     }
 
     if (dailyProductions.length === 0) {
@@ -116,14 +132,49 @@ export async function POST(request) {
 
     console.log(`Attempting to save ${dailyProductions.length} documents`);
 
+    // Step 1: Machine collection এ last location update করুন
+    const machineUpdatePromises = machineUpdates.map(async (update) => {
+      try {
+        const result = await Machine.findOneAndUpdate(
+          { uniqueId: update.uniqueId },
+          { 
+            $set: { 
+              lastLocation: update.lastLocation,
+              updatedAt: new Date()
+            } 
+          },
+          { new: true, upsert: false } // upsert false, কারণ machine আগে থেকে থাকতে হবে
+        );
+        
+        if (!result) {
+          console.log(`Machine with uniqueId ${update.uniqueId} not found`);
+          return { uniqueId: update.uniqueId, status: 'not_found' };
+        }
+        
+        console.log(`Updated last location for machine ${update.uniqueId}`);
+        return { uniqueId: update.uniqueId, status: 'updated' };
+      } catch (error) {
+        console.error(`Error updating machine ${update.uniqueId}:`, error.message);
+        return { uniqueId: update.uniqueId, status: 'error', error: error.message };
+      }
+    });
+
+    // Step 2: Daily production save করুন
     const savedProductions = await DailyProduction.insertMany(dailyProductions);
+
+    // Step 3: Machine update execute করুন
+    const machineUpdateResults = await Promise.allSettled(machineUpdatePromises);
+
+    // Machine update results লগ করুন
+    console.log('Machine update results:', machineUpdateResults);
 
     console.log(`Successfully saved ${savedProductions.length} documents`);
 
     return Response.json({
       success: true,
-      message: `Successfully saved ${savedProductions.length} production records`,
+      message: `Successfully saved ${savedProductions.length} production records and updated ${machineUpdates.length} machine locations`,
       data: savedProductions,
+      machineUpdates: machineUpdateResults,
       count: savedProductions.length
     }, { status: 201 });
 
