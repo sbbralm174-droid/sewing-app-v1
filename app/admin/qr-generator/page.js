@@ -10,9 +10,13 @@ export default function QRBulkGeneratorPage() {
   const [selected, setSelected] = useState({ operators: [], machines: [] });
   const [generated, setGenerated] = useState({ operators: [], machines: [] });
 
+  // Search input track korar jonno state
+  const [opSearch, setOpSearch] = useState("");
+  const [macSearch, setMacSearch] = useState("");
+
   const printRef = useRef(null);
 
-  /* ================= FETCH DATA ================= */
+  /* ================= 1. FETCH DATA ================= */
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -26,54 +30,53 @@ export default function QRBulkGeneratorPage() {
           machines: await macRes.json(),
         });
       } catch (e) {
-        console.error(e);
+        console.error("Data fetch error:", e);
       }
     };
-
     fetchData();
   }, []);
 
-  /* ================= SELECT OPTIONS ================= */
-  const options = useMemo(() => {
-    const operatorOptions = data.operators.map((o) => ({
-      value: o._id,
-      label: `${o.operatorId} - ${o.name}`,
-      item: o,
+  /* ================= 2. CUSTOM FILTER LOGIC ================= */
+  const getFilteredOptions = (items, searchText, type) => {
+    const baseOptions = items.map((item) => ({
+      value: item._id,
+      label: type === "op" 
+        ? `${item.operatorId} - ${item.name}` 
+        : `${item.uniqueId} - ${item.machineType?.name || "N/A"}`,
+      item: item,
     }));
 
-    const machineOptions = data.machines.map((m) => ({
-      value: m._id,
-      label: `${m.uniqueId} - ${m.machineType?.name || "N/A"}`,
-      item: m,
-    }));
+    // Filter by search text
+    const filteredResults = baseOptions.filter((opt) =>
+      opt.label.toLowerCase().includes(searchText.toLowerCase())
+    );
 
-    return {
-      operators: [
-        { value: "__all__", label: "✅ Select All Operators" },
-        ...operatorOptions,
-      ],
-      machines: [
-        { value: "__all__", label: "✅ Select All Machines" },
-        ...machineOptions,
-      ],
-    };
-  }, [data]);
+    // Return list with "Select All" at the top
+    return [
+      {
+        value: "__all__",
+        label: searchText 
+          ? `✅ Select Filtered (${filteredResults.length})` 
+          : "✅ Select All",
+        filtered: filteredResults,
+      },
+      ...filteredResults,
+    ];
+  };
 
-  /* ================= GENERATE QR ================= */
+  const opOptions = useMemo(() => getFilteredOptions(data.operators, opSearch, "op"), [data.operators, opSearch]);
+  const macOptions = useMemo(() => getFilteredOptions(data.machines, macSearch, "mac"), [data.machines, macSearch]);
+
+  /* ================= 3. GENERATE QR LOGIC ================= */
   const generateQRs = async () => {
     const process = async (list, type) =>
       Promise.all(
         list.map(async ({ item }) => {
-          const qrData =
-            type === "op"
-              ? { type: "operator", id: item._id, operatorId: item.operatorId }
-              : { type: "machine", id: item._id, uniqueId: item.uniqueId };
+          const qrData = type === "op"
+            ? { type: "operator", id: item._id, operatorId: item.operatorId }
+            : { type: "machine", id: item._id, uniqueId: item.uniqueId };
 
-          const qrCodeUrl = await QRCode.toDataURL(
-            JSON.stringify(qrData),
-            { width: 400, margin: 1 }
-          );
-
+          const qrCodeUrl = await QRCode.toDataURL(JSON.stringify(qrData), { width: 400, margin: 1 });
           return { ...item, qrCode: qrCodeUrl };
         })
       );
@@ -84,158 +87,120 @@ export default function QRBulkGeneratorPage() {
     });
   };
 
-  const handlePrint = useReactToPrint({
-    contentRef: printRef,
-  });
+  const handlePrint = useReactToPrint({ contentRef: printRef });
 
-  /* ================= STATUS COLOR ================= */
+  /* ================= 4. STATUS COLOR & CARD ================= */
   const getStatusColor = (installDate) => {
     if (!installDate) return "#d1d5db";
-
     const today = new Date();
     const installation = new Date(installDate.$date || installDate);
-    const diffYears =
-      (today - installation) / (1000 * 60 * 60 * 24 * 365.25);
-
+    const diffYears = (today - installation) / (1000 * 60 * 60 * 24 * 365.25);
     if (diffYears <= 1) return "#22c55e";
     if (diffYears <= 3) return "#eab308";
     return "#ef4444";
   };
 
-  /* ================= CARD ================= */
   const Card = ({ item, type }) => {
     const rawDate = item.installationDate?.$date || item.installationDate;
-    const installDateFormatted = rawDate
-      ? new Date(rawDate).toLocaleDateString("en-GB")
-      : "N/A";
-
+    const installDateFormatted = rawDate ? new Date(rawDate).toLocaleDateString("en-GB") : "N/A";
     const colorCode = getStatusColor(item.installationDate);
 
     return (
-      <div
-        style={{
-          height: "67mm",
-          width: "63mm",
-          border: "1px solid black",
-          display: "flex",
-          flexDirection: "column",
-          backgroundColor: "#fff",
-          breakInside: "avoid",
-        }}
-      >
+      <div style={{
+        height: "67mm", width: "63mm", border: "1px solid black",
+        display: "flex", flexDirection: "column", backgroundColor: "#fff", breakInside: "avoid"
+      }}>
         <div style={{ textAlign: "center", padding: "5px 0" }}>
           <h2 style={{ fontWeight: 900, fontSize: "15px", margin: 0 }}>
             {type === "op" ? item.name : item.uniqueId}
           </h2>
         </div>
-
-        <div
-          style={{
-            flexGrow: 1,
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
+        <div style={{ flexGrow: 1, display: "flex", justifyContent: "center", alignItems: "center" }}>
           <img src={item.qrCode} style={{ width: 170 }} alt="qr" />
         </div>
-
         <div style={{ display: "flex", borderTop: "1px solid black" }}>
-          <div style={{ flex: 1, padding: "4px 8px" }}>
+          <div style={{ flex: 1, padding: "4px 8px", textAlign: "center" }}>
             <p style={{ fontSize: "9px", fontWeight: "bold", margin: 0 }}>
-              {type === "op"
-                ? item.designation
-                : item.machineType?.name || "N/A"}
+              {type === "op" ? item.designation : item.machineType?.name || "N/A"}
             </p>
-            <p style={{ fontSize: "12px", fontWeight: 900, margin: 0 }}>
-              INST: {installDateFormatted}
-            </p>
+            <p style={{ fontSize: "8px", fontWeight: 900, margin: 0 }}>INST: {installDateFormatted}</p>
+            <p style={{ fontSize: "8px", fontWeight: 900, margin: 0 }}>co-se-no: {item.companyUniqueNumber}</p>
           </div>
-
-          <div
-            style={{
-              width: "12mm",
-              backgroundColor: colorCode,
-              borderLeft: "1px solid black",
-              WebkitPrintColorAdjust: "exact",
-              printColorAdjust: "exact",
-            }}
-          />
+          <div style={{ width: "12mm", backgroundColor: colorCode, borderLeft: "1px solid black" }} />
         </div>
       </div>
     );
   };
 
-  /* ================= UI ================= */
+  /* ================= 5. RENDER UI ================= */
   return (
     <div className="p-4 bg-gray-100 min-h-screen">
       <div className="no-print max-w-4xl mx-auto bg-white p-6 rounded shadow">
-        <h1 className="text-xl font-bold mb-4">
-          Bulk QR Printer (12 per page)
-        </h1>
+        <h1 className="text-xl font-bold mb-4 text-center">Bulk QR Generator</h1>
 
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          {/* OPERATORS */}
-          <Select
-            isMulti
-            options={options.operators}
-            placeholder="Operators..."
-            onChange={(values) => {
-              if (values?.some((v) => v.value === "__all__")) {
-                setSelected({
-                  ...selected,
-                  operators: options.operators.filter(
-                    (v) => v.value !== "__all__"
-                  ),
-                });
-              } else {
-                setSelected({ ...selected, operators: values });
-              }
-            }}
-          />
+        <div className="grid grid-cols-2 gap-6 mb-6">
+          {/* OPERATORS SELECT */}
+          <div>
+            <label className="block text-sm font-bold mb-2">Select Operators</label>
+            <Select
+              isMulti
+              options={opOptions}
+              value={selected.operators}
+              inputValue={opSearch}
+              onInputChange={(val) => setOpSearch(val)}
+              filterOption={() => true} // This is key to keep "Select All" visible
+              closeMenuOnSelect={false}
+              onChange={(values, action) => {
+                if (action.action === "select-option" && action.option.value === "__all__") {
+                  const alreadySelectedIds = new Set(selected.operators.map(s => s.value));
+                  const toAdd = action.option.filtered.filter(f => !alreadySelectedIds.has(f.value));
+                  setSelected({ ...selected, operators: [...selected.operators, ...toAdd] });
+                  setOpSearch(""); // Clear search after bulk select
+                } else {
+                  setSelected({ ...selected, operators: (values || []).filter(v => v.value !== "__all__") });
+                }
+              }}
+            />
+          </div>
 
-          {/* MACHINES */}
-          <Select
-            isMulti
-            options={options.machines}
-            placeholder="Machines..."
-            onChange={(values) => {
-              if (values?.some((v) => v.value === "__all__")) {
-                setSelected({
-                  ...selected,
-                  machines: options.machines.filter(
-                    (v) => v.value !== "__all__"
-                  ),
-                });
-              } else {
-                setSelected({ ...selected, machines: values });
-              }
-            }}
-          />
+          {/* MACHINES SELECT */}
+          <div>
+            <label className="block text-sm font-bold mb-2">Select Machines</label>
+            <Select
+              isMulti
+              options={macOptions}
+              value={selected.machines}
+              inputValue={macSearch}
+              onInputChange={(val) => setMacSearch(val)}
+              filterOption={() => true}
+              closeMenuOnSelect={false}
+              onChange={(values, action) => {
+                if (action.action === "select-option" && action.option.value === "__all__") {
+                  const alreadySelectedIds = new Set(selected.machines.map(s => s.value));
+                  const toAdd = action.option.filtered.filter(f => !alreadySelectedIds.has(f.value));
+                  setSelected({ ...selected, machines: [...selected.machines, ...toAdd] });
+                  setMacSearch("");
+                } else {
+                  setSelected({ ...selected, machines: (values || []).filter(v => v.value !== "__all__") });
+                }
+              }}
+            />
+          </div>
         </div>
 
-        <div className="flex gap-2">
-          <button
-            onClick={generateQRs}
-            className="bg-blue-600 text-white px-4 py-2 rounded"
-          >
-            Generate
+        <div className="flex justify-center gap-4 border-t pt-4">
+          <button onClick={generateQRs} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-2 rounded-lg font-bold">
+            Generate Cards
           </button>
-          <button
-            onClick={handlePrint}
-            className="bg-purple-600 text-white px-4 py-2 rounded"
-          >
+          <button onClick={handlePrint} className="bg-green-600 hover:bg-green-700 text-white px-8 py-2 rounded-lg font-bold">
             Print A4
           </button>
         </div>
       </div>
 
-      <div className="flex justify-center bg-gray-300 py-10">
-        <div
-          ref={printRef}
-          className="grid grid-cols-3 gap-1 bg-white p-1"
-          style={{ width: "210mm" }}
-        >
+      {/* PRINT AREA */}
+      <div className="flex justify-center mt-10">
+        <div ref={printRef} className="grid grid-cols-3 gap-1 bg-white p-1 shadow-lg" style={{ width: "210mm" }}>
           {generated.operators.map((op, i) => (
             <Card key={`op-${i}`} item={op} type="op" />
           ))}
