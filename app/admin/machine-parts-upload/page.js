@@ -83,7 +83,7 @@ export default function App() {
     };
 
     // API URL dynamically built from the machineId input
-    const apiUrl = `/api/machines/${machineId}/parts-upload`;
+    const apiUrl = `/api/machines/${encodeURIComponent(machineId)}/parts-upload`;
 
     try {
       const response = await fetch(apiUrl, {

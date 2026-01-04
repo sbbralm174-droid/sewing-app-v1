@@ -51,8 +51,8 @@ export async function POST(request, { params }) {
 
         // Normalize uniquePartId for case-insensitive and space-insensitive comparison
         const normalizedUniquePartId = uniquePartId
-            .toLowerCase()
-            .replace(/\s+/g, ''); // Remove all spaces
+    .toLowerCase()
+    .replace(/\s+/g, ''); // শুধু স্পেস রিমুভ করছে
 
         // Check if part with same normalized uniquePartId already exists in this machine
         const existingMachine = await Machine.findOne({ 
