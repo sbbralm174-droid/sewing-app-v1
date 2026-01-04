@@ -4,17 +4,17 @@ import { Html5QrcodeScanner } from 'html5-qrcode';
 
 export default function MachineUpdatePage() {
     const [machineData, setMachineData] = useState(null);
-    const [machineTypes, setMachineTypes] = useState([]); // ড্রপডাউনের জন্য
+    const [machineTypes, setMachineTypes] = useState([]); 
+    const [availableParts, setAvailableParts] = useState(["Full Machine", "Motor", "Belt", "Needle", "Oil Pump", "Display", "Sensor"]); // উদাহরণস্বরূপ
     const [manualId, setManualId] = useState("");
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState({ text: "", type: "" });
     const scannerRef = useRef(null);
 
-    // ১. Machine Types লোড করা (API থেকে)
     useEffect(() => {
         const fetchTypes = async () => {
             try {
-                const res = await fetch('/api/machine-types'); // আপনার সঠিক API পাথ দিন
+                const res = await fetch('/api/machine-types');
                 const data = await res.json();
                 setMachineTypes(data);
             } catch (err) { console.error("Error fetching types", err); }
@@ -22,7 +22,6 @@ export default function MachineUpdatePage() {
         fetchTypes();
     }, []);
 
-    // ২. কিউআর স্ক্যানার সেটআপ
     useEffect(() => {
         if (!machineData) {
             const scanner = new Html5QrcodeScanner("reader", {
@@ -47,7 +46,9 @@ export default function MachineUpdatePage() {
             const res = await fetch(`/api/machines/update-by-qr-code/${encodeURIComponent(id)}`);
             const data = await res.json();
             if (res.ok) {
+                // তারিখগুলো ইনপুট ফিল্ডের ফরম্যাটে আনা
                 if (data.nextServiceDate) data.nextServiceDate = new Date(data.nextServiceDate).toISOString().split('T')[0];
+                if (data.installationDate) data.installationDate = new Date(data.installationDate).toISOString().split('T')[0];
                 if (data.parts) {
                     data.parts = data.parts.map(p => ({
                         ...p,
@@ -59,6 +60,24 @@ export default function MachineUpdatePage() {
             } else { alert("Machine not found!"); }
         } catch (err) { alert("Error connecting to server"); }
         finally { setLoading(false); }
+    };
+
+    // --- নতুন পার্টস হ্যান্ডলিং ---
+    const addNewPart = () => {
+        const newPart = {
+            partName: "",
+            uniquePartId: `P-${Date.now()}`, // Auto generate unique ID
+            nextServiceDate: ""
+        };
+        setMachineData(prev => ({
+            ...prev,
+            parts: [...(prev.parts || []), newPart]
+        }));
+    };
+
+    const removePart = (index) => {
+        const updatedParts = machineData.parts.filter((_, i) => i !== index);
+        setMachineData(prev => ({ ...prev, parts: updatedParts }));
     };
 
     const handleFieldChange = (e, section = null, index = null) => {
@@ -118,14 +137,14 @@ export default function MachineUpdatePage() {
                             <button type="button" onClick={() => setMachineData(null)} className="text-gray-400 hover:text-red-500 font-bold">CANCEL ✕</button>
                         </div>
 
-                        {/* মেইন ইনফরমেশন */}
+                        {/* মেইন ইনফরমেশন (সব ফিল্ড ঠিক রাখা হয়েছে) */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="text-xs font-bold text-gray-500 uppercase">Brand Name</label>
                                 <input type="text" name="brandName" value={machineData.brandName || ''} onChange={handleFieldChange} className="w-full border p-2 rounded mt-1 bg-blue-50/30" required />
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-blue-600 uppercase">Machine Type (Required)</label>
+                                <label className="text-xs font-bold text-blue-600 uppercase">Machine Type</label>
                                 <select name="machineType" value={machineData.machineType || ''} onChange={handleFieldChange} className="w-full border-2 border-blue-100 p-2 rounded mt-1 bg-white font-bold" required>
                                     <option value="">Select Type</option>
                                     {machineTypes.map(type => (
@@ -139,15 +158,19 @@ export default function MachineUpdatePage() {
                             </div>
                             <div>
                                 <label className="text-xs font-bold text-green-600 uppercase">Price (Amount)</label>
-                                <input type="number" name="price" value={machineData.price || ''} onChange={handleFieldChange} className="w-full border-2 border-green-100 p-2 rounded mt-1" />
+                                <input type="number" name="price" value={machineData.price || ''} onChange={handleFieldChange} className="w-full border-2 border-green-100 p-2 rounded mt-1 font-bold" />
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase">Next Service Date</label>
-                                <input type="date" name="nextServiceDate" value={machineData.nextServiceDate || ''} onChange={handleFieldChange} className="w-full border p-2 rounded mt-1" />
+                                <label className="text-xs font-bold text-gray-500 uppercase">Installation Date</label>
+                                <input type="date" name="installationDate" value={machineData.installationDate || ''} onChange={handleFieldChange} className="w-full border p-2 rounded mt-1" />
                             </div>
+                            {/* <div>
+                                <label className="text-xs font-bold text-gray-500 uppercase">Next Machine Service</label>
+                                <input type="date" name="nextServiceDate" value={machineData.nextServiceDate || ''} onChange={handleFieldChange} className="w-full border p-2 rounded mt-1" />
+                            </div> */}
                             <div>
                                 <label className="text-xs font-bold text-gray-500 uppercase">Status</label>
-                                <select name="currentStatus" value={machineData.currentStatus} onChange={handleFieldChange} className="w-full border p-2 rounded mt-1">
+                                <select name="currentStatus" value={machineData.currentStatus} onChange={handleFieldChange} className="w-full border p-2 rounded mt-1 font-bold">
                                     <option value="idle">Idle</option>
                                     <option value="running">Running</option>
                                     <option value="maintenance">Maintenance</option>
@@ -156,7 +179,7 @@ export default function MachineUpdatePage() {
                             </div>
                         </div>
 
-                        {/* বাকি সব ফিল্ড (আগের মতো) */}
+                        {/* অতিরিক্ত ইনফরমেশন */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4">
                             <div>
                                 <label className="text-xs font-bold text-gray-500 uppercase">Company Unique No</label>
@@ -173,32 +196,69 @@ export default function MachineUpdatePage() {
                         </div>
 
                         {/* লোকেশন সেকশন */}
-                        <div className="bg-slate-50 p-4 rounded-xl space-y-3">
+                        <div className="bg-slate-50 p-4 rounded-xl space-y-3 border border-slate-200">
                             <p className="text-xs font-black text-blue-700 uppercase">📍 Location Info</p>
                             <div className="grid grid-cols-3 gap-3">
-                                <input placeholder="Floor" name="floor" value={machineData.lastLocation?.floor || ''} onChange={(e) => handleFieldChange(e, 'lastLocation')} className="border p-2 rounded text-sm shadow-sm" />
-                                <input placeholder="Line" name="line" value={machineData.lastLocation?.line || ''} onChange={(e) => handleFieldChange(e, 'lastLocation')} className="border p-2 rounded text-sm shadow-sm" />
-                                <input placeholder="Supervisor" name="supervisor" value={machineData.lastLocation?.supervisor || ''} onChange={(e) => handleFieldChange(e, 'lastLocation')} className="border p-2 rounded text-sm shadow-sm" />
+                                <div>
+                                    <label className="text-[10px] uppercase font-bold text-gray-400">Floor</label>
+                                    <input name="floor" value={machineData.lastLocation?.floor || ''} onChange={(e) => handleFieldChange(e, 'lastLocation')} className="w-full border p-2 rounded text-sm bg-white" />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase font-bold text-gray-400">Line</label>
+                                    <input name="line" value={machineData.lastLocation?.line || ''} onChange={(e) => handleFieldChange(e, 'lastLocation')} className="w-full border p-2 rounded text-sm bg-white" />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase font-bold text-gray-400">Supervisor</label>
+                                    <input name="supervisor" value={machineData.lastLocation?.supervisor || ''} onChange={(e) => handleFieldChange(e, 'lastLocation')} className="w-full border p-2 rounded text-sm bg-white" />
+                                </div>
                             </div>
                         </div>
 
-                        {/* পার্টস লিস্ট সেকশন */}
-                        {machineData.parts?.length > 0 && (
-                            <div className="space-y-3">
-                                <p className="text-xs font-black text-gray-700 uppercase">⚙️ Machine Parts</p>
-                                {machineData.parts.map((part, index) => (
-                                    <div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                                        <input placeholder="Part Name" name="partName" value={part.partName} onChange={(e) => handleFieldChange(e, 'parts', index)} className="border p-2 rounded text-xs" />
-                                        <input placeholder="Part ID" name="uniquePartId" value={part.uniquePartId} onChange={(e) => handleFieldChange(e, 'parts', index)} className="border p-2 rounded text-xs" />
-                                        <input type="date" name="nextServiceDate" value={part.nextServiceDate} onChange={(e) => handleFieldChange(e, 'parts', index)} className="border p-2 rounded text-xs" />
-                                    </div>
-                                ))}
+                        {/* পার্টস লিস্ট সেকশন - ড্রপডাউন এবং ডিলিট বাটন সহ */}
+                        <div className="space-y-4 border-t pt-4">
+                            <div className="flex justify-between items-center">
+                                <p className="text-xs font-black text-gray-700 uppercase italic">⚙️ Machine Parts List</p>
+                                <button type="button" onClick={addNewPart} className="bg-blue-100 text-blue-700 text-xs px-4 py-2 rounded-lg font-black hover:bg-blue-600 hover:text-white transition-all">
+                                    + ADD NEW PART
+                                </button>
                             </div>
-                        )}
 
-                        <button type="submit" disabled={loading} className="w-full bg-blue-700 text-white py-4 rounded-2xl font-black text-xl shadow-xl hover:bg-blue-800 disabled:bg-gray-400">
+                            {machineData.parts?.map((part, index) => (
+                                <div key={index} className="relative grid grid-cols-1 md:grid-cols-3 gap-3 bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-sm">
+                                    <button type="button" onClick={() => removePart(index)} className="absolute -top-2 -right-2 bg-red-600 text-white w-6 h-6 rounded-full text-xs shadow-lg flex items-center justify-center font-bold">✕</button>
+                                    
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase">Part Name (Dropdown)</label>
+                                        <select name="partName" value={part.partName} onChange={(e) => handleFieldChange(e, 'parts', index)} className="w-full border p-2 rounded text-sm bg-white font-semibold" required>
+                                            <option value="">Select Part</option>
+                                            {availableParts.map((pName, i) => (
+                                                <option key={i} value={pName}>{pName}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase">Unique Part ID (Auto)</label>
+                                        <input readOnly name="uniquePartId" value={part.uniquePartId} className="w-full border p-2 rounded text-sm bg-gray-100 text-gray-500 cursor-not-allowed" />
+                                    </div>
+
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase">Next Service Date</label>
+                                        <input type="date" name="nextServiceDate" value={part.nextServiceDate} onChange={(e) => handleFieldChange(e, 'parts', index)} className="w-full border p-2 rounded text-sm bg-white" required />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <button type="submit" disabled={loading} className="w-full bg-blue-700 text-white py-4 rounded-2xl font-black text-xl shadow-xl hover:bg-blue-800 disabled:bg-gray-400 transition-all">
                             {loading ? "SYNCING..." : "SYNC & SAVE CHANGES"}
                         </button>
+
+                        {message.text && (
+                            <div className={`p-4 rounded-xl text-center font-bold ${message.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                {message.text}
+                            </div>
+                        )}
                     </form>
                 )}
             </div>
