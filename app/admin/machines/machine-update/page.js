@@ -138,7 +138,7 @@ export default function MachineUpdatePage() {
                 body: JSON.stringify(machineData),
             });
             if (res.ok) {
-                setMessage({ text: "✅ ডাটা সফলভাবে আপডেট হয়েছে!", type: "success" });
+                setMessage({ text: "✅ Machine Updated Successfully!", type: "success" });
                 setTimeout(() => setMachineData(null), 2000);
             } else {
                 const result = await res.json();

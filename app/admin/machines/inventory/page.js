@@ -4,7 +4,15 @@ import React, { useEffect, useState, useMemo } from 'react';
 export default function AdvancedInventory() {
   const [machines, setMachines] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+
+  // 🔍 Filter States
+  const [filters, setFilters] = useState({
+    asset: "",
+    commercial: "",
+    location: "",
+    status: "",
+    component: ""
+  });
 
   useEffect(() => {
     fetch('/api/machines')
@@ -15,27 +23,57 @@ export default function AdvancedInventory() {
       });
   }, []);
 
+  // 🛠️ Filter Logic: Empty thakle shob dekhabe, likhle filter hobe
+  const filteredMachines = useMemo(() => {
+    return machines.filter(m => {
+      // Asset Info Filter (String conversion added for safe search)
+      const assetMatch = !filters.asset || 
+        m.brandName?.toLowerCase().includes(filters.asset.toLowerCase()) || 
+        m.uniqueId?.toLowerCase().includes(filters.asset.toLowerCase()) || 
+        String(m.companyUniqueNumber || "").toLowerCase().includes(filters.asset.toLowerCase()); // Fixed Line
+
+      const commercialMatch = !filters.commercial || 
+        String(m.price || "").includes(filters.commercial) || 
+        String(m.warrantyYears || "").includes(filters.commercial);
+
+      const locationMatch = !filters.location || 
+        m.lastLocation?.floor?.floorName?.toLowerCase().includes(filters.location.toLowerCase()) || 
+        m.lastLocation?.line?.lineNumber?.toLowerCase().includes(filters.location.toLowerCase());
+
+      const statusMatch = !filters.status || 
+        m.currentStatus === filters.status;
+
+      const componentMatch = !filters.component || 
+        m.parts?.some(p => 
+          p.partName?.toLowerCase().includes(filters.component.toLowerCase()) || 
+          p.uniquePartId?.toLowerCase().includes(filters.component.toLowerCase())
+        );
+
+      return assetMatch && commercialMatch && locationMatch && statusMatch && componentMatch;
+    });
+  }, [machines, filters]);
+
+  // 📊 Summary Cards auto-update
   const summary = useMemo(() => {
     const counts = {};
-    machines.forEach(m => {
+    filteredMachines.forEach(m => {
       const typeName = m.machineType?.name || 'Unknown';
       counts[typeName] = (counts[typeName] || 0) + 1;
     });
     return Object.entries(counts);
-  }, [machines]);
+  }, [filteredMachines]);
 
-  const filteredMachines = machines.filter(m => 
-    m.brandName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    m.uniqueId?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    m.companyUniqueNumber?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({ ...prev, [name]: value }));
+  };
 
   if (loading) return <div className="flex justify-center items-center h-screen font-sans text-lg text-slate-500">Loading Inventory...</div>;
 
   return (
-    <div className="p-4 md:p-8 mt-6 bg-slate-100 min-h-screen font-sans">
+    <div className="p-4 md:p-8 mt-10 bg-slate-100 min-h-screen font-sans">
       
-      {/* 📊 Summary Cards - Mobile Responsive */}
+      {/* 📊 Summary Cards */}
       <div className="mb-8 overflow-x-auto pb-4 custom-scrollbar">
         <div className="flex gap-4">
           {summary.map(([type, count]) => (
@@ -45,47 +83,56 @@ export default function AdvancedInventory() {
             </div>
           ))}
           <div className="bg-slate-900 p-5 rounded-xl shadow-md border-b-4 border-slate-700 min-w-[200px] flex-shrink-0">
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Total Machines</p>
-            <p className="text-3xl font-black text-white">{machines.length}</p>
+            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Total Found</p>
+            <p className="text-3xl font-black text-white">{filteredMachines.length}</p>
           </div>
         </div>
       </div>
 
       <div className="max-w-full mx-auto bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
         
-        {/* Header & Search Bar */}
         <div className="p-6 bg-white border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="text-center md:text-left">
             <h1 className="text-2xl font-extrabold text-slate-800">Advanced Inventory</h1>
             <p className="text-slate-500 text-sm md:text-base mt-1">Manage and track all factory assets</p>
           </div>
-          <div className="relative w-full md:w-1/3">
-            <input 
-              type="text" 
-              placeholder="Search by GMS ID, Brand..." 
-              className="p-4 pl-5 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm text-base"
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
         </div>
 
-        {/* Desktop Table & Mobile Card View */}
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-50/80 text-slate-600 text-sm uppercase tracking-wider font-bold hidden md:table-header-group">
               <tr>
-                <th className="p-5 border-b border-slate-100">Asset Info</th>
-                <th className="p-5 border-b border-slate-100">Commercials</th>
-                <th className="p-5 border-b border-slate-100">Location Details</th>
-                <th className="p-5 border-b border-slate-100">Status</th>
-                <th className="p-5 border-b border-slate-100">Components</th>
+                <th className="p-5 border-b border-slate-100">
+                  Asset Info
+                  <input name="asset" value={filters.asset} onChange={handleFilterChange} placeholder="Search GMS/Brand..." className="block mt-2 w-full p-2 text-xs font-normal border rounded-lg bg-white outline-none focus:ring-1 focus:ring-blue-400" />
+                </th>
+                <th className="p-5 border-b border-slate-100">
+                  Commercials
+                  <input name="commercial" value={filters.commercial} onChange={handleFilterChange} placeholder="Price/Warranty..." className="block mt-2 w-full p-2 text-xs font-normal border rounded-lg bg-white outline-none focus:ring-1 focus:ring-blue-400" />
+                </th>
+                <th className="p-5 border-b border-slate-100">
+                  Location Details
+                  <input name="location" value={filters.location} onChange={handleFilterChange} placeholder="Floor/Line..." className="block mt-2 w-full p-2 text-xs font-normal border rounded-lg bg-white outline-none focus:ring-1 focus:ring-blue-400" />
+                </th>
+                <th className="p-5 border-b border-slate-100">
+                  Status
+                  <select name="status" value={filters.status} onChange={handleFilterChange} className="block mt-2 w-full p-2 text-xs font-normal border rounded-lg bg-white outline-none">
+                    <option value="">All Status</option>
+                    <option value="running">running</option>
+                    <option value="idle">idle</option>
+                  </select>
+                </th>
+                <th className="p-5 border-b border-slate-100">
+                  Components
+                  <input name="component" value={filters.component} onChange={handleFilterChange} placeholder="Part Name/ID..." className="block mt-2 w-full p-2 text-xs font-normal border rounded-lg bg-white outline-none focus:ring-1 focus:ring-blue-400" />
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 flex flex-col md:table-row-group">
               {filteredMachines.map((machine) => (
                 <tr key={machine._id} className="hover:bg-slate-50/80 transition-colors flex flex-col md:table-row p-4 md:p-0 mb-4 md:mb-0 bg-white md:bg-transparent rounded-lg border md:border-none shadow-sm md:shadow-none">
                   
-                  {/* Asset Info */}
+                  {/* Asset Info (GMS ID, Brand, Model, Co. ID) */}
                   <td className="p-2 md:p-5">
                     <div className="font-black text-slate-800 text-lg md:text-xl">{machine.brandName}</div>
                     <div className="flex flex-wrap gap-2 mt-2 items-center">
@@ -100,7 +147,7 @@ export default function AdvancedInventory() {
                     <div className="text-xs text-slate-400 font-medium">Co. ID: {machine.companyUniqueNumber}</div>
                   </td>
 
-                  {/* Commercials */}
+                  {/* Commercials (Price, Install Date, Warranty) */}
                   <td className="p-2 md:p-5">
                     <div className="text-lg font-black text-blue-700 md:text-slate-700">
                       ${machine.price?.toLocaleString() || '0'}
@@ -113,7 +160,7 @@ export default function AdvancedInventory() {
                     </div>
                   </td>
 
-                  {/* Location Details */}
+                  {/* Location Details (Floor, Line) */}
                   <td className="p-2 md:p-5">
                     <div className="flex flex-col gap-2">
                       <div className="flex items-center gap-2">
@@ -132,14 +179,13 @@ export default function AdvancedInventory() {
                   <td className="p-2 md:p-5">
                     <div className={`w-fit px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wide border
                       ${machine.currentStatus === 'running' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 
-                        machine.currentStatus === 'maintenance' ? 'bg-amber-100 text-amber-700 border-amber-200' : 
+                        machine.currentStatus === 'idle' ? 'bg-amber-100 text-amber-700 border-amber-200' : 
                         'bg-slate-200 text-slate-600 border-slate-300'}`}>
                       {machine.currentStatus}
                     </div>
-                    
                   </td>
 
-                  {/* Parts Section */}
+                  {/* Components (Parts) */}
                   <td className="p-2 md:p-5">
                     {machine.parts && machine.parts.length > 0 ? (
                       <div className="flex flex-col gap-2">
@@ -162,6 +208,9 @@ export default function AdvancedInventory() {
               ))}
             </tbody>
           </table>
+          {filteredMachines.length === 0 && (
+            <div className="p-12 text-center text-slate-400 font-medium italic">No matching assets found.</div>
+          )}
         </div>
       </div>
     </div>

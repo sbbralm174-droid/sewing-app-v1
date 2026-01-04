@@ -111,15 +111,15 @@ export async function POST(request) {
       // Machine last location update করতে হবে যদি machineUniqueId থাকে
       if (row.machineUniqueId && row.machineUniqueId.trim() !== '') {
         machineUpdates.push({
-          uniqueId: row.machineUniqueId,
-          lastLocation: {
-            date: date,
-            line: productionInfo.line,
-            supervisor: productionInfo.supervisor,
-            floor: productionInfo.floor,
-            updatedAt: new Date()
-          }
-        });
+  uniqueId: row.machineUniqueId,
+  lastLocation: {
+    date: date,
+    line: lineId,       // productionInfo.line এর বদলে lineId (যা ObjectId)
+    floor: floorId,     // productionInfo.floor এর বদলে floorId (যা ObjectId)
+    supervisor: productionInfo.supervisor,
+    updatedAt: new Date()
+  }
+});
       }
     }
 
