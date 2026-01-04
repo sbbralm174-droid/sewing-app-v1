@@ -5,23 +5,41 @@ import { Html5QrcodeScanner } from 'html5-qrcode';
 export default function MachineUpdatePage() {
     const [machineData, setMachineData] = useState(null);
     const [machineTypes, setMachineTypes] = useState([]); 
-    const [availableParts, setAvailableParts] = useState(["Full Machine", "Motor", "Belt", "Needle", "Oil Pump", "Display", "Sensor"]); // উদাহরণস্বরূপ
+    const [availableParts, setAvailableParts] = useState(["Full Machine", "Motor", "Belt", "Needle", "Oil Pump", "Display", "Sensor"]);
+    
+    // --- Floor and Line States ---
+    const [floors, setFloors] = useState([]);
+    const [allLines, setAllLines] = useState([]);
+    const [filteredLines, setFilteredLines] = useState([]);
+    
     const [manualId, setManualId] = useState("");
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState({ text: "", type: "" });
     const scannerRef = useRef(null);
 
+    // Initial Data Fetching (Machine Types, Floors, and Lines)
     useEffect(() => {
-        const fetchTypes = async () => {
+        const fetchData = async () => {
             try {
-                const res = await fetch('/api/machine-types');
-                const data = await res.json();
-                setMachineTypes(data);
-            } catch (err) { console.error("Error fetching types", err); }
+                const [typeRes, floorRes, lineRes] = await Promise.all([
+                    fetch('/api/machine-types'),
+                    fetch('/api/floors'),
+                    fetch('/api/floor-lines')
+                ]);
+
+                const typeData = await typeRes.json();
+                const floorData = await floorRes.json();
+                const lineData = await lineRes.json();
+
+                setMachineTypes(typeData);
+                setFloors(floorData.data || []);
+                setAllLines(lineData || []);
+            } catch (err) { console.error("Error fetching initial data", err); }
         };
-        fetchTypes();
+        fetchData();
     }, []);
 
+    // QR Scanner Logic
     useEffect(() => {
         if (!machineData) {
             const scanner = new Html5QrcodeScanner("reader", {
@@ -32,6 +50,31 @@ export default function MachineUpdatePage() {
         }
         return () => { if (scannerRef.current) scannerRef.current.clear().catch(() => {}); };
     }, [machineData]);
+
+    // Handle Floor Change & Filter Lines
+    const handleFloorSelection = (e) => {
+        const floorId = e.target.value;
+        setMachineData(prev => ({
+            ...prev,
+            lastLocation: { ...prev.lastLocation, floor: floorId, line: "" }
+        }));
+
+        if (floorId) {
+            const filtered = allLines.filter(line => (line.floor._id === floorId || line.floor === floorId));
+            setFilteredLines(filtered);
+        } else {
+            setFilteredLines([]);
+        }
+    };
+
+    // Auto-filter lines when machine data is loaded (for editing)
+    useEffect(() => {
+        if (machineData?.lastLocation?.floor && allLines.length > 0) {
+            const floorId = machineData.lastLocation.floor;
+            const filtered = allLines.filter(line => (line.floor._id === floorId || line.floor === floorId));
+            setFilteredLines(filtered);
+        }
+    }, [machineData, allLines]);
 
     const processInput = (input) => {
         let id = "";
@@ -46,7 +89,6 @@ export default function MachineUpdatePage() {
             const res = await fetch(`/api/machines/update-by-qr-code/${encodeURIComponent(id)}`);
             const data = await res.json();
             if (res.ok) {
-                // তারিখগুলো ইনপুট ফিল্ডের ফরম্যাটে আনা
                 if (data.nextServiceDate) data.nextServiceDate = new Date(data.nextServiceDate).toISOString().split('T')[0];
                 if (data.installationDate) data.installationDate = new Date(data.installationDate).toISOString().split('T')[0];
                 if (data.parts) {
@@ -62,17 +104,9 @@ export default function MachineUpdatePage() {
         finally { setLoading(false); }
     };
 
-    // --- নতুন পার্টস হ্যান্ডলিং ---
     const addNewPart = () => {
-        const newPart = {
-            partName: "",
-            uniquePartId: `P-${Date.now()}`, // Auto generate unique ID
-            nextServiceDate: ""
-        };
-        setMachineData(prev => ({
-            ...prev,
-            parts: [...(prev.parts || []), newPart]
-        }));
+        const newPart = { partName: "", uniquePartId: `P-${Date.now()}`, nextServiceDate: "" };
+        setMachineData(prev => ({ ...prev, parts: [...(prev.parts || []), newPart] }));
     };
 
     const removePart = (index) => {
@@ -137,7 +171,7 @@ export default function MachineUpdatePage() {
                             <button type="button" onClick={() => setMachineData(null)} className="text-gray-400 hover:text-red-500 font-bold">CANCEL ✕</button>
                         </div>
 
-                        {/* মেইন ইনফরমেশন (সব ফিল্ড ঠিক রাখা হয়েছে) */}
+                        {/* মেইন ইনফরমেশন */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="text-xs font-bold text-gray-500 uppercase">Brand Name</label>
@@ -164,13 +198,9 @@ export default function MachineUpdatePage() {
                                 <label className="text-xs font-bold text-gray-500 uppercase">Installation Date</label>
                                 <input type="date" name="installationDate" value={machineData.installationDate || ''} onChange={handleFieldChange} className="w-full border p-2 rounded mt-1" />
                             </div>
-                            {/* <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase">Next Machine Service</label>
-                                <input type="date" name="nextServiceDate" value={machineData.nextServiceDate || ''} onChange={handleFieldChange} className="w-full border p-2 rounded mt-1" />
-                            </div> */}
                             <div>
                                 <label className="text-xs font-bold text-gray-500 uppercase">Status</label>
-                                <select name="currentStatus" value={machineData.currentStatus} onChange={handleFieldChange} className="w-full border p-2 rounded mt-1 font-bold">
+                                <select name="currentStatus" value={machineData.currentStatus} onChange={handleFieldChange} className="w-full border p-2 rounded mt-1 font-bold bg-white">
                                     <option value="idle">Idle</option>
                                     <option value="running">Running</option>
                                     <option value="maintenance">Maintenance</option>
@@ -195,26 +225,43 @@ export default function MachineUpdatePage() {
                             </div>
                         </div>
 
-                        {/* লোকেশন সেকশন */}
+                        {/* লোকেশন সেকশন - Dynamic Floor & Line */}
                         <div className="bg-slate-50 p-4 rounded-xl space-y-3 border border-slate-200">
                             <p className="text-xs font-black text-blue-700 uppercase">📍 Location Info</p>
-                            <div className="grid grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 <div>
                                     <label className="text-[10px] uppercase font-bold text-gray-400">Floor</label>
-                                    <input name="floor" value={machineData.lastLocation?.floor || ''} onChange={(e) => handleFieldChange(e, 'lastLocation')} className="w-full border p-2 rounded text-sm bg-white" />
+                                    <select 
+                                        name="floor" 
+                                        value={machineData.lastLocation?.floor || ''} 
+                                        onChange={handleFloorSelection} 
+                                        className="w-full border p-2 rounded text-sm bg-white font-semibold"
+                                    >
+                                        <option value="">Select Floor</option>
+                                        {floors.map(f => <option key={f._id} value={f._id}>{f.floorName}</option>)}
+                                    </select>
                                 </div>
                                 <div>
                                     <label className="text-[10px] uppercase font-bold text-gray-400">Line</label>
-                                    <input name="line" value={machineData.lastLocation?.line || ''} onChange={(e) => handleFieldChange(e, 'lastLocation')} className="w-full border p-2 rounded text-sm bg-white" />
+                                    <select 
+                                        name="line" 
+                                        value={machineData.lastLocation?.line || ''} 
+                                        onChange={(e) => handleFieldChange(e, 'lastLocation')} 
+                                        disabled={!machineData.lastLocation?.floor}
+                                        className="w-full border p-2 rounded text-sm bg-white font-semibold disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                    >
+                                        <option value="">{machineData.lastLocation?.floor ? "Select Line" : "Select Floor First"}</option>
+                                        {filteredLines.map(l => <option key={l._id} value={l._id}>{l.lineNumber}</option>)}
+                                    </select>
                                 </div>
                                 <div>
                                     <label className="text-[10px] uppercase font-bold text-gray-400">Supervisor</label>
-                                    <input name="supervisor" value={machineData.lastLocation?.supervisor || ''} onChange={(e) => handleFieldChange(e, 'lastLocation')} className="w-full border p-2 rounded text-sm bg-white" />
+                                    <input name="supervisor" value={machineData.lastLocation?.supervisor || ''} onChange={(e) => handleFieldChange(e, 'lastLocation')} className="w-full border p-2 rounded text-sm bg-white" placeholder="Supervisor Name" />
                                 </div>
                             </div>
                         </div>
 
-                        {/* পার্টস লিস্ট সেকশন - ড্রপডাউন এবং ডিলিট বাটন সহ */}
+                        {/* পার্টস লিস্ট সেকশন */}
                         <div className="space-y-4 border-t pt-4">
                             <div className="flex justify-between items-center">
                                 <p className="text-xs font-black text-gray-700 uppercase italic">⚙️ Machine Parts List</p>
@@ -226,22 +273,17 @@ export default function MachineUpdatePage() {
                             {machineData.parts?.map((part, index) => (
                                 <div key={index} className="relative grid grid-cols-1 md:grid-cols-3 gap-3 bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-sm">
                                     <button type="button" onClick={() => removePart(index)} className="absolute -top-2 -right-2 bg-red-600 text-white w-6 h-6 rounded-full text-xs shadow-lg flex items-center justify-center font-bold">✕</button>
-                                    
                                     <div>
-                                        <label className="text-[10px] font-bold text-gray-400 uppercase">Part Name (Dropdown)</label>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase">Part Name</label>
                                         <select name="partName" value={part.partName} onChange={(e) => handleFieldChange(e, 'parts', index)} className="w-full border p-2 rounded text-sm bg-white font-semibold" required>
                                             <option value="">Select Part</option>
-                                            {availableParts.map((pName, i) => (
-                                                <option key={i} value={pName}>{pName}</option>
-                                            ))}
+                                            {availableParts.map((pName, i) => <option key={i} value={pName}>{pName}</option>)}
                                         </select>
                                     </div>
-
                                     <div>
-                                        <label className="text-[10px] font-bold text-gray-400 uppercase">Unique Part ID (Auto)</label>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase">Unique Part ID</label>
                                         <input readOnly name="uniquePartId" value={part.uniquePartId} className="w-full border p-2 rounded text-sm bg-gray-100 text-gray-500 cursor-not-allowed" />
                                     </div>
-
                                     <div>
                                         <label className="text-[10px] font-bold text-gray-400 uppercase">Next Service Date</label>
                                         <input type="date" name="nextServiceDate" value={part.nextServiceDate} onChange={(e) => handleFieldChange(e, 'parts', index)} className="w-full border p-2 rounded text-sm bg-white" required />

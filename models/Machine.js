@@ -3,9 +3,15 @@ const mongoose = require('mongoose');
 // ✅ Last Location Schema
 const LastLocationSchema = new mongoose.Schema({
   date: { type: Date },
-  line: { type: String },
+  line: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'FloorLine' // FloorLine মডেলের সাথে কানেক্ট
+  },
   supervisor: { type: String },
-  floor: { type: String },
+  floor: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'Floor' // Floor মডেলের সাথে কানেক্ট
+  },
   updatedAt: { type: Date, default: Date.now }
 }, { _id: false });
 

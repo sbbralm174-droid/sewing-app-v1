@@ -2,6 +2,8 @@ import { connectDB } from '@/lib/db';
 import Machine from '@/models/Machine';
 import { NextResponse } from 'next/server';
 import '@/models/MachineType'
+import Floor from '@/models/Floor';
+import FloorLine from '@/models/FloorLine';
 
 export async function POST(req) {
   try {
@@ -17,7 +19,10 @@ export async function POST(req) {
 export async function GET() {
   try {
     await connectDB();
-    const machines = await Machine.find({}).populate('machineType');
+    const machines = await Machine.find({})
+      .populate('machineType')
+      .populate('lastLocation.floor')
+      .populate('lastLocation.line');
     return NextResponse.json(machines);
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
