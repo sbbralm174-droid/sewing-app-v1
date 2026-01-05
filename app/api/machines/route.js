@@ -1,4 +1,3 @@
-// app/api/machines/route.js
 import { connectDB } from '@/lib/db';
 import Machine from '@/models/Machine';
 import { NextResponse } from 'next/server';
@@ -7,16 +6,9 @@ export async function GET() {
   try {
     await connectDB();
 
-    // 🔹 AUTO TODAY
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-
-    const end = new Date();
-    end.setHours(23, 59, 59, 999);
-
     const machines = await Machine.aggregate([
       // =========================
-      // 🔥 FIX: string -> ObjectId
+      // 🔥 FIX: machineType string -> ObjectId
       // =========================
       {
         $addFields: {
@@ -95,38 +87,46 @@ export async function GET() {
       },
 
       // =========================
-      // DailyProduction check
+      // 🔥 TIMEZONE SAFE DATE COMPARE
       // =========================
       {
-        $lookup: {
-          from: 'dailyproductions',
-          let: { machineId: '$uniqueId' },
-          pipeline: [
-            {
-              $match: {
-                $expr: {
-                  $and: [
-                    { $eq: ['$uniqueMachine', '$$machineId'] },
-                    { $gte: ['$date', start] },
-                    { $lte: ['$date', end] }
-                  ]
+        $addFields: {
+          lastLocationDateOnly: {
+            $cond: [
+              { $ifNull: ['$lastLocation.date', false] },
+              {
+                $dateToString: {
+                  format: '%Y-%m-%d',
+                  date: '$lastLocation.date',
+                  timezone: 'Asia/Dhaka'
                 }
-              }
-            },
-            { $limit: 1 }
-          ],
-          as: 'todayProduction'
+              },
+              null
+            ]
+          },
+          todayDateOnly: {
+            $dateToString: {
+              format: '%Y-%m-%d',
+              date: new Date(),
+              timezone: 'Asia/Dhaka'
+            }
+          }
         }
       },
 
       // =========================
-      // status set
+      // 🔥 RUNNING / IDLE LOGIC (FINAL)
       // =========================
       {
         $addFields: {
           currentStatus: {
             $cond: [
-              { $gt: [{ $size: '$todayProduction' }, 0] },
+              {
+                $and: [
+                  { $ne: ['$lastLocationDateOnly', null] },
+                  { $eq: ['$lastLocationDateOnly', '$todayDateOnly'] }
+                ]
+              },
               'running',
               'idle'
             ]
@@ -142,14 +142,18 @@ export async function GET() {
           machineTypeObjectId: 0,
           lastLocationFloor: 0,
           lastLocationLine: 0,
-          todayProduction: 0
+          lastLocationDateOnly: 0,
+          todayDateOnly: 0
         }
       }
     ]);
 
     return NextResponse.json(machines);
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message },
+      { status: 500 }
+    );
   }
 }
 
@@ -160,6 +164,9 @@ export async function POST(req) {
     const machine = await Machine.create(body);
     return NextResponse.json(machine, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json(
+      { error: error.message },
+      { status: 400 }
+    );
   }
 }

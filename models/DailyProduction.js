@@ -38,7 +38,7 @@ const DailyProductionSchema = new mongoose.Schema({
     default: 'present'
   },
   machineType: { type: String },
-  uniqueMachine: { type: String },
+  uniqueMachine: { type: String, index: true },
   target: { type: Number, min: 0 },
   hourlyTarget:{ type: Number, min: 0 },
   buyerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Buyer', required: true },
@@ -66,6 +66,8 @@ DailyProductionSchema.index({ date: -1, floor: 1, line: 1 });
 DailyProductionSchema.index({ supervisor: 1, process: 1, breakdownProcess: 1 });
 DailyProductionSchema.index({ "operator.operatorId": 1, date: -1 });
 DailyProductionSchema.index({ date: 1, line: 1 }); // নতুন index যোগ করা হলো
+DailyProductionSchema.index({ uniqueMachine: 1, date: -1 }); 
+DailyProductionSchema.index({ floorId: 1, lineId: 1, date: -1 });
 
 // Update the updatedAt field before saving
 DailyProductionSchema.pre('save', function(next) {
