@@ -4,41 +4,67 @@ import React, { useEffect, useState, useMemo } from 'react';
 export default function AdvancedInventory() {
   const [machines, setMachines] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [machineTypes, setMachineTypes] = useState([]);
+  const [floors, setFloors] = useState([]);
 
   // 🔍 Filter States
   const [filters, setFilters] = useState({
     asset: "",
+    machineType: "",
     commercial: "",
     location: "",
     status: "",
-    component: ""
+    component: "",
+    selectedFloors: []
   });
 
   useEffect(() => {
+    // Fetch machines data
     fetch('/api/machines')
       .then(res => res.json())
       .then(data => {
         setMachines(data);
         setLoading(false);
+        
+        // Extract unique machine types from data
+        const uniqueTypes = [...new Set(data.map(m => m.machineType?.name).filter(Boolean))];
+        setMachineTypes(uniqueTypes);
+        
+        // Extract unique floors from data
+        const uniqueFloors = [...new Set(data
+          .map(m => m.lastLocation?.floor?.floorName)
+          .filter(Boolean)
+          .sort())];
+        setFloors(uniqueFloors);
       });
   }, []);
 
-  // 🛠️ Filter Logic: Empty thakle shob dekhabe, likhle filter hobe
+  // 🛠️ Filter Logic
   const filteredMachines = useMemo(() => {
     return machines.filter(m => {
-      // Asset Info Filter (String conversion added for safe search)
+      // Asset Info Filter
       const assetMatch = !filters.asset || 
         m.brandName?.toLowerCase().includes(filters.asset.toLowerCase()) || 
         m.uniqueId?.toLowerCase().includes(filters.asset.toLowerCase()) || 
-        String(m.companyUniqueNumber || "").toLowerCase().includes(filters.asset.toLowerCase()); // Fixed Line
+        String(m.companyUniqueNumber || "").toLowerCase().includes(filters.asset.toLowerCase());
 
+      // Machine Type Filter
+      const machineTypeMatch = !filters.machineType || 
+        m.machineType?.name?.toLowerCase() === filters.machineType.toLowerCase();
+
+      // Commercial Filter
       const commercialMatch = !filters.commercial || 
         String(m.price || "").includes(filters.commercial) || 
         String(m.warrantyYears || "").includes(filters.commercial);
 
-      const locationMatch = !filters.location || 
+      // Location Filter (Text search)
+      const locationTextMatch = !filters.location || 
         m.lastLocation?.floor?.floorName?.toLowerCase().includes(filters.location.toLowerCase()) || 
         m.lastLocation?.line?.lineNumber?.toLowerCase().includes(filters.location.toLowerCase());
+
+      // Multi-floor Filter
+      const floorMatch = filters.selectedFloors.length === 0 || 
+        filters.selectedFloors.includes(m.lastLocation?.floor?.floorName || '');
 
       const statusMatch = !filters.status || 
         m.currentStatus === filters.status;
@@ -49,7 +75,8 @@ export default function AdvancedInventory() {
           p.uniquePartId?.toLowerCase().includes(filters.component.toLowerCase())
         );
 
-      return assetMatch && commercialMatch && locationMatch && statusMatch && componentMatch;
+      return assetMatch && machineTypeMatch && commercialMatch && 
+             locationTextMatch && floorMatch && statusMatch && componentMatch;
     });
   }, [machines, filters]);
 
@@ -66,6 +93,20 @@ export default function AdvancedInventory() {
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleFloorToggle = (floorName) => {
+    setFilters(prev => {
+      const newSelectedFloors = prev.selectedFloors.includes(floorName)
+        ? prev.selectedFloors.filter(f => f !== floorName)
+        : [...prev.selectedFloors, floorName];
+      
+      return { ...prev, selectedFloors: newSelectedFloors };
+    });
+  };
+
+  const clearAllFloors = () => {
+    setFilters(prev => ({ ...prev, selectedFloors: [] }));
   };
 
   if (loading) return <div className="flex justify-center items-center h-screen font-sans text-lg text-slate-500">Loading Inventory...</div>;
@@ -96,6 +137,119 @@ export default function AdvancedInventory() {
             <h1 className="text-2xl font-extrabold text-slate-800">Advanced Inventory</h1>
             <p className="text-slate-500 text-sm md:text-base mt-1">Manage and track all factory assets</p>
           </div>
+          
+          {/* Multi-floor Selection Panel */}
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 w-full md:w-auto">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm font-bold text-slate-700">Filter by Floor:</span>
+              {filters.selectedFloors.length > 0 && (
+                <button 
+                  onClick={clearAllFloors}
+                  className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {floors.map((floor) => (
+                <button
+                  key={floor}
+                  onClick={() => handleFloorToggle(floor)}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-all ${
+                    filters.selectedFloors.includes(floor)
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400'
+                  }`}
+                >
+                  {floor}
+                  {filters.selectedFloors.includes(floor) && (
+                    <span className="ml-1">✓</span>
+                  )}
+                </button>
+              ))}
+            </div>
+            {filters.selectedFloors.length > 0 && (
+              <div className="mt-2 text-xs text-slate-500">
+                Selected: {filters.selectedFloors.length} floor{filters.selectedFloors.length !== 1 ? 's' : ''}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Mobile Filter Section - MOVED OUTSIDE TABLE */}
+        <div className="md:hidden bg-slate-50 p-4 border-b border-slate-200">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1">Asset Info</label>
+              <input 
+                name="asset" 
+                value={filters.asset} 
+                onChange={handleFilterChange} 
+                placeholder="Search GMS/Brand/Model..." 
+                className="w-full p-2 text-sm border rounded-lg bg-white"
+              />
+              <select 
+                name="machineType" 
+                value={filters.machineType} 
+                onChange={handleFilterChange}
+                className="w-full p-2 text-sm border rounded-lg bg-white mt-2"
+              >
+                <option value="">All Machine Types</option>
+                {machineTypes.map(type => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1">Location Search</label>
+              <input 
+                name="location" 
+                value={filters.location} 
+                onChange={handleFilterChange} 
+                placeholder="Search Floor/Line..." 
+                className="w-full p-2 text-sm border rounded-lg bg-white"
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Commercials</label>
+                <input 
+                  name="commercial" 
+                  value={filters.commercial} 
+                  onChange={handleFilterChange} 
+                  placeholder="Price/Warranty" 
+                  className="w-full p-2 text-sm border rounded-lg bg-white"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Status</label>
+                <select 
+                  name="status" 
+                  value={filters.status} 
+                  onChange={handleFilterChange} 
+                  className="w-full p-2 text-sm border rounded-lg bg-white"
+                >
+                  <option value="">All</option>
+                  <option value="running">running</option>
+                  <option value="idle">idle</option>
+                </select>
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1">Components</label>
+              <input 
+                name="component" 
+                value={filters.component} 
+                onChange={handleFilterChange} 
+                placeholder="Part Name/ID..." 
+                className="w-full p-2 text-sm border rounded-lg bg-white"
+              />
+            </div>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -104,19 +258,60 @@ export default function AdvancedInventory() {
               <tr>
                 <th className="p-5 border-b border-slate-100">
                   Asset Info
-                  <input name="asset" value={filters.asset} onChange={handleFilterChange} placeholder="Search GMS/Brand..." className="block mt-2 w-full p-2 text-xs font-normal border rounded-lg bg-white outline-none focus:ring-1 focus:ring-blue-400" />
+                  <div className="space-y-2 mt-2">
+                    <input 
+                      name="asset" 
+                      value={filters.asset} 
+                      onChange={handleFilterChange} 
+                      placeholder="Search GMS/Brand/Model..." 
+                      className="block w-full p-2 text-xs font-normal border rounded-lg bg-white outline-none focus:ring-1 focus:ring-blue-400" 
+                    />
+                    <select 
+                      name="machineType" 
+                      value={filters.machineType} 
+                      onChange={handleFilterChange}
+                      className="block w-full p-2 text-xs font-normal border rounded-lg bg-white outline-none focus:ring-1 focus:ring-blue-400"
+                    >
+                      <option value="">All Machine Types</option>
+                      {machineTypes.map(type => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                  </div>
                 </th>
                 <th className="p-5 border-b border-slate-100">
                   Commercials
-                  <input name="commercial" value={filters.commercial} onChange={handleFilterChange} placeholder="Price/Warranty..." className="block mt-2 w-full p-2 text-xs font-normal border rounded-lg bg-white outline-none focus:ring-1 focus:ring-blue-400" />
+                  <input 
+                    name="commercial" 
+                    value={filters.commercial} 
+                    onChange={handleFilterChange} 
+                    placeholder="Price/Warranty..." 
+                    className="block mt-2 w-full p-2 text-xs font-normal border rounded-lg bg-white outline-none focus:ring-1 focus:ring-blue-400" 
+                  />
                 </th>
                 <th className="p-5 border-b border-slate-100">
                   Location Details
-                  <input name="location" value={filters.location} onChange={handleFilterChange} placeholder="Floor/Line..." className="block mt-2 w-full p-2 text-xs font-normal border rounded-lg bg-white outline-none focus:ring-1 focus:ring-blue-400" />
+                  <div className="space-y-2 mt-2">
+                    <input 
+                      name="location" 
+                      value={filters.location} 
+                      onChange={handleFilterChange} 
+                      placeholder="Search Floor/Line..." 
+                      className="block w-full p-2 text-xs font-normal border rounded-lg bg-white outline-none focus:ring-1 focus:ring-blue-400" 
+                    />
+                    <div className="text-xs text-slate-500 font-medium">
+                      Use buttons above for multi-floor selection
+                    </div>
+                  </div>
                 </th>
                 <th className="p-5 border-b border-slate-100">
                   Status
-                  <select name="status" value={filters.status} onChange={handleFilterChange} className="block mt-2 w-full p-2 text-xs font-normal border rounded-lg bg-white outline-none">
+                  <select 
+                    name="status" 
+                    value={filters.status} 
+                    onChange={handleFilterChange} 
+                    className="block mt-2 w-full p-2 text-xs font-normal border rounded-lg bg-white outline-none"
+                  >
                     <option value="">All Status</option>
                     <option value="running">running</option>
                     <option value="idle">idle</option>
@@ -124,10 +319,17 @@ export default function AdvancedInventory() {
                 </th>
                 <th className="p-5 border-b border-slate-100">
                   Components
-                  <input name="component" value={filters.component} onChange={handleFilterChange} placeholder="Part Name/ID..." className="block mt-2 w-full p-2 text-xs font-normal border rounded-lg bg-white outline-none focus:ring-1 focus:ring-blue-400" />
+                  <input 
+                    name="component" 
+                    value={filters.component} 
+                    onChange={handleFilterChange} 
+                    placeholder="Part Name/ID..." 
+                    className="block mt-2 w-full p-2 text-xs font-normal border rounded-lg bg-white outline-none focus:ring-1 focus:ring-blue-400" 
+                  />
                 </th>
               </tr>
             </thead>
+            
             <tbody className="divide-y divide-slate-100 flex flex-col md:table-row-group">
               {filteredMachines.map((machine) => (
                 <tr key={machine._id} className="hover:bg-slate-50/80 transition-colors flex flex-col md:table-row p-4 md:p-0 mb-4 md:mb-0 bg-white md:bg-transparent rounded-lg border md:border-none shadow-sm md:shadow-none">
@@ -136,12 +338,12 @@ export default function AdvancedInventory() {
                   <td className="p-2 md:p-5">
                     <div className="font-black text-slate-800 text-lg md:text-xl">{machine.brandName}</div>
                     <div className="flex flex-wrap gap-2 mt-2 items-center">
-                        <span className="text-xs bg-indigo-100 text-indigo-700 px-3 py-1 rounded-md font-bold uppercase">
-                            {machine.machineType?.name || 'Uncategorized'}
-                        </span>
-                        <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded">
-                          {machine.uniqueId}
-                        </span>
+                      <span className="text-xs bg-indigo-100 text-indigo-700 px-3 py-1 rounded-md font-bold uppercase">
+                        {machine.machineType?.name || 'Uncategorized'}
+                      </span>
+                      <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded">
+                        {machine.uniqueId}
+                      </span>
                     </div>
                     <div className="text-sm text-slate-500 mt-2">Model: <span className="font-semibold text-slate-700">{machine.model || 'N/A'}</span></div>
                     <div className="text-xs text-slate-400 font-medium">Co. ID: {machine.companyUniqueNumber}</div>
@@ -164,10 +366,17 @@ export default function AdvancedInventory() {
                   <td className="p-2 md:p-5">
                     <div className="flex flex-col gap-2">
                       <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+                        <div className={`w-2.5 h-2.5 rounded-full ${
+                          filters.selectedFloors.includes(machine.lastLocation?.floor?.floorName || '') 
+                            ? 'bg-green-500' 
+                            : 'bg-blue-500'
+                        }`}></div>
                         <span className="text-sm md:text-base font-bold text-slate-800">
                           {machine.lastLocation?.floor?.floorName || 'N/A'}
                         </span>
+                        {filters.selectedFloors.includes(machine.lastLocation?.floor?.floorName || '') && (
+                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Filtered</span>
+                        )}
                       </div>
                       <div className="text-sm text-slate-600 pl-4 border-l-2 border-slate-200 ml-1">
                         Line: <span className="font-black text-slate-800">{machine.lastLocation?.line?.lineNumber || 'N/A'}</span>

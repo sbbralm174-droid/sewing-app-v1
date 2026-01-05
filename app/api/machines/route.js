@@ -152,3 +152,14 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export async function POST(req) {
+  try {
+    await connectDB();
+    const body = await req.json();
+    const machine = await Machine.create(body);
+    return NextResponse.json(machine, { status: 201 });
+  } catch (error) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+}
