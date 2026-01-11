@@ -83,3 +83,14 @@ MachineSchema.pre('save', function (next) {
 });
 
 module.exports = mongoose.models.Machine || mongoose.model('Machine', MachineSchema);
+
+
+
+// 01735980944
+
+//01735944844
+
+
+//  018883040442
+
+

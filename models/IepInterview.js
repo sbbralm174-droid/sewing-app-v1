@@ -23,7 +23,6 @@ const VivaInterviewSchema = new mongoose.Schema(
     },
     picture: {
       type: String,
-      required: [true, "Candidate picture is required"],
     },
     videos: [
       {

@@ -1,6 +1,36 @@
 const mongoose = require('mongoose');
 
 // ------------------------------------------
+// Sub-Schema 3: Operator Last Scan
+// ------------------------------------------
+const OperatorLastScanSchema = new mongoose.Schema({
+    date: {
+        type: Date,
+        default: Date.now
+    },
+    machine: { type: String },
+    floor: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Floor',
+    },
+    line: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'FloorLine',
+    },
+    process: {
+        type: String,
+        required: true,
+        trim: true
+    },
+    breakdownProcess: {
+        type: String,
+        trim: true
+    }
+}, {
+    _id: false
+});
+
+// ------------------------------------------
 // Sub-Schema 1: Occurrence Report
 // ------------------------------------------
 const OccurrenceReportSchema = new mongoose.Schema({
@@ -67,6 +97,12 @@ const OperatorSchema = new mongoose.Schema({
         trim: true,
         uppercase: true
     },
+    employeeId: {
+        type: String,
+        unique: true,
+        trim: true,
+        uppercase: true
+    },
     joiningDate: {
         type: Date,
         required: [true, 'Joining date is required']
@@ -99,6 +135,11 @@ const OperatorSchema = new mongoose.Schema({
     occurrenceReports: {
         type: [OccurrenceReportSchema],
         default: [],
+    },
+
+    lastScan: {
+        type: OperatorLastScanSchema,
+        default: null
     },
     
     resignationHistory: { 

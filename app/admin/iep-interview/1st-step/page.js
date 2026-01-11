@@ -307,9 +307,7 @@ export default function VivaInterviewStep1() {
       errors.idValidation = 'Either NID or Birth Certificate must be provided';
     }
     
-    if (!photoFileRef.current && !formData.picture && !capturedImage) {
-      errors.picture = 'Candidate picture is required';
-    }
+    
     
     if (result === 'FAILED' && !formData.failureReason.trim()) {
       errors.failureReason = 'Failure reason is required when candidate fails';

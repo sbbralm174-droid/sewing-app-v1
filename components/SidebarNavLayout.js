@@ -49,7 +49,7 @@ function NotificationsDropdown({ notifications, isLoading, error }) {
                 <p className="text-xs text-gray-500">
                   {new Date(n.date).toLocaleString()}
                 </p>
-                <Link href={`/admin/servicing/${n.uniqueId}?partName=${encodeURIComponent(n.partName)}`}>
+                <Link href={`/admin/servicing/${encodeURIComponent(n.uniqueId)}?partName=${encodeURIComponent(n.partName)}`}>
                   <button
                     className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-0.5 rounded-full text-xs transition duration-150 ease-in-out shadow-md"
                   >

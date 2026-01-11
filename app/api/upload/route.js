@@ -1,59 +1,45 @@
-import { NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
-import { v4 as uuidv4 } from "uuid";
+import { NextResponse } from 'next/server';
+import cloudinary from '@/lib/cloudinary';
 
-export async function POST(request) {
+export const runtime = 'nodejs';
+
+export async function POST(req) {
   try {
-    const formData = await request.formData();
-    const file = formData.get("file");
-    const type = formData.get("type"); // 'photo' or 'video'
+    const formData = await req.formData();
+    const file = formData.get('file');
 
     if (!file) {
-      return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+      return NextResponse.json(
+        { error: 'No file uploaded' },
+        { status: 400 }
+      );
     }
 
-    // Validate file type
-    const allowedImageTypes = ["image/jpeg", "image/png", "image/jpg", "image/webp"];
-    const allowedVideoTypes = ["video/mp4", "video/webm", "video/ogg"];
-    
-    if (type === 'photo' && !allowedImageTypes.includes(file.type)) {
-      return NextResponse.json({ error: "Invalid image format" }, { status: 400 });
-    }
-    
-    if (type === 'video' && !allowedVideoTypes.includes(file.type)) {
-      return NextResponse.json({ error: "Invalid video format" }, { status: 400 });
-    }
+    const buffer = Buffer.from(await file.arrayBuffer());
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    const uploadResult = await new Promise((resolve, reject) => {
+      cloudinary.uploader.upload_stream(
+        {
+          folder: 'iep-interview',
+          resource_type: 'image',
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      ).end(buffer);
+    });
 
-    // Create unique filename
-    const fileExtension = path.extname(file.name);
-    const fileName = `${uuidv4()}${fileExtension}`;
-    
-    // Determine upload directory
-    const uploadDir = type === 'photo' ? 'uploads/photos' : 'uploads/videos';
-    const uploadPath = path.join(process.cwd(), 'public', uploadDir, fileName);
-
-    // Ensure directory exists
-    await mkdir(path.dirname(uploadPath), { recursive: true });
-
-    // Save file
-    await writeFile(uploadPath, buffer);
-
-    // Return public URL
-    const publicUrl = `/${uploadDir}/${fileName}`;
-
-    return NextResponse.json({ 
-      success: true, 
-      url: publicUrl,
-      fileName: file.name,
-      type: type
+    return NextResponse.json({
+      url: uploadResult.secure_url,
+      public_id: uploadResult.public_id,
     });
 
   } catch (error) {
-    console.error("Upload error:", error);
-    return NextResponse.json({ error: "File upload failed" }, { status: 500 });
+    console.error('Cloudinary Upload Error:', error);
+    return NextResponse.json(
+      { error: 'Upload failed' },
+      { status: 500 }
+    );
   }
 }

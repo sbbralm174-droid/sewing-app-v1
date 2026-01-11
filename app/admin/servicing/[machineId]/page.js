@@ -34,7 +34,7 @@ export default function ServicingPage() {
         setLoading(true);
 
         // 1. Fetch machine data
-        const machineResponse = await fetch(`/api/machines/${machineId}`);
+        const machineResponse = await fetch(`/api/machines/${encodeURIComponent(machineId)}`);
 
         if (!machineResponse.ok) {
           throw new Error('Machine not found');
@@ -210,7 +210,7 @@ export default function ServicingPage() {
         
         // কিছুক্ষণ পর হোম পেজে রিডাইরেক্ট
         setTimeout(() => {
-          router.push('/admin');
+          router.push('/');
         }, 2000);
       } else {
         setMessage(data.message || 'Error completing service');
@@ -241,10 +241,10 @@ export default function ServicingPage() {
           <h1 className="text-2xl font-bold text-red-600">Machine Not Found</h1>
           <p className="mt-2 text-gray-600">{message}</p>
           <button 
-            onClick={() => router.push('/admin')}
+            onClick={() => router.push('/')}
             className="mt-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
           >
-            Back to Admin
+            Back to Home
           </button>
         </div>
       </div>
@@ -267,10 +267,10 @@ export default function ServicingPage() {
             <p><strong>Model:</strong> {machine.model}</p>
           </div>
           <button 
-            onClick={() => router.push('/admin')}
+            onClick={() => router.push('/')}
             className="mt-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
           >
-            Back to Admin
+            Back to Home
           </button>
         </div>
       </div>
@@ -298,10 +298,10 @@ export default function ServicingPage() {
         {/* Header */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <button
-            onClick={() => router.push('/admin')}
+            onClick={() => router.push('/')}
             className="text-blue-500 hover:text-blue-600 mb-4 flex items-center font-medium"
           >
-            ← Back to Admin
+            ← Back to Home
           </button>
 
           <h1 className="text-2xl font-bold text-gray-900 mb-2">

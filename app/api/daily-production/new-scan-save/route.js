@@ -1,83 +1,112 @@
 import { connectDB } from '@/lib/db';
 import DailyProduction from '@/models/DailyProduction';
-import Machine from '@/models/Machine'; // Machine model import করুন
+import Machine from '@/models/Machine';
+import Operator from '@/models/Operator';
 import mongoose from 'mongoose';
 
 export async function POST(request) {
+  console.log('\n================ API HIT ================');
+
   try {
     await connectDB();
-    
+    console.log('✅ DB Connected');
+
     const data = await request.json();
     const { productionInfo, rows } = data;
 
-    console.log('=== RECEIVED DATA ===');
-    console.log('Production Info:', productionInfo);
-    console.log('Rows:', rows);
-    console.log('=== END ===');
+    console.log('📦 ProductionInfo:', productionInfo);
+    console.log('📦 Rows length:', rows?.length);
 
     if (!productionInfo || !rows || rows.length === 0) {
+      console.log('❌ Missing productionInfo or rows');
       return Response.json(
-        { success: false, message: 'Production info and rows are required' },
+        { success: false, message: 'Invalid payload' },
         { status: 400 }
       );
     }
 
-    // Validate required fields from productionInfo
-    const requiredFields = ['supervisor', 'floor', 'line', 'buyerId', 'styleId', 'supervisorId', 'floorId', 'lineId', 'jobNo', 'date'];
-    const missingFields = requiredFields.filter(field => !productionInfo[field]);
-    
+    // -------------------------
+    // Required field validation
+    // -------------------------
+    const requiredFields = [
+      'supervisor',
+      'floor',
+      'line',
+      'buyerId',
+      'styleId',
+      'supervisorId',
+      'floorId',
+      'lineId',
+      'jobNo',
+      'date'
+    ];
+
+    const missingFields = requiredFields.filter(f => !productionInfo[f]);
     if (missingFields.length > 0) {
+      console.log('❌ Missing fields:', missingFields);
       return Response.json(
-        { 
-          success: false, 
-          message: `Missing required fields in productionInfo: ${missingFields.join(', ')}` 
-        },
+        { success: false, message: `Missing fields: ${missingFields.join(', ')}` },
         { status: 400 }
       );
     }
 
-    // Convert IDs to ObjectId
+    // -------------------------
+    // ObjectId conversion
+    // -------------------------
     const buyerId = new mongoose.Types.ObjectId(productionInfo.buyerId);
     const styleId = new mongoose.Types.ObjectId(productionInfo.styleId);
     const supervisorId = new mongoose.Types.ObjectId(productionInfo.supervisorId);
     const floorId = new mongoose.Types.ObjectId(productionInfo.floorId);
     const lineId = new mongoose.Types.ObjectId(productionInfo.lineId);
-
     const date = new Date(productionInfo.date);
 
     const dailyProductions = [];
-    const machineUpdates = []; // Machine update তথ্য রাখার জন্য
+    const machineUpdates = [];
+    const operatorLastScanUpdates = [];
 
+    // =========================
+    // MAIN ROW LOOP
+    // =========================
     for (let index = 0; index < rows.length; index++) {
       const row = rows[index];
+      console.log(`\n➡️ Processing row ${index + 1}`, row);
 
-      if (!row.operatorMongoId && !row.operatorId) continue; // skip if no operator
+      if (!row.operatorId) {
+        console.log('⚠️ operatorId missing, skipping row');
+        continue;
+      }
 
-      // Check if this operator already has a record for this date
+      const operatorId = row.operatorId.trim().toUpperCase();
+
+      // -------------------------
+      // Duplicate check
+      // -------------------------
       const exists = await DailyProduction.findOne({
-        date: date,
-        'operator._id': row.operatorMongoId ? new mongoose.Types.ObjectId(row.operatorMongoId) : undefined
+        date,
+        'operator.operatorId': operatorId
       });
 
       if (exists) {
-        console.log(`Skipping duplicate operator: ${row.operatorName || row.operatorId} on ${date.toDateString()}`);
-        continue; // skip duplicate
+        console.log(`⚠️ Duplicate DailyProduction for ${operatorId}`);
+        continue;
       }
 
+      // -------------------------
+      // SMV Type
+      // -------------------------
       let smvType = '';
       if (row.smv) {
-        if (row.breakdownProcess && row.breakdownProcess.trim() !== '') {
-          smvType = 'breakdown';
-        } else if (row.process && row.process.trim() !== '') {
-          smvType = 'process';
-        }
+        if (row.breakdownProcess?.trim()) smvType = 'breakdown';
+        else if (row.process?.trim()) smvType = 'process';
       }
 
+      // -------------------------
+      // DailyProduction push
+      // -------------------------
       dailyProductions.push({
         date,
         operator: {
-          _id: row.operatorMongoId ? new mongoose.Types.ObjectId(row.operatorMongoId) : undefined,
-          operatorId: row.operatorId || '',
+          operatorId,
           name: row.operatorName || '',
           designation: row.operatorDesignation || 'Operator'
         },
@@ -108,86 +137,104 @@ export async function POST(request) {
         updatedAt: new Date()
       });
 
-      // Machine last location update করতে হবে যদি machineUniqueId থাকে
-      if (row.machineUniqueId && row.machineUniqueId.trim() !== '') {
+      // -------------------------
+      // Machine lastLocation update
+      // -------------------------
+      if (row.machineUniqueId?.trim()) {
+        console.log('🛠 Preparing machine update:', row.machineUniqueId);
         machineUpdates.push({
-  uniqueId: row.machineUniqueId,
-  lastLocation: {
-    date: date,
-    line: lineId,       // productionInfo.line এর বদলে lineId (যা ObjectId)
-    floor: floorId,     // productionInfo.floor এর বদলে floorId (যা ObjectId)
-    supervisor: productionInfo.supervisor,
-    updatedAt: new Date()
-  }
-});
+          uniqueId: row.machineUniqueId,
+          lastLocation: {
+            date,
+            line: lineId,
+            floor: floorId,
+            supervisor: productionInfo.supervisor,
+            updatedAt: new Date()
+          }
+        });
       }
+
+      // -------------------------
+      // Operator lastScan update
+      // -------------------------
+      
+        console.log('🧠 Preparing operator lastScan for:', operatorId);
+        operatorLastScanUpdates.push({
+          operatorId,
+          lastScan: {
+            date,
+            machine: new mongoose.Types.ObjectId(row.machineMongoId),
+            floor: floorId,
+            line: lineId,
+            process: row.process || '',
+            breakdownProcess: row.breakdownProcess || ''
+          }
+        });
+      
+        
     }
+
+    console.log('\n📊 SUMMARY');
+    console.log('DailyProductions:', dailyProductions.length);
+    console.log('MachineUpdates:', machineUpdates.length);
+    console.log('OperatorLastScans:', operatorLastScanUpdates.length);
 
     if (dailyProductions.length === 0) {
-      return Response.json({
-        success: false,
-        message: 'No new production records to save. All operators already exist for this date.'
-      }, { status: 400 });
+      return Response.json(
+        { success: false, message: 'No new production data' },
+        { status: 400 }
+      );
     }
 
-    console.log(`Attempting to save ${dailyProductions.length} documents`);
-
-    // Step 1: Machine collection এ last location update করুন
-    const machineUpdatePromises = machineUpdates.map(async (update) => {
-      try {
-        const result = await Machine.findOneAndUpdate(
-          { uniqueId: update.uniqueId },
-          { 
-            $set: { 
-              lastLocation: update.lastLocation,
-              updatedAt: new Date()
-            } 
-          },
-          { new: true, upsert: false } // upsert false, কারণ machine আগে থেকে থাকতে হবে
-        );
-        
-        if (!result) {
-          console.log(`Machine with uniqueId ${update.uniqueId} not found`);
-          return { uniqueId: update.uniqueId, status: 'not_found' };
-        }
-        
-        console.log(`Updated last location for machine ${update.uniqueId}`);
-        return { uniqueId: update.uniqueId, status: 'updated' };
-      } catch (error) {
-        console.error(`Error updating machine ${update.uniqueId}:`, error.message);
-        return { uniqueId: update.uniqueId, status: 'error', error: error.message };
-      }
-    });
-
-    // Step 2: Daily production save করুন
+    // =========================
+    // SAVE DAILY PRODUCTION
+    // =========================
     const savedProductions = await DailyProduction.insertMany(dailyProductions);
+    console.log('✅ DailyProduction saved:', savedProductions.length);
 
-    // Step 3: Machine update execute করুন
-    const machineUpdateResults = await Promise.allSettled(machineUpdatePromises);
+    // =========================
+    // MACHINE UPDATE
+    // =========================
+    await Promise.allSettled(
+      machineUpdates.map(update =>
+        Machine.findOneAndUpdate(
+          { uniqueId: update.uniqueId },
+          { $set: { lastLocation: update.lastLocation } }
+        )
+      )
+    );
+    console.log('✅ Machine updates done');
 
-    // Machine update results লগ করুন
-    console.log('Machine update results:', machineUpdateResults);
+    // =========================
+    // OPERATOR LAST SCAN UPDATE
+    // =========================
+    const operatorResults = await Promise.allSettled(
+      operatorLastScanUpdates.map(op => {
+        console.log('🔄 Updating lastScan for operatorId:', op.operatorId);
+        return Operator.findOneAndUpdate(
+          { operatorId: op.operatorId },
+          { $set: { lastScan: op.lastScan } },
+          { new: true }
+        );
+      })
+    );
 
-    console.log(`Successfully saved ${savedProductions.length} documents`);
-
-    return Response.json({
-      success: true,
-      message: `Successfully saved ${savedProductions.length} production records and updated ${machineUpdates.length} machine locations`,
-      data: savedProductions,
-      machineUpdates: machineUpdateResults,
-      count: savedProductions.length
-    }, { status: 201 });
-
-  } catch (error) {
-    console.error('=== ERROR DETAILS ===', error);
+    console.log('📊 Operator update results:', operatorResults);
 
     return Response.json(
-      { 
-        success: false, 
-        message: 'Failed to save production data',
-        error: error.message,
-        details: error.errors ? Object.keys(error.errors) : []
+      {
+        success: true,
+        message: 'Production saved, machine & operator lastScan updated',
+        saved: savedProductions.length,
+        operatorsUpdated: operatorResults.length
       },
+      { status: 201 }
+    );
+
+  } catch (error) {
+    console.error('🔥 API ERROR:', error);
+    return Response.json(
+      { success: false, message: error.message },
       { status: 500 }
     );
   }

@@ -19,7 +19,7 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
     vivaDetails: [{ question: '', answer: '', remark: '' }],
     processAndScore: {},
     grade: 'C',
-    result: 'PENDING',
+    result: 'PASSED',
     remarks: '',
     promotedToAdmin: false,
     canceledReason: ''

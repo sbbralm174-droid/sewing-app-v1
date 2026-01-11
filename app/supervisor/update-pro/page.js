@@ -1,7 +1,7 @@
 // app/page.js
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import { Search, Save, Loader2, RefreshCw, ChevronDown, X, Plus, Minus, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 
 export default function DailyProductionPage() {
@@ -614,88 +614,90 @@ export default function DailyProductionPage() {
   };
 
   // Prepare data for API submission
-  const handleUpdate = async () => {
-    if (productionData.length === 0) {
-      setMessage({ type: 'error', text: 'No data to update' });
-      return;
-    }
+  // Prepare data for API submission
+const handleUpdate = async () => {
+  if (productionData.length === 0) {
+    setMessage({ type: 'error', text: 'No data to update' });
+    return;
+  }
 
-    // Check for duplicate rowNos before saving
-    const hasDuplicates = Object.keys(duplicateRowNos).length > 0;
-    if (hasDuplicates) {
-      setMessage({ 
-        type: 'error', 
-        text: 'Cannot save: Duplicate Row Nos found. Please fix them before saving.' 
-      });
-      return;
-    }
+  // Check for duplicate rowNos before saving
+  const hasDuplicates = Object.keys(duplicateRowNos).length > 0;
+  if (hasDuplicates) {
+    setMessage({ 
+      type: 'error', 
+      text: 'Cannot save: Duplicate Row Nos found. Please fix them before saving.' 
+    });
+    return;
+  }
 
-    setIsSaving(true);
-    setMessage({ type: '', text: '' });
+  setIsSaving(true);
+  setMessage({ type: '', text: '' });
 
-    try {
-      // Prepare data for API - ensure hourlyProduction is an array
-      const apiData = productionData.map(item => {
-        // Ensure hourlyProduction is always an array
-        const hourlyProduction = Array.isArray(item.hourlyProduction) 
-          ? item.hourlyProduction 
-          : [];
-        
-        // Filter out empty entries
-        const filteredHourlyProduction = hourlyProduction.filter(
-          hp => hp.productionCount > 0 || (hp.defects && hp.defects.length > 0)
-        );
-
-        const apiItem = {
-          _id: item._id,
-          rowNo: item.rowNo, // Include rowNo in API data
-          process: item.process,
-          breakdownProcess: item.breakdownProcess,
-          uniqueMachine: item.uniqueMachine,
-          smv: item.smv,
-          target: item.target,
-          workAs: item.workAs,
-          hourlyProduction: filteredHourlyProduction, // Send as array
-          hourlyTarget: item.hourlyTarget || '' // Include hourlyTarget
-        };
-        
-        // If operator was originally an object, keep the operatorId
-        if (item.operatorId) {
-          apiItem.operator = item.operatorId;
-        }
-        
-        return apiItem;
-      });
-
-      const response = await fetch('/api/daily-production/update-production', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(apiData),
-      });
-
-      const result = await response.json();
+  try {
+    // Prepare data for API - ensure hourlyProduction is an array
+    const apiData = productionData.map(item => {
+      // Ensure hourlyProduction is always an array
+      const hourlyProduction = Array.isArray(item.hourlyProduction) 
+        ? item.hourlyProduction 
+        : [];
       
-      if (result.success) {
-        setMessage({ 
-          type: 'success', 
-          text: result.message || 'Data updated successfully!' 
-        });
-        
-        // Refresh data after update
-        setTimeout(() => {
-          fetchProductionData();
-        }, 1000);
-      } else {
-        setMessage({ type: 'error', text: result.message });
+      // Filter out empty entries
+      const filteredHourlyProduction = hourlyProduction.filter(
+        hp => hp.productionCount > 0 || (hp.defects && hp.defects.length > 0)
+      );
+
+      const apiItem = {
+        _id: item._id,
+        rowNo: item.rowNo, // Include rowNo in API data
+        process: item.process,
+        breakdownProcess: item.breakdownProcess,
+        uniqueMachine: item.uniqueMachine,
+        smv: item.smv,
+        target: item.target,
+        workAs: item.workAs,
+        hourlyProduction: filteredHourlyProduction, // Send as array
+        hourlyTarget: item.hourlyTarget || '', // Include hourlyTarget
+        operatorId: item.operatorId || '' // ✅ এখানে operatorId যোগ করুন
+      };
+      
+      // যদি operatorId থাকে, তাহলে operator ফিল্ড হিসেবে পাঠান
+      if (item.operatorId && item.operatorId.trim() !== '') {
+        apiItem.operator = item.operatorId;
       }
-    } catch (error) {
-      setMessage({ type: 'error', text: error.message });
-    } finally {
-      setIsSaving(false);
+      
+      return apiItem;
+    });
+
+    const response = await fetch('/api/daily-production/update-production', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(apiData),
+    });
+
+    const result = await response.json();
+    
+    if (result.success) {
+      setMessage({ 
+        type: 'success', 
+        text: result.message || 'Data updated successfully!' 
+      });
+      
+      // Refresh data after update
+      setTimeout(() => {
+        fetchProductionData();
+      }, 1000);
+    } else {
+      setMessage({ type: 'error', text: result.message });
     }
-  };
+  } catch (error) {
+    setMessage({ type: 'error', text: error.message });
+  } finally {
+    setIsSaving(false);
+  }
+};
 
   // Handle hourly target save for all rows
   const handleHourlyTargetSave = async () => {
@@ -1307,7 +1309,7 @@ export default function DailyProductionPage() {
                     const isDuplicate = duplicateRowNos[index];
                     
                     return (
-                      <>
+                      <Fragment key={item._id ?? index}>
                         <tr 
                           key={item._id || index} 
                           className={`hover:bg-gray-50 transition ${isDuplicate ? 'bg-red-50' : ''}`}
@@ -1334,7 +1336,7 @@ export default function DailyProductionPage() {
                           </td>
                           
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                            {item.operatorName || item.operator || 'N/A'}
+                            {item.operatorId || item.operator || 'N/A'}
                           </td>
                           
                           {/* Machine Cell with Dropdown */}
@@ -1398,20 +1400,7 @@ export default function DailyProductionPage() {
                                         className="w-full text-left px-3 py-3 text-sm hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition dropdown-container"
                                       >
                                         <div className="font-medium text-gray-900">{machine.uniqueId}</div>
-                                        <div className="flex justify-between mt-1">
-                                          <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                            machine.currentStatus === 'idle' 
-                                              ? 'bg-green-100 text-green-800'
-                                              : 'bg-yellow-100 text-yellow-800'
-                                          }`}>
-                                            {machine.currentStatus}
-                                          </span>
-                                          {machine.lastLocation && (
-                                            <span className="text-xs text-gray-500">
-                                              {machine.lastLocation.line}
-                                            </span>
-                                          )}
-                                        </div>
+                                        
                                       </button>
                                     ))
                                   )}
@@ -1709,7 +1698,7 @@ export default function DailyProductionPage() {
                             </td>
                           </tr>
                         )}
-                      </>
+                      </Fragment>
                     );
                   })}
                 </tbody>

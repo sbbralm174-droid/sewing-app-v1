@@ -1,10 +1,11 @@
-// /api/daily-production/update-production
-
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import DailyProduction from '@/models/DailyProduction';
+import Operator from '@/models/Operator';
 
-// ১. ডেটা খোঁজার এপিআই (GET)
+/* ======================================================
+   ১️⃣ GET : Daily Production Fetch
+====================================================== */
 export async function GET(request) {
   try {
     await connectDB();
@@ -15,7 +16,10 @@ export async function GET(request) {
     const line = searchParams.get('line');
 
     if (!dateStr || !floor || !line) {
-      return NextResponse.json({ message: "Missing required parameters" }, { status: 400 });
+      return NextResponse.json(
+        { message: 'Missing required parameters' },
+        { status: 400 }
+      );
     }
 
     const startOfDay = new Date(dateStr);
@@ -26,49 +30,52 @@ export async function GET(request) {
     const productions = await DailyProduction.find({
       date: { $gte: startOfDay, $lte: endOfDay },
       floor,
-      line
+      line,
     })
-    .select('rowNo operator uniqueMachine process breakdownProcess smv workAs target hourlyProduction hourlyTarget')
-    .sort({ rowNo: 1 })
-    .lean();
+      .select(
+        'rowNo operator uniqueMachine process breakdownProcess smv workAs target hourlyProduction hourlyTarget'
+      )
+      .sort({ rowNo: 1 })
+      .lean();
 
-    // Transform the data - ensure hourlyProduction is properly structured
-    const transformedProductions = productions.map(prod => ({
-      ...prod,
-      // Ensure hourlyProduction is always an array
-      hourlyProduction: Array.isArray(prod.hourlyProduction) 
-        ? prod.hourlyProduction 
-        : [],
-      // Extract operator information
-      operatorName: prod.operator?.name || prod.operator || '',
-      operatorId: prod.operator?._id || prod.operator || '',
-      // Ensure hourlyTarget is included
-      hourlyTarget: prod.hourlyTarget || ''
-    }));
-
-    return NextResponse.json({ 
-      success: true, 
-      data: transformedProductions 
+    return NextResponse.json({
+      success: true,
+      data: productions.map((p) => ({
+        ...p,
+        hourlyProduction: Array.isArray(p.hourlyProduction)
+          ? p.hourlyProduction
+          : [],
+        operatorId: p.operator?._id || p.operator || '',
+        operatorName: p.operator?.name || '',
+      })),
     });
   } catch (error) {
     return NextResponse.json({ message: error.message }, { status: 500 });
   }
 }
 
-// ২. ডেটা আপডেট করার এপিআই (PUT)
+/* ======================================================
+   ২️⃣ PUT : Daily Production + Operator LastScan Update
+====================================================== */
 export async function PUT(request) {
   try {
     await connectDB();
     const body = await request.json();
 
     if (!Array.isArray(body)) {
-      return NextResponse.json({ message: "Data must be an array" }, { status: 400 });
+      return NextResponse.json(
+        { message: 'Data must be an array' },
+        { status: 400 }
+      );
     }
 
-    const updateOperations = body.map((item) => ({
+    /* -------------------------------
+       DailyProduction bulk update
+    -------------------------------- */
+    const productionOps = body.map((item) => ({
       updateOne: {
         filter: { _id: item._id },
-        update: { 
+        update: {
           $set: {
             rowNo: item.rowNo,
             process: item.process,
@@ -77,67 +84,91 @@ export async function PUT(request) {
             smv: item.smv,
             target: item.target,
             workAs: item.workAs,
-            hourlyTarget: item.hourlyTarget || '', // Add hourlyTarget field
-            // Ensure hourlyProduction is always an array
-            hourlyProduction: Array.isArray(item.hourlyProduction) 
-              ? item.hourlyProduction 
+            hourlyTarget: item.hourlyTarget || '',
+            hourlyProduction: Array.isArray(item.hourlyProduction)
+              ? item.hourlyProduction
               : [],
-            updatedAt: new Date()
-          } 
-        }
-      }
+            updatedAt: new Date(),
+          },
+        },
+      },
     }));
 
-    const result = await DailyProduction.bulkWrite(updateOperations);
+    const productionResult =
+      await DailyProduction.bulkWrite(productionOps);
 
-    return NextResponse.json({ 
-      success: true, 
-      message: `${result.modifiedCount} items updated successfully!` 
+    /* -------------------------------
+       Operator lastScan bulk update
+       🔴 ONLY operatorId based
+    -------------------------------- */
+    const operatorOps = body
+      .filter((item) => item.operatorId)
+      .map((item) => ({
+        updateOne: {
+          filter: { operatorId: item.operatorId },
+          update: {
+            $set: {
+              'lastScan.process': item.process || null,
+              'lastScan.breakdownProcess':
+                item.breakdownProcess || null,
+              'lastScan.machine': item.uniqueMachine || null,
+              'lastScan.updatedAt': new Date(),
+            },
+          },
+        },
+      }));
+
+    if (operatorOps.length > 0) {
+      await Operator.bulkWrite(operatorOps);
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `${productionResult.modifiedCount} production updated & operator lastScan synced`,
     });
-
   } catch (error) {
-    console.error("Update Error:", error);
+    console.error('PUT Error:', error);
     return NextResponse.json({ message: error.message }, { status: 500 });
   }
 }
 
-// ৩. Hourly Target update করার জন্য আলাদা API (PUT)
+/* ======================================================
+   ৩️⃣ POST : Hourly Target Update Only
+====================================================== */
 export async function POST(request) {
   try {
     await connectDB();
     const body = await request.json();
-    
-    const { data, date, floor, line } = body;
-    
+
+    const { data } = body;
+
     if (!Array.isArray(data)) {
-      return NextResponse.json({ message: "Data must be an array" }, { status: 400 });
+      return NextResponse.json(
+        { message: 'Data must be an array' },
+        { status: 400 }
+      );
     }
-    
-    if (!date || !floor || !line) {
-      return NextResponse.json({ message: "Missing required parameters" }, { status: 400 });
-    }
-    
-    const updateOperations = data.map((item) => ({
+
+    const ops = data.map((item) => ({
       updateOne: {
         filter: { _id: item._id },
-        update: { 
+        update: {
           $set: {
             hourlyTarget: item.hourlyTarget || '',
-            updatedAt: new Date()
-          } 
-        }
-      }
+            updatedAt: new Date(),
+          },
+        },
+      },
     }));
 
-    const result = await DailyProduction.bulkWrite(updateOperations);
+    const result = await DailyProduction.bulkWrite(ops);
 
-    return NextResponse.json({ 
-      success: true, 
-      message: `Hourly target updated for ${result.modifiedCount} items successfully!` 
+    return NextResponse.json({
+      success: true,
+      message: `Hourly target updated for ${result.modifiedCount} items`,
     });
-
   } catch (error) {
-    console.error("Hourly Target Update Error:", error);
+    console.error('POST Error:', error);
     return NextResponse.json({ message: error.message }, { status: 500 });
   }
 }

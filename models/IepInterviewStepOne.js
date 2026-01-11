@@ -23,7 +23,6 @@ const VivaInterviewStep1Schema = new mongoose.Schema(
     },
     picture: {
       type: String,
-      required: [true, "Candidate picture is required"],
     },
     stepCompleted: {
       type: Number,

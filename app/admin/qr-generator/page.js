@@ -73,7 +73,7 @@ export default function QRBulkGeneratorPage() {
       Promise.all(
         list.map(async ({ item }) => {
           const qrData = type === "op"
-            ? { type: "operator", id: item._id, operatorId: item.operatorId }
+            ? { type: "operator", id: item._id, operatorId: item.operatorId, name: item.name }
             : { type: "machine", id: item._id, uniqueId: item.uniqueId };
 
           const qrCodeUrl = await QRCode.toDataURL(JSON.stringify(qrData), { width: 400, margin: 1 });
@@ -103,30 +103,91 @@ export default function QRBulkGeneratorPage() {
   const Card = ({ item, type }) => {
     const rawDate = item.installationDate?.$date || item.installationDate;
     const installDateFormatted = rawDate ? new Date(rawDate).toLocaleDateString("en-GB") : "N/A";
-    const colorCode = getStatusColor(item.installationDate);
+    
+    const showColorBar = type === "mac";
+    const colorCode = showColorBar ? getStatusColor(item.installationDate) : "#fff";
+
+    // টেক্সট যদি অনেক বড় হয় তবে ফন্ট সাইজ কমিয়ে দেওয়ার জন্য এই স্টাইলটি সাহায্য করবে
+    const textContainerStyle = {
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "center",
+      alignItems: "center",
+      flex: 1,
+      padding: "2px 4px",
+      textAlign: "center",
+      overflow: "hidden", // বক্সের বাইরে যাবে না
+      wordBreak: "break-word", // লম্বা শব্দ ভেঙে দেবে
+      maxWidth: showColorBar ? "calc(63mm - 12mm - 5px)" : "100%", 
+    };
 
     return (
       <div style={{
         height: "67mm", width: "63mm", border: "1px solid black",
         display: "flex", flexDirection: "column", backgroundColor: "#fff", breakInside: "avoid"
       }}>
-        <div style={{ textAlign: "center", padding: "5px 0" }}>
-          <h2 style={{ fontWeight: 900, fontSize: "15px", margin: 0 }}>
+        {/* Header (ID/Name) */}
+        <div style={{ textAlign: "center", padding: "5px 2px", borderBottom: "0.5px solid #eee" }}>
+          <h2 style={{ 
+            fontWeight: 900, 
+            fontSize: "14px", 
+            margin: 0,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis" // নাম খুব বড় হলে ডট ডট (...) দেখাবে
+          }}>
             {type === "op" ? item.name : item.uniqueId}
           </h2>
         </div>
-        <div style={{ flexGrow: 1, display: "flex", justifyContent: "center", alignItems: "center" }}>
-          <img src={item.qrCode} style={{ width: 170 }} alt="qr" />
+
+        {/* QR Code Section */}
+        <div style={{ flexGrow: 1, display: "flex", justifyContent: "center", alignItems: "center", padding: "5px" }}>
+          <img src={item.qrCode} style={{ width: "150px", height: "150px" }} alt="qr" />
         </div>
-        <div style={{ display: "flex", borderTop: "1px solid black" }}>
-          <div style={{ flex: 1, padding: "4px 8px", textAlign: "center" }}>
-            <p style={{ fontSize: "9px", fontWeight: "bold", margin: 0 }}>
+
+        {/* Footer Info Section */}
+        <div style={{ display: "flex", borderTop: "1px solid black", height: "18mm" }}>
+          <div style={textContainerStyle}>
+            {/* Machine Type / Designation - Font Auto Control */}
+            <p style={{ 
+              fontSize: (type === "mac" && item.machineType?.name?.length > 25) ? "7px" : "9px", 
+              fontWeight: "bold", 
+              margin: 0,
+              lineHeight: "1.1",
+              textTransform: "uppercase"
+            }}>
               {type === "op" ? item.designation : item.machineType?.name || "N/A"}
             </p>
-            <p style={{ fontSize: "8px", fontWeight: 900, margin: 0 }}>INST: {installDateFormatted}</p>
-            <p style={{ fontSize: "8px", fontWeight: 900, margin: 0 }}>co-se-no: {item.companyUniqueNumber}</p>
+
+            <p style={{ fontSize: "9px", fontWeight: "bold", margin: "2px 0 0 0" }}>
+              {type === "op" ? item.operatorId : ""}
+            </p>
+            <p style={{ fontSize: "9px", fontWeight: "bold", margin: "2px 0 0 0" }}>
+              {type === "op" && item.joiningDate
+                ? new Date(item.joiningDate).toLocaleDateString("en-GB")
+                : ""}
+            </p>
+
+            {type === "mac" && (
+              <>
+                <p style={{ fontSize: "8px", fontWeight: 900, margin: 0 }}>
+                  INST: {installDateFormatted}
+                </p>
+                <p style={{ 
+                  fontSize: item.companyUniqueNumber?.length > 15 ? "7px" : "8px", 
+                  fontWeight: 900, 
+                  margin: 0,
+                  overflow: "hidden"
+                }}>
+                  co-se-no: {item.companyUniqueNumber}
+                </p>
+              </>
+            )}
           </div>
-          <div style={{ width: "12mm", backgroundColor: colorCode, borderLeft: "1px solid black" }} />
+
+          {showColorBar && (
+            <div style={{ width: "12mm", backgroundColor: colorCode, borderLeft: "1px solid black" }} />
+          )}
         </div>
       </div>
     );

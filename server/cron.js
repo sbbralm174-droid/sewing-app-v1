@@ -19,7 +19,6 @@ cron.schedule("*/10  * * *", async () => {
     // MongoDB থেকে due machines খুঁজে বের করা
     const dueMachines = await Machine.find({
       "parts.nextServiceDate": { $lte: today },
-      "parts.isNotificationActive": true,
     });
 
     if (dueMachines.length === 0) {
@@ -34,8 +33,7 @@ cron.schedule("*/10  * * *", async () => {
       const dueParts = machine.parts.filter(
         (part) =>
           part.nextServiceDate &&
-          part.nextServiceDate <= today &&
-          part.isNotificationActive
+          part.nextServiceDate <= today 
       );
 
       for (const part of dueParts) {
