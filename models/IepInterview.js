@@ -21,6 +21,14 @@ const VivaInterviewSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    homeDistrict: {
+    type: String,
+  },
+
+  floor: {
+  type: String,
+  required: true
+},
     picture: {
       type: String,
     },

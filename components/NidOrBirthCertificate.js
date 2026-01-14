@@ -1,4 +1,3 @@
-// components/NidOrBirthCertificateSearch.js
 'use client';
 import { useState, useEffect } from 'react';
 
@@ -10,7 +9,15 @@ export default function NidOrBirthCertificateSearch({
   const [loading, setLoading] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
 
-  // autoSearch true thakle automatically search kore
+  const displayNames = {
+    'IepInterviewStepOne': 'SECURITY (GATE)',
+    'IepInterviewDownAdmin': 'ADMIN (SELECTION)',
+    'IepInterview': 'IE (ASSESSMENT)',
+    'AdminInterview': 'ADMIN (RECRUITMENT)',
+    'Operator': 'Employee Main Record',
+    'ResignHistory': 'Previous Resignation History'
+  };
+
   useEffect(() => {
     if (autoSearch && nidOrBirthCertificateValue) {
       handleSearch();
@@ -18,8 +25,7 @@ export default function NidOrBirthCertificateSearch({
   }, [nidOrBirthCertificateValue, autoSearch]);
 
   const handleSearch = async () => {
-    if (!nidOrBirthCertificateValue.trim()) {
-      alert('Please provide NID or Birth Certificate number');
+    if (!nidOrBirthCertificateValue || !nidOrBirthCertificateValue.trim()) {
       return;
     }
     
@@ -45,24 +51,14 @@ export default function NidOrBirthCertificateSearch({
     }
   };
 
-  // Function to format date for display
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-BD');
-  };
-
-  // Function to render process and score data
-  const renderProcessAndScore = (processAndScore) => {
-    if (!processAndScore || Object.keys(processAndScore).length === 0) {
-      return 'N/A';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-BD');
+    } catch (e) {
+      return 'Invalid Date';
     }
-    
-    return Object.entries(processAndScore).map(([process, score]) => (
-      <div key={process} style={{ marginBottom: '4px' }}>
-        <strong>{process}:</strong> {score}
-      </div>
-    ));
   };
 
   const closePopup = () => {
@@ -72,217 +68,96 @@ export default function NidOrBirthCertificateSearch({
 
   return (
     <>
-      {/* Popup Modal */}
       {showPopup && (
         <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 1000
+          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+          justifyContent: 'center', alignItems: 'center', zIndex: 9999
         }}>
           <div style={{
-            backgroundColor: 'white',
-            padding: '20px',
-            borderRadius: '8px',
-            width: '90%',
-            maxWidth: '1200px',
-            maxHeight: '90vh',
-            overflow: 'auto',
-            position: 'relative'
+            backgroundColor: 'white', padding: '20px', borderRadius: '8px',
+            width: '95%', maxWidth: '1200px', maxHeight: '90vh',
+            overflow: 'auto', position: 'relative', boxShadow: '0 4px 15px rgba(0,0,0,0.3)'
           }}>
-            {/* Close Button */}
-            <button
-              onClick={closePopup}
-              style={{
-                position: 'absolute',
-                top: '10px',
-                right: '15px',
-                background: 'none',
-                border: 'none',
-                fontSize: '24px',
-                cursor: 'pointer',
-                color: '#666'
-              }}
-            >
-              ×
-            </button>
+            <button onClick={closePopup} style={{
+                position: 'absolute', top: '10px', right: '15px',
+                background: '#eee', border: 'none', fontSize: '20px',
+                cursor: 'pointer', borderRadius: '50%', width: '30px', height: '30px'
+              }}>×</button>
 
-            <h2 style={{ marginBottom: '20px', color: '#333' }}>
-              Search Results for: {nidOrBirthCertificateValue}
+            <h2 style={{ marginBottom: '20px', color: '#333', borderBottom: '2px solid #eee', paddingBottom: '10px' }}>
+              Search Results for: {String(nidOrBirthCertificateValue)}
             </h2>
 
             {loading ? (
-              <div style={{ textAlign: 'center', padding: '40px' }}>
-                <p>Searching...</p>
-              </div>
-            ) : results ? (
+              <div style={{ textAlign: 'center', padding: '40px' }}><p>Searching... Please wait</p></div>
+            ) : results && typeof results === 'object' ? (
               results.success ? (
                 <>
-                  <div style={{ 
-                    marginBottom: '20px', 
-                    padding: '15px', 
-                    backgroundColor: '#f0f8ff', 
-                    borderRadius: '5px' 
-                  }}>
-                    <h3>Summary:</h3>
-                    <p><strong>Total Records:</strong> {results.summary.totalRecords}</p>
-                    <p><strong>Models with Data:</strong> {results.summary.modelsWithData.join(', ')}</p>
+                  <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f0f8ff', borderRadius: '5px' }}>
+                    <p><strong>Total Records Found:</strong> {results.summary?.totalRecords || 0}</p>
+                    <p><strong>Data Sections:</strong> {
+                      results.summary?.modelsWithData
+                        ? results.summary.modelsWithData.map(m => displayNames[m] || m).join(', ')
+                        : 'None'
+                    }</p>
                   </div>
 
-                  {Object.entries(results.results).map(([key, modelData]) => (
+                  {results.results && Object.entries(results.results).map(([key, modelData]) => (
                     modelData.count > 0 && (
-                      <div key={key} style={{ 
-                        marginBottom: '25px', 
-                        border: '1px solid #ddd', 
-                        padding: '15px',
-                        borderRadius: '5px'
-                      }}>
-                        <h4 style={{ 
-                          backgroundColor: '#f5f5f5', 
-                          padding: '10px', 
-                          margin: '-15px -15px 15px -15px',
-                          borderBottom: '1px solid #ddd'
-                        }}>
-                          {modelData.model} ({modelData.count} records)
+                      <div key={key} style={{ marginBottom: '25px', border: '1px solid #ddd', borderRadius: '5px', overflow: 'hidden' }}>
+                        <h4 style={{ backgroundColor: '#f8f9fa', padding: '10px', margin: 0, borderBottom: '1px solid #ddd' }}>
+                          {displayNames[modelData.model] || modelData.model} ({modelData.count})
                         </h4>
                         
                         <div style={{ overflowX: 'auto' }}>
-                          <table style={{ 
-                            width: '100%', 
-                            borderCollapse: 'collapse',
-                            fontSize: '14px'
-                          }}>
-                            <thead>
-                              <tr style={{ backgroundColor: '#e9ecef' }}>
-                                {modelData.model === 'IepInterviewStepOne' && (
+                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead style={{ backgroundColor: '#f1f1f1' }}>
+                              <tr>
+                                <th style={{ padding: '10px', border: '1px solid #ddd' }}>Candidate ID</th>
+                                {modelData.model === 'AdminInterview' ? (
                                   <>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Candidate ID</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Name</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>NID</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Result</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Date</th>
+                                    <th style={{ padding: '10px', border: '1px solid #ddd' }}>NID / Birth Cert</th>
+                                    <th style={{ padding: '10px', border: '1px solid #ddd' }}>Result</th>
+                                    {modelData.data.some(d => d.result === 'FAILED') && (
+                                      <th style={{ padding: '10px', border: '1px solid #ddd' }}>Cancel Reason</th>
+                                    )}
+                                  </>
+                                ) : (
+                                  <>
+                                    <th style={{ padding: '10px', border: '1px solid #ddd' }}>Result</th>
                                   </>
                                 )}
-                                
-                                {modelData.model === 'IepInterviewDownAdmin' && (
-                                  <>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Candidate ID</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Result</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Date</th>
-                                  </>
-                                )}
-                                
-                                {modelData.model === 'IepInterview' && (
-                                  <>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Candidate ID</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Name</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>NID</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Interviewer</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Department</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Grade</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Result</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Process & Score</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Date</th>
-                                  </>
-                                )}
-                                
-                                {modelData.model === 'Operator' && (
-                                  <>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Operator ID</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Name</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>NID</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Designation</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Grade</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Allowed Processes</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Joining Date</th>
-                                  </>
-                                )}
-                                
-                                {modelData.model === 'ResignHistory' && (
-                                  <>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Operator ID</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Name</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>NID</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Designation</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Resignation Date</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Approved By</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Reason</th>
-                                    <th style={{ padding: '8px', border: '1px solid #ddd', textAlign: 'left' }}>Allowed Processes</th>
-                                  </>
-                                )}
+                                <th style={{ padding: '10px', border: '1px solid #ddd' }}>Date</th>
                               </tr>
                             </thead>
                             <tbody>
-                              {modelData.data.map((item, index) => (
-                                <tr key={index} style={{ backgroundColor: index % 2 === 0 ? '#fff' : '#f9f9f9' }}>
-                                  {modelData.model === 'IepInterviewStepOne' && (
-                                    <>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.candidateId}</td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.name}</td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.nid}</td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.result}</td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{formatDate(item.createdAt)}</td>
-                                    </>
-                                  )}
+                              {modelData.data.map((item, idx) => (
+                                <tr key={idx}>
+                                  <td style={{ padding: '10px', border: '1px solid #ddd' }}>
+                                    {/* এখানে চেক করা হচ্ছে: candidateId যদি অবজেক্ট হয় তবে ভেতর থেকে মান নিবে, নাহলে সরাসরি মান দেখাবে */}
+                                    {typeof item.candidateId === 'object' 
+                                      ? (item.candidateId?.candidateId || 'N/A') 
+                                      : (item.candidateId || 'N/A')}
+                                  </td>
                                   
-                                  {modelData.model === 'IepInterviewDownAdmin' && (
+                                  {modelData.model === 'AdminInterview' ? (
                                     <>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.candidateId}</td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.result}</td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{formatDate(item.createdAt)}</td>
-                                    </>
-                                  )}
-                                  
-                                  {modelData.model === 'IepInterview' && (
-                                    <>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.candidateId}</td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.name}</td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.nid}</td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.interviewer}</td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.department}</td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.grade}</td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.result}</td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>
-                                        {renderProcessAndScore(item.processAndScore)}
+                                      <td style={{ padding: '10px', border: '1px solid #ddd' }}>{String(item.nid || item.birthCertificate || 'N/A')}</td>
+                                      <td style={{ padding: '10px', border: '1px solid #ddd', color: item.result === 'FAILED' ? 'red' : 'green', fontWeight: 'bold' }}>
+                                        {String(item.result || 'N/A')}
                                       </td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{formatDate(item.interviewDate)}</td>
+                                      {modelData.data.some(d => d.result === 'FAILED') && (
+                                        <td style={{ padding: '10px', border: '1px solid #ddd', color: 'red' }}>
+                                          {item.result === 'FAILED' ? String(item.canceledReason || 'Not Specified') : '-'}
+                                        </td>
+                                      )}
                                     </>
+                                  ) : (
+                                    <td style={{ padding: '10px', border: '1px solid #ddd' }}>{String(item.result || 'N/A')}</td>
                                   )}
                                   
-                                  {modelData.model === 'Operator' && (
-                                    <>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.operatorId}</td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.name}</td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.nid}</td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.designation}</td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.grade}</td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>
-                                        {renderProcessAndScore(item.allowedProcesses)}
-                                      </td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{formatDate(item.joiningDate)}</td>
-                                    </>
-                                  )}
-                                  
-                                  {modelData.model === 'ResignHistory' && (
-                                    <>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.operatorId}</td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.name}</td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.nid}</td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.designation}</td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{formatDate(item.resignationDate)}</td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.approvedBy}</td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>{item.reason}</td>
-                                      <td style={{ padding: '8px', border: '1px solid #ddd' }}>
-                                        {renderProcessAndScore(item.allowedProcesses)}
-                                      </td>
-                                    </>
-                                  )}
+                                  <td style={{ padding: '10px', border: '1px solid #ddd' }}>{formatDate(item.createdAt || item.interviewDate)}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -293,22 +168,11 @@ export default function NidOrBirthCertificateSearch({
                   ))}
                 </>
               ) : (
-                <div style={{ 
-                  color: 'red', 
-                  padding: '15px', 
-                  backgroundColor: '#ffe6e6', 
-                  borderRadius: '5px',
-                  textAlign: 'center'
-                }}>
-                  <h3>Error</h3>
-                  <p>{results.message}</p>
+                <div style={{ color: 'red', textAlign: 'center', padding: '20px' }}>
+                  {String(results.message || 'No data found')}
                 </div>
               )
-            ) : (
-              <div style={{ textAlign: 'center', padding: '40px' }}>
-                <p>No results to display</p>
-              </div>
-            )}
+            ) : null}
           </div>
         </div>
       )}

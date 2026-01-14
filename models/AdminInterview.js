@@ -18,6 +18,14 @@ const AdminInterviewSchema = new mongoose.Schema({
   joiningDate: {
     type: Date,
   },
+  nid: {
+      type: String,
+      trim: true,
+    },
+    birthCertificate: {
+      type: String,
+      trim: true,
+    },
   designation: {
     type: String,
   },

@@ -865,11 +865,12 @@ function DataEntry({
                   <th className="px-4 py-2 border">Process Name</th>
                   <th className="px-4 py-2 border">DOP</th>
                   <th className="px-4 py-2 border">SMV</th>
-                  <th className="px-4 py-2 border">1st</th>
-                  <th className="px-4 py-2 border">2nd</th>
-                  <th className="px-4 py-2 border">3rd</th>
-                  <th className="px-4 py-2 border">4th</th>
-                  <th className="px-4 py-2 border">5th</th>
+                  <th className="px-4 py-2 border">SECOND</th>
+                  <th className="px-6 py-2 border">1st</th>
+                  <th className="px-6 py-2 border">2nd</th>
+                  <th className="px-6 py-2 border">3rd</th>
+                  <th className="px-6 py-2 border">4th</th>
+                  <th className="px-6 py-2 border">5th</th>
                   <th className="px-4 py-2 border">Quality Status</th>
                   <th className="px-4 py-2 border">Actions</th>
                 </tr>
@@ -924,6 +925,15 @@ function DataEntry({
                         type="number"
                         step="0.01"
                         value={process.smv}
+                        readOnly
+                        className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100"
+                      />
+                    </td>
+                    <td className="px-4 py-2 border min-w-[80px]">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={process.smv * 60}
                         readOnly
                         className="w-full px-2 py-1 border border-gray-300 rounded bg-gray-100"
                       />
@@ -1314,7 +1324,7 @@ function calculateResults(data) {
     else if (passedCount === 3) practicalMarks = 78
     else if (passedCount === 2) practicalMarks = 61
     else if (passedCount === 1) practicalMarks = 60
-    else practicalMarks = 60
+    else practicalMarks = 40
   }
 
   // -------------------------------

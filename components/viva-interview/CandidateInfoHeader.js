@@ -18,6 +18,8 @@ export default function CandidateInfoHeader({
   const status = apiData?.status || candidateInfo?.status || 'N/A';
   const result = apiData?.result || candidateInfo?.result || 'N/A';
   const stepCompleted = apiData?.stepCompleted || candidateInfo?.stepCompleted || 'N/A';
+  const floor = apiData?.floor;
+  const hodmeDistrict = apiData?.homeDistrict;
 
   console.log('Final experienceMachines:', experienceMachines);
   console.log('Final designation:', designation);
@@ -76,16 +78,7 @@ export default function CandidateInfoHeader({
         </div>
 
         {/* API Data Section */}
-        {apiData && (
-          <div className="mt-4 p-3 bg-blue-50 rounded-md border border-blue-200">
-            <h4 className="font-semibold text-blue-700 mb-2">API Data:</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-              <p><strong>Status:</strong> <span className="capitalize">{status}</span></p>
-              <p><strong>Result:</strong> <span className="font-bold">{result}</span></p>
-              <p><strong>Step Completed:</strong> {stepCompleted}</p>
-            </div>
-          </div>
-        )}
+        
 
         {/* Experience Machines Section */}
         <div className="mt-4 p-3 bg-white rounded-md border">
@@ -153,6 +146,12 @@ export default function CandidateInfoHeader({
               Education Certificate: {educationCertificate ? 'Available' : 'Not Available'}
             </div>
           </div>
+        </div>
+        <div className="mt-4 p-3 bg-white rounded-md border">
+          FLOOR: {floor}
+        </div>
+        <div className="mt-4 p-3 bg-white rounded-md border">
+          Home District: {hodmeDistrict}
         </div>
       </div>
 

@@ -110,7 +110,7 @@ export default function VivaInterviewClient() {
     <div className="min-h-screen bg-gray-50 text-gray-800 font-sans flex">
       <SidebarNavLayout />
 
-      <div className="flex-1 max-w-8xl mx-auto p-4 mt-16 overflow-y-auto">
+      <div className="flex-1  mx-auto p-4 mt-16 overflow-y-auto">
         <div className="w-full max-w-6xl mx-auto bg-white p-6 rounded-lg shadow-lg">
           {!candidateInfo && (
             <CandidateSearchSection

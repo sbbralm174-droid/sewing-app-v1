@@ -58,6 +58,7 @@ export async function POST(request) {
       result: requestData.result,
       name: requestData.interviewData?.name || requestData.name || 'Unknown Candidate',
       nid: requestData.interviewData?.nid || requestData.nid || '',
+      homeDistrict: requestData.homeDistrict,
       
       // Certificate information - DIRECT boolean assignment
       chairmanCertificate: Boolean(requestData.chairmanCertificate),

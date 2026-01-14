@@ -40,19 +40,7 @@ export default function ResultSection({ formData, onChange }) {
           </select>
         </div>
 
-        <div className="flex items-center">
-          <input
-            type="checkbox"
-            name="promotedToAdmin"
-            checked={formData.promotedToAdmin}
-            onChange={onChange}
-            disabled={formData.result === 'PENDING' || formData.result === 'FAILED'}
-            className="mr-2 h-4 w-4 rounded border-gray-300 bg-white text-indigo-600 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          />
-          <label className={`text-sm font-medium ${(formData.result === 'PENDING' || formData.result === 'FAILED') ? 'text-gray-500' : 'text-gray-700'}`}>
-            Promoted to Admin
-          </label>
-        </div>
+        
       </div>
 
       <div className="mt-4">

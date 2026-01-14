@@ -8,7 +8,7 @@ import VivaDetailsSection from './VivaDetailsSection';
 import ResultSection from './ResultSection';
 import MainAssessment from '../operator-assessment/Mainassessment';
 
-export default function InterviewForm({ candidateInfo, onBackToSearch }) {
+export default function InterviewForm({ candidateInfo, apiData, onBackToSearch, }) {
   const router = useRouter();
   
   const [formData, setFormData] = useState({
@@ -22,7 +22,8 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
     result: 'PASSED',
     remarks: '',
     promotedToAdmin: false,
-    canceledReason: ''
+    canceledReason: '',
+
   });
   
   const [processes, setProcesses] = useState([]);
@@ -38,6 +39,7 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
 
   // Load processes on component mount
   useEffect(() => {
+    
     const fetchProcesses = async () => {
       try {
         const response = await fetch('/api/processes');
@@ -51,7 +53,7 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
     };
 
     fetchProcesses();
-  }, []);
+  }, [apiData]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -203,9 +205,12 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
       };
 
       // Prepare submission data with processCapacity and assessment data
+      
       const submissionData = {
         candidateId: candidateInfo.candidateId,
         ...formData,
+        floor: candidateInfo.floor,
+        homeDistrict: apiData.homeDistrict,
         videos: uploadedVideos,
         processAndScore: assessmentData?.processCapacity || {},
         grade: formData.grade,

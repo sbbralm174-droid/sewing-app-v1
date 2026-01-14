@@ -19,6 +19,16 @@ const candidateSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  homeDistrict: {
+    type: String,
+    default: ''
+  },
+
+  floor: {
+  type: String,
+  enum: ['SHAPLA', 'PODDO', 'KODOM', 'BELLY'],
+  required: true
+},
   stepCompleted: {
     type: Number,
     default: 1
@@ -82,11 +92,7 @@ const candidateSchema = new mongoose.Schema({
   },
   
   // Floor information - ADD THIS FIELD
-  floor: {
-    type: String,
-    enum: ['', 'SHAPLA', 'PODDO', 'KODOM', 'BELLY'],
-    default: ''
-  },
+  
   
   // Additional information
   otherInfo: {
