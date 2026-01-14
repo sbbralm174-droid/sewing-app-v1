@@ -607,22 +607,26 @@ function DataEntry({
   }
 
   const addProcess = () => {
-    setFormData({
-      ...formData,
-      processes: [
-        ...formData.processes,
-        {
-          machineType: '',
-          processName: '',
-          dop: '',
-          smv: 0,
-          cycleTimes: [0, 0, 0, 0, 0],
-          qualityStatus: '',
-          remarks: ''
-        }
-      ]
-    })
-  }
+  const lastProcess =
+    formData.processes[formData.processes.length - 1]
+
+  setFormData({
+    ...formData,
+    processes: [
+      ...formData.processes,
+      {
+        machineType: lastProcess?.machineType || 'SNLS/DNLS',
+        processName: '',
+        dop: '',
+        smv: 0,
+        cycleTimes: [0, 0, 0, 0, 0],
+        qualityStatus: lastProcess?.qualityStatus || 'No Defect',
+        remarks: ''
+      }
+    ]
+  })
+}
+
 
   const removeProcess = (index) => {
     const updatedProcesses = formData.processes.filter((_, i) => i !== index)
