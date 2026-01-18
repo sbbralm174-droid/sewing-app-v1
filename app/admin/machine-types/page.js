@@ -25,9 +25,7 @@ export default function MachineTypeForm() {
         },
         body: JSON.stringify(formData),
       });
-      if (response.ok) {
-        router.push('/');
-      }
+      
     } catch (error) {
       console.error('Error:', error);
     }

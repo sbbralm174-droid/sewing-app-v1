@@ -21,6 +21,8 @@ export default function VivaInterviewClient() {
   const [showSearch, setShowSearch] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const [searchKey, setSearchKey] = useState(0);
+  const [selectedFloor, setSelectedFloor] = useState('');
+const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Handle candidate selection from search
   const handleCandidateSelect = async (candidate) => {
@@ -114,6 +116,10 @@ export default function VivaInterviewClient() {
         <div className="w-full max-w-6xl mx-auto bg-white p-6 rounded-lg shadow-lg">
           {!candidateInfo && (
             <CandidateSearchSection
+              floor={selectedFloor}
+              setFloor={setSelectedFloor}
+              searchDate={selectedDate}
+    setSearchDate={setSelectedDate}
               onCandidateSelect={handleCandidateSelect}
               searchError={searchError}
               setSearchError={setSearchError}

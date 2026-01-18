@@ -1,4 +1,3 @@
-// app/admin/iep-interview/step-one/page.js
 'use client'
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -7,8 +6,6 @@ import { Html5QrcodeScanner } from 'html5-qrcode';
 import NidOrBirthCertificateSearch from '@/components/NidOrBirthCertificate';
 
 export default function VivaInterviewStep1() {
-  
-  
   const router = useRouter();
   const [formData, setFormData] = useState({
     name: '',
@@ -31,6 +28,8 @@ export default function VivaInterviewStep1() {
   const [scanningText, setScanningText] = useState('');
   const [availableCameras, setAvailableCameras] = useState([]);
   const [selectedCamera, setSelectedCamera] = useState('');
+  const [nidExists, setNidExists] = useState(false);
+  const [nidExistsMessage, setNidExistsMessage] = useState('');
   
   const photoFileRef = useRef(null);
   const webcamRef = useRef(null);
@@ -44,11 +43,45 @@ export default function VivaInterviewStep1() {
     
     if (successMessage) setSuccessMessage('');
     if (errorMessage) setErrorMessage('');
-    
+    if (nidExistsMessage) setNidExistsMessage('');
     if (formErrors[name]) {
       setFormErrors(prev => ({ ...prev, [name]: '' }));
     }
   };
+
+  // NID চেঞ্জ হলে চেক করুন
+  useEffect(() => {
+    const checkNidExists = async () => {
+      if (formData.nid && formData.nid.trim().length >= 10) {
+        try {
+          // Debounce for 500ms
+          const timer = setTimeout(async () => {
+            const response = await fetch(`/api/iep-interview/check-nid?nid=${formData.nid.trim()}`);
+            if (response.ok) {
+              const data = await response.json();
+              if (data.exists) {
+                setNidExists(true);
+                setNidExistsMessage(`⚠️ This NID (${formData.nid}) already exists in database. Candidate: ${data.name}`);
+                
+              } else {
+                setNidExists(false);
+                setNidExistsMessage('');
+              }
+            }
+          }, 500);
+          
+          return () => clearTimeout(timer);
+        } catch (error) {
+          console.error('Error checking NID:', error);
+        }
+      } else {
+        setNidExists(false);
+        setNidExistsMessage('');
+      }
+    };
+    
+    checkNidExists();
+  }, [formData.nid]);
 
   // Extract from XML style
   function extractFromXML(input) {
@@ -307,10 +340,13 @@ export default function VivaInterviewStep1() {
       errors.idValidation = 'Either NID or Birth Certificate must be provided';
     }
     
-    
-    
     if (result === 'FAILED' && !formData.failureReason.trim()) {
       errors.failureReason = 'Failure reason is required when candidate fails';
+    }
+    
+    // Check if NID already exists (only for new submissions)
+    if (formData.nid && nidExists) {
+      errors.nid = 'This NID already exists in the database';
     }
     
     setFormErrors(errors);
@@ -451,6 +487,8 @@ export default function VivaInterviewStep1() {
           failureReason: ''
         });
         setCapturedImage(null);
+        setNidExists(false);
+        setNidExistsMessage('');
         if (photoFileRef.current) {
           photoFileRef.current = null;
         }
@@ -513,7 +551,7 @@ export default function VivaInterviewStep1() {
           <p className="text-gray-600 mt-2">Provide candidate&apos;s basic details and photo</p>
         </div>
 
-        {/* CAMERA SCANNER SECTION - ADDED ABOVE TEXT AREA */}
+        {/* CAMERA SCANNER SECTION */}
         <div className="mb-6">
           <div className="flex justify-between items-center mb-3">
             <h3 className="text-lg font-semibold text-gray-700">
@@ -616,7 +654,7 @@ export default function VivaInterviewStep1() {
           )}
         </div>
 
-        {/* TEXT AREA FOR MANUAL PASTE - MODIFIED */}
+        {/* TEXT AREA FOR MANUAL PASTE */}
         <div className="mb-6">
           <label className="block mb-2 text-lg font-medium text-gray-700">
             Scan/Paste Data Area:
@@ -690,8 +728,25 @@ export default function VivaInterviewStep1() {
           </div>
         )}
 
+        {/* NID Exists Warning */}
+        {nidExistsMessage && (
+          <div className="mb-4 p-3 bg-yellow-100 text-yellow-700 rounded-md text-center border border-yellow-300">
+            {nidExistsMessage}
+            <div className="mt-2 text-sm">
+              
+              <button
+                type="button"
+                onClick={handleSearch}
+                className="text-blue-600 hover:text-blue-800 underline text-sm"
+              >
+                View Details
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Success/Error Messages */}
-        {successMessage && (
+        {successMessage && !nidExistsMessage && (
           <div className={`mb-4 p-3 rounded-md text-center ${
             successMessage.includes('⚠️') 
               ? 'bg-yellow-100 text-yellow-700' 
@@ -701,7 +756,7 @@ export default function VivaInterviewStep1() {
           </div>
         )}
 
-        {errorMessage && (
+        {errorMessage && !nidExistsMessage && (
           <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-center">
             {errorMessage}
           </div>
@@ -731,15 +786,21 @@ export default function VivaInterviewStep1() {
           {/* Identification Fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block mb-2 text-lg font-medium text-gray-700">NID Number:</label>
+              <label className="block mb-2 text-lg font-medium text-gray-700">
+                NID Number:
+                {nidExists && <span className="text-red-500 ml-1">* (Already exists)</span>}
+              </label>
               <input
                 type="text"
                 name="nid"
                 value={formData.nid}
                 onChange={handleChange}
-                className="w-full p-3 rounded-md border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-base"
+                className={`w-full p-3 rounded-md border ${nidExists ? 'border-red-500 bg-red-50' : 'border-gray-300'} bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-base`}
                 placeholder="Enter NID number (auto-filled from scanner)"
               />
+              {formErrors.nid && (
+                <div className="mt-1 text-red-600 text-sm">{formErrors.nid}</div>
+              )}
             </div>
 
             <div>
@@ -910,7 +971,7 @@ export default function VivaInterviewStep1() {
               <button
                 type="button"
                 onClick={() => handleSubmit('PASSED')}
-                disabled={loading}
+                disabled={loading || (formData.nid && nidExists)}
                 className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-3 rounded-md shadow-sm font-medium text-base transition-colors"
               >
                 {loading ? 'Processing...' : 'PASSED'}
@@ -919,7 +980,7 @@ export default function VivaInterviewStep1() {
               <button
                 type="button"
                 onClick={() => handleSubmit('FAILED')}
-                disabled={loading}
+                disabled={loading || (formData.nid && nidExists)}
                 className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-3 rounded-md shadow-sm font-medium text-base transition-colors"
               >
                 {loading ? 'Processing...' : 'FAILED'}
@@ -935,6 +996,7 @@ export default function VivaInterviewStep1() {
             <li>Or manually paste scanned data in the text area</li>
             <li>Take/upload candidate photo</li>
             <li>Click PASSED or FAILED to submit</li>
+            <li className="text-red-600 font-medium">System will alert if NID already exists</li>
           </ol>
         </div>
       </div>

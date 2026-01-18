@@ -1,14 +1,20 @@
 'use client'
 import { useState, useEffect, useRef } from 'react';
 
-export default function CandidateSearchSection({ onCandidateSelect, searchError, setSearchError }) {
+export default function CandidateSearchSection({ 
+  onCandidateSelect, 
+  searchError, 
+  setSearchError,
+  // এই ৪টি প্রপস প্যারেন্ট থেকে পাঠাতে হবে যাতে ডাটা সেভ থাকে
+  floor, 
+  setFloor, 
+  searchDate, 
+  setSearchDate 
+}) {
   const [candidates, setCandidates] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [dropdownLoading, setDropdownLoading] = useState(false);
-  const [floor, setFloor] = useState('');
-  // ডিফল্টভাবে আজকের তারিখ (YYYY-MM-DD ফরম্যাটে)
-  const [searchDate, setSearchDate] = useState(new Date().toISOString().split('T')[0]);
   const [filteredCandidates, setFilteredCandidates] = useState([]);
   
   const dropdownRef = useRef(null);
@@ -24,11 +30,11 @@ export default function CandidateSearchSection({ onCandidateSelect, searchError,
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // নতুন API অনুযায়ী ক্যান্ডিডেট ফেচ করার ফাংশন
+  // ক্যান্ডিডেট ফেচ করার ফাংশন
   const fetchEligibleCandidates = async (queryText = '') => {
-   // setDropdownLoading(true);
+    setDropdownLoading(true);
     try {
-      // API call with date and floor filters
+      // API call with current date and floor
       const url = `/api/iep-interview/eligible-candidates-iep?date=${searchDate}&floor=${floor}`;
       const response = await fetch(url);
       const result = await response.json();
@@ -36,7 +42,7 @@ export default function CandidateSearchSection({ onCandidateSelect, searchError,
       if (result.success && Array.isArray(result.data)) {
         let data = result.data;
 
-        // যদি ইউজার সার্চ বক্সে কিছু টাইপ করে, তবে ক্লায়েন্ট সাইডে ফিল্টার
+        // ক্লায়েন্ট সাইড ফিল্টারিং (Search Query থাকলে)
         if (queryText.trim()) {
           data = data.filter(c =>
             c.candidateId?.toLowerCase().includes(queryText.toLowerCase()) ||
@@ -59,9 +65,10 @@ export default function CandidateSearchSection({ onCandidateSelect, searchError,
     }
   };
 
-  // তারিখ, ফ্লোর বা সার্চ কুয়েরি পরিবর্তন হলে অটো-লোড
+  // তারিখ, ফ্লোর বা সার্চ কুয়েরি পরিবর্তন হলে অটো-লোড
   useEffect(() => {
-    if (showDropdown) {
+    // যদি ড্রপডাউন ওপেন থাকে অথবা অলরেডি কোনো ফ্লোর সিলেক্ট করা থাকে
+    if (showDropdown || floor) {
       const delayDebounceFn = setTimeout(() => {
         fetchEligibleCandidates(searchQuery);
       }, 300);
@@ -166,6 +173,7 @@ export default function CandidateSearchSection({ onCandidateSelect, searchError,
             </div>
           )}
         </div>
+        {searchError && <p className="mt-2 text-sm text-red-600">{searchError}</p>}
       </div>
     </div>
   );

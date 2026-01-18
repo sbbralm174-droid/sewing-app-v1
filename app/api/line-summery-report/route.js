@@ -47,16 +47,16 @@ export async function GET(req) {
       console.error("Andon API Error:", err);
     }
 
-    // --- ২. ডাটা ফেচিং (Main Production & History) ---
+    // --- ২. ডাটা ফেচিং (History তেও Populate যোগ করা হয়েছে) ---
     const [mainRecords, historyRecords] = await Promise.all([
       DailyProduction.find({ date: { $gte: startDate, $lte: endDate } })
         .populate('buyerId', 'name').populate('styleId', 'name').lean(),
-      HistoryDailyProduction.find({ date: { $gte: startDate, $lte: endDate } }).lean()
+      HistoryDailyProduction.find({ date: { $gte: startDate, $lte: endDate } })
+        .populate('buyerId', 'name').populate('styleId', 'name').lean()
     ]);
 
     const lineMap = {};
 
-    // হেল্পার ফাংশন লাইন অবজেক্ট তৈরি করতে
     const getLineObj = (lineKey, doc) => {
       if (!lineMap[lineKey]) {
         lineMap[lineKey] = {
@@ -70,31 +70,32 @@ export async function GET(req) {
           totalWorkingMinutes: 0
         };
       }
+      // অতিরিক্ত নিরাপত্তা: যদি আগে নাম না থাকে এখন যোগ করবে
+      if (!lineMap[lineKey].buyer && doc?.buyerId?.name) lineMap[lineKey].buyer = doc.buyerId.name;
+      if (!lineMap[lineKey].style && doc?.styleId?.name) lineMap[lineKey].style = doc.styleId.name;
+      
       return lineMap[lineKey];
     };
 
-    // --- ৩. হিস্ট্রি প্রসেসিং (পুরানো লাইনের সময় যোগ করা) ---
+    // --- ৩. হিস্ট্রি প্রসেসিং ---
     historyRecords.forEach(hist => {
       const lineKey = hist.line;
       const lineObj = getLineObj(lineKey, hist);
 
-      // হিস্ট্রি থেকে ওই লাইনের কাজের সময় (মিনিটে)
       const workMinutes = parseFloat(hist.previousLineWorkingTime) || 0;
       lineObj.totalWorkingMinutes += workMinutes;
 
-      // ম্যানপাওয়ার কাউন্ট
       if (hist.workAs === 'operator') lineObj.operatorCount += 1;
       else if (hist.workAs === 'helper') lineObj.helperCount += 1;
       
       lineObj.totalSmv += parseFloat(hist.smv) || 0;
     });
 
-    // --- ৪. মেইন প্রোডাকশন প্রসেসিং (বর্তমান লাইনের সময় থেকে হিস্ট্রি বিয়োগ) ---
+    // --- ৪. মেইন প্রোডাকশন প্রসেসিং ---
     mainRecords.forEach(doc => {
       const lineKey = doc.line;
       const lineObj = getLineObj(lineKey, doc);
 
-      // ১ নম্বর পয়েন্ট লজিক: বর্তমান লাইনের মোট সময় থেকে অন্য লাইনের সময় বিয়োগ
       let totalMinutesThisOperatorWorkedToday = 0;
       if (doc.hourlyProduction && doc.hourlyProduction.length > 0) {
         const lastEntry = doc.hourlyProduction[doc.hourlyProduction.length - 1];
@@ -102,17 +103,14 @@ export async function GET(req) {
         totalMinutesThisOperatorWorkedToday = hoursWorked * 60;
       }
 
-      // এই অপারেটরের হিস্ট্রি রেকর্ডগুলো খুঁজে বের করা (সে অন্য লাইনে কতক্ষণ ছিল)
       const operatorHistory = historyRecords.filter(h => 
-        h.operator.operatorId === doc.operator.operatorId
+        String(h.operator.operatorId || h.operator) === String(doc.operator.operatorId || doc.operator)
       );
       const minutesSpentInOtherLines = operatorHistory.reduce((sum, h) => sum + (parseFloat(h.previousLineWorkingTime) || 0), 0);
 
-      // বর্তমান লাইনের একচুয়াল সময়
       const actualMinutesInCurrentLine = Math.max(0, totalMinutesThisOperatorWorkedToday - minutesSpentInOtherLines);
       lineObj.totalWorkingMinutes += actualMinutesInCurrentLine;
 
-      // ম্যানপাওয়ার ও অন্যান্য ডাটা
       if (doc.workAs === 'operator') lineObj.operatorCount += 1;
       else if (doc.workAs === 'helper') lineObj.helperCount += 1;
       if (doc.hourlyTarget) lineObj.hourlyTarget = doc.hourlyTarget;
@@ -121,6 +119,7 @@ export async function GET(req) {
 
     // --- ৫. ফাইনাল আউটপুট প্রোসেসিং ---
     const result = Object.values(lineMap).map(line => {
+      const totalManpower = line.operatorCount + line.helperCount;
       return {
         line: line.line,
         buyer: line.buyer,
@@ -128,9 +127,10 @@ export async function GET(req) {
         totalSmv: Number(line.totalSmv.toFixed(2)),
         operator: line.operatorCount,
         helper: line.helperCount,
-        totalManpower: line.operatorCount + line.helperCount,
+        totalManpower: totalManpower,
         hourlyTarget: line.hourlyTarget,
-        avgWorkingHour: Number((line.totalWorkingMinutes / 60).toFixed(2)), // মিনিট থেকে ঘণ্টায় কনভার্ট
+        // টোটাল ম্যানপাওয়ার দিয়ে ভাগ করে এভারেজ ঘণ্টা বের করা হয়েছে
+        avgWorkingHour: Number((line.totalWorkingMinutes / (totalManpower || 1) / 60).toFixed(2)),
         npt: nptMap[line.line] ? Number((nptMap[line.line] / 60).toFixed(2)) : 0
       };
     });

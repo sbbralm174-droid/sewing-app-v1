@@ -10,6 +10,8 @@ export async function POST(req) {
   try {
     await connectDB();
     const body = await req.json();
+    console.log("SAVING RESULT:", body.result);
+
 
     // Validate required fields
     if (!body.adminInterviewId) {
@@ -70,6 +72,7 @@ export async function POST(req) {
     const operatorData = {
       operatorId: body.operatorId,
       name: vivaInterview.name,
+      employeeId: body.operatorId,
       nid: vivaInterview.nid,
       birthCertificate: vivaInterview.birthCertificate,
       picture: vivaInterview.picture,

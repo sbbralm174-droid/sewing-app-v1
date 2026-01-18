@@ -161,7 +161,7 @@ export default function AdminInterviewForm() {
       if (!response.ok) throw new Error('Submission failed');
       const result = await response.json();
 
-      if (formData.result === 'PASSED' && formData.promotedToOperator) {
+      if (formData.result === 'PASSED') {
         await fetch('/api/adminInterview/operator', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -173,6 +173,7 @@ export default function AdminInterviewForm() {
             designation: formData.designation || 'Operator',
             nid: formData.nid,
             salary: submissionData.salary
+            
           }),
         });
       }
