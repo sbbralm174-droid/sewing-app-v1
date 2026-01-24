@@ -41,6 +41,7 @@ const DailyProductionSchema = new mongoose.Schema({
   uniqueMachine: { type: String, index: true },
   target: { type: Number, min: 0 },
   hourlyTarget:{ type: Number, min: 0 },
+  totalManpower: { type: Number, default: 0 },
   buyerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Buyer', required: true },
   styleId: { type: mongoose.Schema.Types.ObjectId, ref: 'Style', required: true },
   workAs: { type: String, enum: ['operator', 'helper'], required: true },

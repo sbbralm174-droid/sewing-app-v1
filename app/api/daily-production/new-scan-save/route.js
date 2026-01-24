@@ -14,6 +14,9 @@ export async function POST(request) {
     const data = await request.json();
     const { productionInfo, rows } = data;
 
+    // rows.length কেই manpower হিসেবে ধরা হচ্ছে যদি productionInfo তে না থাকে
+    const totalManpower = productionInfo.totalManpower || rows.length;
+
     console.log('📦 ProductionInfo:', productionInfo);
     console.log('📦 Rows length:', rows?.length);
 
@@ -122,6 +125,7 @@ export async function POST(request) {
         uniqueMachine: row.machineUniqueId || '',
         target: row.target ? parseInt(row.target) : 0,
         buyerId,
+        totalManpower: totalManpower,
         buyerName: productionInfo.buyerName || '',
         styleId,
         styleName: productionInfo.styleName || '',

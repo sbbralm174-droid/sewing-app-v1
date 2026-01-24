@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import DailyProduction from '@/models/DailyProduction';
 import HistoryDailyProduction from '@/models/HistoryDailyProduction';
+import { Breakdown } from '@/models/Breakdown';
 import '@/models/Buyer';
 import '@/models/Style';
 
@@ -36,8 +37,8 @@ export async function GET(req) {
         andonJson.data.forEach(item => {
           const parts = item.deviceId.split('-');
           if (parts.length >= 4) {
-            const lineNumber = parts[3].padStart(2, '0'); 
-            const formattedLine = `PODDO-${lineNumber}`; 
+            const lineNumber = parts[3].padStart(2, '0');
+            const formattedLine = `PODDO-${lineNumber}`;
             const duration = parseFloat(item.onDuration) || 0;
             nptMap[formattedLine] = (nptMap[formattedLine] || 0) + duration;
           }
@@ -47,7 +48,7 @@ export async function GET(req) {
       console.error("Andon API Error:", err);
     }
 
-    // --- ২. ডাটা ফেচিং (History তেও Populate যোগ করা হয়েছে) ---
+    // --- ২. ডাটা ফেচিং ---
     const [mainRecords, historyRecords] = await Promise.all([
       DailyProduction.find({ date: { $gte: startDate, $lte: endDate } })
         .populate('buyerId', 'name').populate('styleId', 'name').lean(),
@@ -63,82 +64,122 @@ export async function GET(req) {
           line: lineKey,
           buyer: doc?.buyerId?.name || '',
           style: doc?.styleId?.name || '',
+          jobNo: doc?.jobNo || '', // jobNo এখানে যুক্ত করা হয়েছে
+          totalManpower: doc?.totalManpower || '', 
+          breakdownTitle: doc?.breakdownProcessTitle || '',
           totalSmv: 0,
           operatorCount: 0,
           helperCount: 0,
           hourlyTarget: 0,
-          totalWorkingMinutes: 0
+          totalWorkingMinutes: 0,
+          opWorkAsHelper: 0,
+          helperWorkAsOp: 0
         };
       }
-      // অতিরিক্ত নিরাপত্তা: যদি আগে নাম না থাকে এখন যোগ করবে
       if (!lineMap[lineKey].buyer && doc?.buyerId?.name) lineMap[lineKey].buyer = doc.buyerId.name;
       if (!lineMap[lineKey].style && doc?.styleId?.name) lineMap[lineKey].style = doc.styleId.name;
-      
+      if (!lineMap[lineKey].jobNo && doc?.jobNo) lineMap[lineKey].jobNo = doc.jobNo; // jobNo আপডেট
+      if (!lineMap[lineKey].totalManpower && doc?.totalManpower) lineMap[lineKey].totalManpower = doc.totalManpower; 
+      if (!lineMap[lineKey].breakdownTitle && doc?.breakdownProcessTitle) lineMap[lineKey].breakdownTitle = doc.breakdownProcessTitle;
+
       return lineMap[lineKey];
     };
 
-    // --- ৩. হিস্ট্রি প্রসেসিং ---
-    historyRecords.forEach(hist => {
-      const lineKey = hist.line;
-      const lineObj = getLineObj(lineKey, hist);
+    const getRealRole = (designation) => {
+      if (!designation) return 'operator';
+      return designation.toUpperCase().includes('ASST') ? 'helper' : 'operator';
+    };
 
-      const workMinutes = parseFloat(hist.previousLineWorkingTime) || 0;
-      lineObj.totalWorkingMinutes += workMinutes;
+    // --- ৩. হিস্ট্রি ও মেইন প্রোডাকশন প্রসেসিং ---
+    const processRecord = (doc, isHistory = false) => {
+      const lineObj = getLineObj(doc.line, doc);
+      const realRole = getRealRole(doc.operator?.designation);
+      const currentWorkAs = doc.workAs; 
 
-      if (hist.workAs === 'operator') lineObj.operatorCount += 1;
-      else if (hist.workAs === 'helper') lineObj.helperCount += 1;
-      
-      lineObj.totalSmv += parseFloat(hist.smv) || 0;
-    });
+      if (currentWorkAs === 'operator') lineObj.operatorCount += 1;
+      else if (currentWorkAs === 'helper') lineObj.helperCount += 1;
 
-    // --- ৪. মেইন প্রোডাকশন প্রসেসিং ---
-    mainRecords.forEach(doc => {
-      const lineKey = doc.line;
-      const lineObj = getLineObj(lineKey, doc);
-
-      let totalMinutesThisOperatorWorkedToday = 0;
-      if (doc.hourlyProduction && doc.hourlyProduction.length > 0) {
-        const lastEntry = doc.hourlyProduction[doc.hourlyProduction.length - 1];
-        const hoursWorked = HOUR_MAP[lastEntry.hour] || 0;
-        totalMinutesThisOperatorWorkedToday = hoursWorked * 60;
+      if (realRole === 'operator' && currentWorkAs === 'helper') {
+        lineObj.opWorkAsHelper += 1;
+      } else if (realRole === 'helper' && currentWorkAs === 'operator') {
+        lineObj.helperWorkAsOp += 1;
       }
 
-      const operatorHistory = historyRecords.filter(h => 
-        String(h.operator.operatorId || h.operator) === String(doc.operator.operatorId || doc.operator)
-      );
-      const minutesSpentInOtherLines = operatorHistory.reduce((sum, h) => sum + (parseFloat(h.previousLineWorkingTime) || 0), 0);
-
-      const actualMinutesInCurrentLine = Math.max(0, totalMinutesThisOperatorWorkedToday - minutesSpentInOtherLines);
-      lineObj.totalWorkingMinutes += actualMinutesInCurrentLine;
-
-      if (doc.workAs === 'operator') lineObj.operatorCount += 1;
-      else if (doc.workAs === 'helper') lineObj.helperCount += 1;
-      if (doc.hourlyTarget) lineObj.hourlyTarget = doc.hourlyTarget;
       lineObj.totalSmv += parseFloat(doc.smv) || 0;
-    });
 
-    // --- ৫. ফাইনাল আউটপুট প্রোসেসিং ---
-    const result = Object.values(lineMap).map(line => {
-      const totalManpower = line.operatorCount + line.helperCount;
+      if (isHistory) {
+        lineObj.totalWorkingMinutes += parseFloat(doc.previousLineWorkingTime) || 0;
+      } else {
+        let totalMinutesThisOperatorWorkedToday = 0;
+        if (doc.hourlyProduction && doc.hourlyProduction.length > 0) {
+          const lastEntry = doc.hourlyProduction[doc.hourlyProduction.length - 1];
+          totalMinutesThisOperatorWorkedToday = (HOUR_MAP[lastEntry.hour] || 0) * 60;
+        }
+        const operatorHistory = historyRecords.filter(h => String(h.operator) === String(doc.operator?._id || doc.operator));
+        const minutesSpentInOtherLines = operatorHistory.reduce((sum, h) => sum + (parseFloat(h.previousLineWorkingTime) || 0), 0);
+        lineObj.totalWorkingMinutes += Math.max(0, totalMinutesThisOperatorWorkedToday - minutesSpentInOtherLines);
+        
+        if (doc.hourlyTarget) lineObj.hourlyTarget = doc.hourlyTarget;
+      }
+    };
+
+    historyRecords.forEach(hist => processRecord(hist, true));
+    mainRecords.forEach(doc => processRecord(doc, false));
+
+    // --- ৪. Breakdown ক্যালকুলেশন এবং ফাইনাল আউটপুট ---
+    const finalData = await Promise.all(Object.values(lineMap).map(async (line) => {
+      let breakdownSMV = 0;
+      let breakdownHP = 0;
+      let breakdownOperator = 0;
+      let capacities = [];
+
+      if (line.breakdownTitle) {
+        const bdData = await Breakdown.findOne({ fileName: line.breakdownTitle }).lean();
+        if (bdData && bdData.data) {
+          bdData.data.forEach(item => {
+            breakdownSMV += parseFloat(item.smv) || 0;
+            if (item.mcTypeHp && item.mcTypeHp.toUpperCase() === "HP") {
+              breakdownHP += 1;
+            } else if (item.mcTypeHp) {
+              breakdownOperator += 1;
+            }
+            const capValue = parseFloat(item.capacity);
+            if (!isNaN(capValue) && capValue > 0) {
+              capacities.push(capValue);
+            }
+          });
+        }
+      }
+
+      const totalManpowerVariable = line.operatorCount + line.helperCount;
+      const breakdownCapacity = capacities.length > 0 ? Math.min(...capacities) : 0;
+
       return {
         line: line.line,
         buyer: line.buyer,
         style: line.style,
+        jobNo: line.jobNo, // এখানে jobNo পাঠানো হচ্ছে
+        totalManpower: line.totalManpower, 
         totalSmv: Number(line.totalSmv.toFixed(2)),
         operator: line.operatorCount,
         helper: line.helperCount,
-        totalManpower: totalManpower,
+        totalManpowerVariable: totalManpowerVariable,
+        opWorkAsHelper: line.opWorkAsHelper,
+        helperWorkAsOp: line.helperWorkAsOp,
         hourlyTarget: line.hourlyTarget,
-        // টোটাল ম্যানপাওয়ার দিয়ে ভাগ করে এভারেজ ঘণ্টা বের করা হয়েছে
-        avgWorkingHour: Number((line.totalWorkingMinutes / (totalManpower || 1) / 60).toFixed(2)),
-        npt: nptMap[line.line] ? Number((nptMap[line.line] / 60).toFixed(2)) : 0
+        avgWorkingHour: Number((line.totalWorkingMinutes / (line.totalManpower || 1) / 60).toFixed(2)),
+        npt: nptMap[line.line] ? Number((nptMap[line.line] / 60).toFixed(2)) : 0,
+        breakdownSMV: Number(breakdownSMV.toFixed(2)),
+        breakdownOperator: breakdownOperator,
+        breakdownHP: breakdownHP,
+        breakdownCapacity: breakdownCapacity
       };
-    });
+    }));
 
     return NextResponse.json({
       date: dateParam,
-      totalLines: result.length,
-      data: result
+      totalLines: finalData.length,
+      data: finalData
     });
 
   } catch (error) {

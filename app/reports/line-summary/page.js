@@ -1,162 +1,190 @@
-'use client';
+'use client'
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react'
 
-export default function LineSummaryPage() {
-  const [date, setDate] = useState('2025-12-25');
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(false);
+export default function LineSummaryReport() {
+  const [date, setDate] = useState('2025-12-25')
+  const [report, setReport] = useState(null)
+  const [loading, setLoading] = useState(false)
 
   const fetchReport = async () => {
-    setLoading(true);
     try {
-      const res = await fetch(`/api/line-summery-report?date=${date}`);
-      const json = await res.json();
-      
-      // API থেকে আসা ডেটাতে production প্রোপার্টি যোগ করা হচ্ছে যাতে ইনপুট হ্যান্ডেল করা যায়
-      const updatedData = (json.data || []).map(item => ({
-        ...item,
-        production: 0 // ইনিশিয়াল প্রোডাকশন ০
-      }));
-      setData(updatedData);
-    } catch (error) {
-      console.error(error);
-      alert('Failed to load report');
+      setLoading(true)
+      const res = await fetch(`/api/line-summery-report?date=${date}`)
+      const data = await res.json()
+      setReport(data)
+    } catch (err) {
+      console.error(err)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   useEffect(() => {
-    fetchReport();
-  }, []);
-
-  // প্রোডাকশন ইনপুট চেঞ্জ হ্যান্ডেলার
-  const handleProductionChange = (index, value) => {
-    const newData = [...data];
-    newData[index].production = Number(value);
-    setData(newData);
-  };
-
-  // ক্যালকুলেশন ফাংশন
-  const calculateMetrics = (row) => {
-    const { production, totalSmv, totalManpower, avgWorkingHour, npt } = row;
-    const smv = totalSmv || 0;
-    const manpower = totalManpower || 0;
-    const workingHour = avgWorkingHour || 0;
-    const nptVal = npt || 0;
-
-    const commonDenominator = manpower * workingHour * 60;
-
-    // Efficiency Calculation
-    const efficiency = commonDenominator > 0 
-      ? ((production * smv) / commonDenominator) * 100 
-      : 0;
-
-    // Performance Calculation (Denominator minus NPT)
-    const perfDenominator = commonDenominator - nptVal;
-    const performance = perfDenominator > 0 
-      ? ((production * smv) / perfDenominator) * 100 
-      : 0;
-
-    return {
-      efficiency: efficiency.toFixed(2),
-      performance: performance.toFixed(2)
-    };
-  };
+    fetchReport()
+  }, [])
+  const totalQcPassPerDay = 200;
+  const todayBallanceTarget = 150;
+  const activeWipInLine = 2200;
 
   return (
-    <div className="p-6 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6 border-b pb-2 border-gray-200 dark:border-gray-700">
-          Line Wise Production Summary & NPT Report
-        </h1>
+    <div className="p-4  mt-20 min-h-screen">
+      {/* HEADER */}
+      <div className="flex justify-between items-center mb-4">
+        
 
-        <div className="flex items-center gap-4 mb-6 bg-gray-50 dark:bg-gray-800 p-4 rounded-lg shadow-sm">
-          <div className="flex flex-col">
-            <label className="text-xs font-semibold uppercase text-gray-500 mb-1">Select Date</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="border rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 outline-none"
-            />
-          </div>
+        <div className="flex gap-2 items-center">
+          <span className="text-sm font-medium">Date:</span>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="border px-2 py-1 text-sm"
+          />
           <button
             onClick={fetchReport}
-            className="mt-5 bg-blue-600 text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
-            disabled={loading}
+            className="bg-blue-600 text-white px-3 py-1 text-sm rounded"
           >
-            {loading ? 'Loading...' : 'Load Report'}
+            Load
           </button>
         </div>
+      </div>
 
-        <div className="overflow-x-auto border rounded-lg border-gray-300 dark:border-gray-700 shadow-md">
-          <table className="min-w-full text-sm border-collapse bg-white dark:bg-gray-800">
-            <thead className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+      {/* TABLE */}
+      <div className="overflow-x-auto bg-white border">
+        <table className="w-full border-collapse text-[11px]">
+          <thead>
+            {/* ===== HEADER ROW 1 ===== */}
+            <tr className="bg-gray-100 text-center font-semibold">
+              <th rowSpan={2} className="border px-2 py-1">LINE</th>
+              <th rowSpan={2} className="border px-2 py-1">BUYER</th>
+              <th rowSpan={2} className="border px-2 py-1">STYLE</th>
+              <th rowSpan={2} className="border px-2 py-1">job</th>
+              <th rowSpan={2} className="border px-2 py-1">SMV</th>
+
+              
+              <th colSpan={3} className="border px-2 py-1">LAYOUT OP & HP</th>
+              <th colSpan={5} className="border px-2 py-1">USE MP</th>
+              <th colSpan={3} className="border px-2 py-1">ACTUAL USE OP & HP</th>
+
+              <th rowSpan={2} className="border px-2 py-1">HO<br />URLY<br />TAR<br />GET</th>
+              <th rowSpan={2} className="border px-2 py-1">WH</th>
+              <th rowSpan={2} className="border px-2 py-1">BAL<br />ANCE <br/> TARGET<br />/DAY</th>
+              <th rowSpan={2} className="border px-2 py-1">TOTAL<br />QC PASS <br/> PER/<br />DAY(API)</th>
+              <th rowSpan={2} className="border px-2 py-1">DAVI<br />ATION</th>
+              <th rowSpan={2} className="border px-2 py-1">DAVI<br />ATION %</th>
+              <th rowSpan={2} className="border px-2 py-1">AVAIL<br />ABLE MIN (PER HR)</th>
+              <th rowSpan={2} className="border px-2 py-1">EARN MIN(Per Hr)</th>
+              <th rowSpan={2} className="border px-2 py-1">EFF%</th>
+              <th rowSpan={2} className="border px-2 py-1">PER<br />FORM<br />ANCE %</th>
+              <th rowSpan={2} className="border px-2 py-1">NPT</th>
+              <th rowSpan={2} className="border px-2 py-1">LOSS PCS</th>
+              <th rowSpan={2} className="border px-2 py-1">REMARKS</th>
+              <th colSpan={6} className="border px-2 py-1">
+                APROXIMATE FORCASTING FOR TODAY
+              </th>
+            </tr>
+
+            {/* ===== HEADER ROW 2 ===== */}
+            <tr className="bg-gray-100 text-center font-semibold">
+              {/* PRESENT MP */}
+              
+
+              {/* LAYOUT */}
+              <th className="border px-2 py-1">OP</th>
+              <th className="border px-2 py-1">HP</th>
+              <th className="border px-2 py-1">TOTAL</th>
+
+              {/* USE MP */}
+              <th className="border px-2 py-1">OP</th>
+              <th className="border px-2 py-1">HP</th>
+              <th className="border px-2 py-1">OP<br/>AS HP</th>
+              <th className="border px-2 py-1">TOTAL<br/>OP HP</th>
+              <th className="border px-2 py-1">G.TO<br />TAL</th>
+
+              {/* ACTUAL */}
+              <th className="border px-2 py-1">OP</th>
+              <th className="border px-2 py-1">HP</th>
+              <th className="border px-2 py-1">TOTAL</th>
+
+              {/* ACTUAL */}
+              <th className="border px-2 py-1">TODAY <br/>(BALANCE <br/>TARGET_HOUR)</th>
+              <th className="border px-2 py-1">LINE BALANCING TARGET/DAY</th>
+              <th className="border px-2 py-1">BALANCE EFF%_ HOURS</th>
+              <th className="border px-2 py-1">TOTAL INPUT DEMAND</th>
+              <th className="border px-2 py-1">ACTIVE WIP IN LINE</th>
+              <th className="border px-2 py-1">ACTUALL INPUT DEMAND FOR TODAY</th>
+            </tr>
+          </thead>
+
+          {/* ===== BODY ===== */}
+          <tbody>
+            {loading && (
               <tr>
-                {[
-                  'Line', 'Buyer', 'Style', 'SMV', 'Manpower', 'Working Hr', 'NPT (Sec)', 
-                  'Production', 'Efficiency (%)', 'Performance (%)'
-                ].map((h) => (
-                  <th key={h} className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-left font-bold uppercase tracking-wider">
-                    {h}
-                  </th>
-                ))}
+                <td colSpan="26" className="text-center py-6">
+                  Loading...
+                </td>
               </tr>
-            </thead>
+            )}
 
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {loading ? (
-                <tr>
-                  <td colSpan="13" className="text-center py-10">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            {!loading && report?.data?.map((row, index) => {
+              const presentTotal = row.operator + row.helper
+              const useTotal = row.operator + row.helper + row.helperWorkAsOp
+              return (
+                <tr key={index} className="hover:bg-gray-50 text-center">
+                  <td className="border px-2 py-1">{row.line}</td>
+                  <td className="border px-2 py-1">{row.buyer}</td>
+                  <td className="border px-2 py-1">{row.style}</td>
+                  <td className="border px-2 py-1">{row.jobNo}</td>
+                  <td className="border px-2 py-1">{row.totalSmv}</td>
+
+                  {/* PRESENT MP */}
+                  
+
+                  {/* LAYOUT */}
+                  <td className="border px-2 py-1">{row.breakdownOperator}</td>
+                  <td className="border px-2 py-1">{row.breakdownHP}</td>
+                  <td className="border px-2 py-1">
+                    {row.breakdownOperator + row.breakdownHP}
                   </td>
-                </tr>
-              ) : data.length === 0 ? (
-                <tr>
-                  <td colSpan="13" className="text-center py-10 text-gray-500">No data found.</td>
-                </tr>
-              ) : (
-                data.map((row, index) => {
-                  const metrics = calculateMetrics(row);
-                  return (
-                    <tr key={index} className="hover:bg-blue-50 dark:hover:bg-gray-700/50 transition-colors">
-                      <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 font-semibold text-blue-700 dark:text-blue-400">{row.line}</td>
-                      <td className="border border-gray-300 dark:border-gray-600 px-4 py-3">{row.buyer}</td>
-                      <td className="border border-gray-300 dark:border-gray-600 px-4 py-3">{row.style}</td>
-                      <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-right">{row.totalSmv}</td>
-                      <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-right font-bold">{row.totalManpower}</td>
-                      <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-right">{row.avgWorkingHour}</td>
-                      <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-right text-red-500">{row.npt || 0}</td>
-                      
-                      {/* 1. Production Input Field */}
-                      <td className="border border-gray-300 dark:border-gray-600 px-2 py-1">
-                        <input
-                          type="number"
-                          value={row.production}
-                          onChange={(e) => handleProductionChange(index, e.target.value)}
-                          className="w-20 p-1 border rounded text-right bg-yellow-50 dark:bg-gray-800 border-yellow-300 focus:ring-2 focus:ring-yellow-500 outline-none"
-                        />
-                      </td>
 
-                      {/* 2. Efficiency Column */}
-                      <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-right font-bold text-green-600 dark:text-green-400">
-                        {metrics.efficiency}%
-                      </td>
+                  {/* USE MP */}
+                  <td className="border px-2 py-1">{row.operator}</td>
+                  <td className="border px-2 py-1">{row.helper}</td>
+                  <td className="border px-2 py-1">{row.opWorkAsHelper}</td>
+                  <td className="border px-2 py-1">{row.operator + row.helper + row.opWorkAsHelper}</td>
+                  <td className="border px-2 py-1">{row.operator + row.helper + row.opWorkAsHelper}</td>
 
-                      {/* 3. Performance Column */}
-                      <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-right font-bold text-purple-600 dark:text-purple-400">
-                        {metrics.performance}%
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                  {/* ACTUAL */}
+                  <td className="border px-2 py-1">{row.operator}</td>
+                  <td className="border px-2 py-1">{row.helper}</td>
+                  <td className="border px-2 py-1">{presentTotal}</td>
+
+                  <td className="border px-2 py-1">{row.hourlyTarget}</td>
+                  <td className="border px-2 py-1">{row.avgWorkingHour}</td>
+                  <td className="border px-2 py-1">{row.hourlyTarget * row.avgWorkingHour}</td>
+                  <td className="border px-2 py-1">{totalQcPassPerDay}</td>
+                  <td className="border px-2 py-1">{totalQcPassPerDay - (row.hourlyTarget * row.avgWorkingHour)}</td>
+                  <td className="border px-2 py-1">{((totalQcPassPerDay - (row.hourlyTarget * row.avgWorkingHour)) / (row.hourlyTarget * row.avgWorkingHour)).toFixed(2)}</td>
+                  <td className="border px-2 py-1">{ ((row.operator + row.helper + row.opWorkAsHelper) * row.avgWorkingHour * 60).toFixed(2)}</td>
+                  <td className="border px-2 py-1">{totalQcPassPerDay * row.breakdownSMV  }</td>
+                  <td className="border px-2 py-1">{((totalQcPassPerDay * row.breakdownSMV) /  (((row.operator + row.helper + row.opWorkAsHelper) * row.avgWorkingHour * 60))).toFixed(2) }fg</td>
+                  <td className="border px-2 py-1">{(totalQcPassPerDay /  (row.hourlyTarget * row.avgWorkingHour)).toFixed(2) }</td>
+                  <td className="border px-2 py-1">{row.npt }</td>
+                  <td className="border px-2 py-1">{(row.npt / row.breakdownSMV).toFixed(2) }</td>
+                  <td className="border px-2 py-1">-</td>
+                  <td className="border px-2 py-1">{todayBallanceTarget}</td>
+                  <td className="border px-2 py-1">{todayBallanceTarget * 8}</td>
+                  <td className="border px-2 py-1">{(((todayBallanceTarget * 8) * row.breakdownSMV) / ((row.operator + row.helper + row.opWorkAsHelper) * 8 * 60)).toFixed(2)}</td>
+                  <td className="border px-2 py-1">{(todayBallanceTarget * 8) * 1.6}</td>
+                  <td className="border px-2 py-1">{activeWipInLine}</td>
+                  <td className="border px-2 py-1">{((todayBallanceTarget * 8) * 1.6) - activeWipInLine}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
-  );
+  )
 }
