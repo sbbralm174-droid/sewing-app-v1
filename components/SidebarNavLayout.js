@@ -47,7 +47,7 @@ function NotificationsDropdown({ notifications, isLoading, error }) {
               </div>
               <div className="flex justify-between items-center">
                 <p className="text-xs text-gray-500">
-                  {new Date(n.date).toLocaleString()}
+                  {/* {new Date(n.date).toLocaleString()} */}
                 </p>
                 <Link href={`/admin/servicing/${encodeURIComponent(n.uniqueId)}?partName=${encodeURIComponent(n.partName)}`}>
                   <button

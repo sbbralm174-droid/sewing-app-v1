@@ -884,7 +884,7 @@ const handleUpdate = async () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-8xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Daily Production Update</h1>
@@ -1005,7 +1005,7 @@ const handleUpdate = async () => {
               <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-green-700 mb-2">
-                    Set Hourly Target for All Rows
+                    Set Hourly Target for Line
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -1300,7 +1300,7 @@ const handleUpdate = async () => {
                       Target
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Hourly Target
+                      Hourly Line Target
                     </th>
                   </tr>
                 </thead>
@@ -1336,7 +1336,7 @@ const handleUpdate = async () => {
                           </td>
                           
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                            {item.operatorId || item.operator || 'N/A'}
+                            {item.operator.operatorId || item.operator || 'N/A'}
                           </td>
                           
                           {/* Machine Cell with Dropdown */}
@@ -1657,7 +1657,7 @@ const handleUpdate = async () => {
                             <td colSpan="10" className="px-6 py-4">
                               <div className="mb-2">
                                 <h3 className="text-sm font-medium text-gray-700 mb-3">
-                                  {item.operatorName || item.operator || 'N/A'} -------- {item.operator.operatorId  || 'N/A'}
+                                  {item.operatorName || item.operator || 'N/A'} -------- {item.operator.operatorId  || 'N/A'} ------ {item.operatorName || item.operator || 'N/A'} -------- {item.operator.operatorId  || 'N/A'} ------{item.operatorName || item.operator || 'N/A'} -------- {item.operator.operatorId  || 'N/A'}
                                 </h3>
                                 <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-15 xl:grid-cols-15 2xl:grid-cols-15 gap-3">
                                   {hours.map((hour) => (

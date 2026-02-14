@@ -15,7 +15,8 @@ export default function AdminInterviewForm() {
     joiningDate: '',
     designation: '',
     nid: '',
-    birthCertificate: ''
+    birthCertificate: '',
+    floor:''
   });
 
   const [availableCandidates, setAvailableCandidates] = useState([]);
@@ -89,7 +90,8 @@ export default function AdminInterviewForm() {
       ...prev,
       candidateId,
       nid: candidate?.nid || '',
-      birthCertificate: candidate?.birthCertificate || ''
+      birthCertificate: candidate?.birthCertificate || '',
+      floor:candidate?.floor,
     }));
     setSearchTerm(candidate ? `${candidate.name} - ${candidate.candidateId}` : '');
     setIsDropdownOpen(false);

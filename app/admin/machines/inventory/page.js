@@ -6,6 +6,8 @@ const MultiSelectDropdown = ({ title, options, selectedValues, onChange, placeho
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [tempSelected, setTempSelected] = useState(selectedValues);
+  
+
   const dropdownRef = useRef(null);
 
   useEffect(() => {
@@ -100,6 +102,7 @@ export default function AdvancedInventory() {
   const [machines, setMachines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [floors, setFloors] = useState([]);
+  const [showAll, setShowAll] = useState(false);
 
   // 🔍 Filter States
   const initialFilters = {
@@ -218,7 +221,7 @@ export default function AdvancedInventory() {
           { title: "Type Summary", data: summaryData.types, color: "border-orange-500", badge: "bg-orange-500" },
           { title: "Line Summary", data: summaryData.lines, color: "border-blue-500", badge: "bg-blue-500" },
           { title: "Brand Inventory", data: summaryData.brands, color: "border-indigo-500", badge: "bg-indigo-500" },
-          { title: "Model Dist.", data: summaryData.models, color: "border-emerald-500", badge: "bg-emerald-500" }
+          { title: "Model List.", data: summaryData.models, color: "border-emerald-500", badge: "bg-emerald-500" }
         ].map((item, idx) => (
           <div key={idx} className={`bg-white p-5 rounded-2xl shadow-sm border-b-4 ${item.color} h-52 flex flex-col`}>
             <div className="flex justify-between items-center mb-3">
@@ -361,14 +364,48 @@ export default function AdvancedInventory() {
                     </span>
                   </td>
                   <td className="p-6">
-                    {machine.parts?.length > 0 ? (
-                      <div className="text-sm bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-inner">
-                        <span className="font-bold block text-slate-700 text-base">{machine.parts[0].partName}</span>
-                        <span className="text-xs text-slate-400 font-mono mt-1 block">ID: {machine.parts[0].uniquePartId}</span>
-                        {machine.parts.length > 1 && <div className="text-blue-600 text-[10px] mt-2 font-black bg-blue-50 w-fit px-2 py-0.5 rounded-md">+{machine.parts.length - 1} MORE COMPONENTS</div>}
-                      </div>
-                    ) : <span className="text-sm text-slate-400 italic">No components</span>}
-                  </td>
+  {machine.parts?.length > 0 ? (
+    <div className="text-sm bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-inner space-y-3">
+
+      {(showAll ? machine.parts : [machine.parts[0]]).map((part, index) => (
+        <div
+          key={part.uniquePartId || index}
+          className="bg-white border border-slate-200 rounded-lg p-3"
+        >
+          <span className="font-bold block text-slate-700 text-base">
+            {part.partName}
+          </span>
+
+          <span className="text-xs text-slate-400 font-mono mt-1 block">
+            ID: {part.uniquePartId}
+          </span>
+
+          <span className="text-xs text-slate-400 font-mono mt-1 block">
+            SERVICE DATE:{" "}
+            {part.nextServiceDate
+              ? new Date(part.nextServiceDate).toLocaleDateString()
+              : "N/A"}
+          </span>
+        </div>
+      ))}
+
+      {machine.parts.length > 1 && (
+        <button
+          onClick={() => setShowAll(!showAll)}
+          className="text-blue-600 text-[11px] font-black bg-blue-50 w-fit px-2 py-1 rounded-md hover:bg-blue-100 transition"
+        >
+          {showAll
+            ? "HIDE COMPONENTS"
+            : `+${machine.parts.length - 1} MORE COMPONENTS`}
+        </button>
+      )}
+
+    </div>
+  ) : (
+    <span className="text-sm text-slate-400 italic">No components</span>
+  )}
+</td>
+
                 </tr>
               ))}
             </tbody>

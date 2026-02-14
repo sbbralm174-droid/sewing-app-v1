@@ -29,6 +29,11 @@ const AdminInterviewSchema = new mongoose.Schema({
   designation: {
     type: String,
   },
+  floor: {
+  type: String,
+  enum: ['SHAPLA', 'PODDO', 'KODOM', 'BELLY'],
+  required: true
+},
   result: {
     type: String,
     enum: ["PASSED", "FAILED", "PENDING"],

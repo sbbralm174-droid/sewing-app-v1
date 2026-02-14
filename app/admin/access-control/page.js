@@ -33,7 +33,7 @@ const ALL_PAGES = [
   { path: '/supervisor', name: 'Supervisor Dashboard' },
   { path: '/supervisor/processes', name: 'Add Process' },
   { path: '/supervisor/daily-production-by-qrcode', name: 'Daily Production' },
-  { path: '/admin/hourly-production-entry', name: 'Hourly Production Entry' },
+  { path: '/supervisor/update-pro', name: 'Hourly Production Entry' },
   { path: '/supervisor/line-completion', name: 'Line Completion' },
   { path: '/supervisor/delete-daily-production-entry', name: 'Delete Daily Production Entry' },
   { path: '/reports/heighest-process-score', name: 'Highest Process Score' },

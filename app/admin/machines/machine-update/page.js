@@ -138,8 +138,8 @@ export default function MachineUpdatePage() {
                 body: JSON.stringify(machineData),
             });
             if (res.ok) {
-                setMessage({ text: "✅ Machine Updated Successfully!", type: "success" });
-                setTimeout(() => setMachineData(null), 2000);
+                setMessage({ text: "✅ Machine Updated Successfully!", type: "success" },2000);
+               // setTimeout(() => setMachineData(null), 2000);
             } else {
                 const result = await res.json();
                 setMessage({ text: `❌ ${result.error || "ব্যর্থ"}`, type: "error" });

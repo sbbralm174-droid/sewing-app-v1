@@ -1,20 +1,20 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react'; // useRef যোগ করা হয়েছে
+import { useState, useEffect, useRef } from 'react';
 import Header from '@/components/daily-production/Header';
 import ProductionForm from '@/components/daily-production/ProductionForm';
 import ScanInput from '@/components/daily-production/ScanInput';
 import ProductionTable from '@/components/daily-production/ProductionTable';
-import { Html5QrcodeScanner } from 'html5-qrcode'; // Scanner ইম্পোর্ট
+import { Html5QrcodeScanner } from 'html5-qrcode';
 
 export default function Home() {
   const [productionInfo, setProductionInfo] = useState(null);
   const [rows, setRows] = useState([]);
   const [selectedRow, setSelectedRow] = useState(null);
   const [scanType, setScanType] = useState('operator');
-  const [isMobileScannerOpen, setIsMobileScannerOpen] = useState(false); // মোবাইল স্ক্যানার স্টেট
+  const [isMobileScannerOpen, setIsMobileScannerOpen] = useState(false);
   
-  // API থেকে fetch করা ডেটা state
+  // API states
   const [buyers, setBuyers] = useState([]);
   const [styles, setStyles] = useState([]);
   const [floors, setFloors] = useState([]);
@@ -22,6 +22,9 @@ export default function Home() {
   const [supervisors, setSupervisors] = useState([]);
   const [breakdownFiles, setBreakdownFiles] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // সেভ করার সময় লোডিং স্টেট
+  const [isSaving, setIsSaving] = useState(false);
   
   const [filteredStyles, setFilteredStyles] = useState([]);
   
@@ -42,7 +45,7 @@ export default function Home() {
     lineNumber: ''
   });
 
-  // মোবাইল স্ক্যানার কন্ট্রোল করার জন্য useEffect
+  // মোবাইল স্ক্যানার কন্ট্রোল
   useEffect(() => {
     let scanner = null;
     if (isMobileScannerOpen) {
@@ -53,7 +56,7 @@ export default function Home() {
 
       scanner.render((decodedText) => {
         handleScan(decodedText);
-        setIsMobileScannerOpen(false); // স্ক্যান সফল হলে ক্যামেরা বন্ধ হবে
+        setIsMobileScannerOpen(false);
         scanner.clear();
       }, (error) => {
         // console.warn(error);
@@ -176,6 +179,9 @@ export default function Home() {
       return;
     }
 
+    // সেভিং শুরু
+    setIsSaving(true);
+
     const dataToSave = {
       productionInfo: {
         date: productionInfo.date,
@@ -217,12 +223,18 @@ export default function Home() {
       });
       const result = await response.json();
       if (result.success) {
-        alert(`✅ Saved! Total Manpower: ${rows.length}`);
+        alert(`✅ Saved Successfully! Total Manpower: ${rows.length}`);
         setRows([]);
         setProductionInfo(null);
+      } else {
+        alert('Failed to save: ' + (result.message || 'Unknown error'));
       }
     } catch (error) {
-      alert('Error saving data');
+      alert('Error saving data to database');
+      console.error(error);
+    } finally {
+      // সেভিং শেষ (সাফল্য বা ব্যর্থতা যাই হোক)
+      setIsSaving(false);
     }
   };
 
@@ -252,7 +264,6 @@ export default function Home() {
                   />
                 </div>
 
-                {/* মোবাইল স্ক্যানার বাটন */}
                 <button 
                   onClick={() => setIsMobileScannerOpen(!isMobileScannerOpen)}
                   className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-indigo-700 flex items-center"
@@ -263,7 +274,6 @@ export default function Home() {
                 <p className="text-sm text-gray-500 italic hidden md:block">* Updates automatically as you scan operators</p>
               </div>
 
-              {/* মোবাইল ক্যামেরার জন্য রেন্ডারিং এরিয়া */}
               {isMobileScannerOpen && (
                 <div className="bg-white p-4 rounded-lg shadow border-2 border-indigo-200">
                   <div id="reader" className="w-full"></div>
@@ -282,10 +292,22 @@ export default function Home() {
               <div className="flex justify-end pt-4">
                 <button
                   onClick={handleSaveToDatabase}
-                  disabled={rows.length === 0}
-                  className="px-8 py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 disabled:bg-gray-400"
+                  disabled={rows.length === 0 || isSaving}
+                  className={`px-8 py-3 text-white rounded-lg font-bold flex items-center gap-2 transition-all ${
+                    isSaving ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 shadow-lg'
+                  }`}
                 >
-                  Save to Database ({rows.length})
+                  {isSaving ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Saving to Database...
+                    </>
+                  ) : (
+                    `Save to Database (${rows.length})`
+                  )}
                 </button>
               </div>
             </>

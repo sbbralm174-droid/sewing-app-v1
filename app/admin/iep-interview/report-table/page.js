@@ -188,10 +188,10 @@ export default function CandidateReport() {
         <tr>
           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">SL</th>
           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Candidate</th>
-          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">STEP 1</th>
-          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">STEP 2</th>
-          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">STEP 3</th>
-          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">STEP 4</th>
+          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">SECURITY</th>
+          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">DOWN ADMIN</th>
+          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">IEP</th>
+          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">ADMIN</th>
           <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Current Step</th>
           <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
         </tr>

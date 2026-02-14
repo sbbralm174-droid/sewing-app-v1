@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import NidOrBirthCertificateSearch from '@/components/NidOrBirthCertificate';
+import Link from 'next/link';
 
 export default function InterviewStepTwo() {
   const [candidates, setCandidates] = useState([]);
@@ -184,6 +185,13 @@ export default function InterviewStepTwo() {
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
             <h1 className="text-2xl font-bold text-gray-900">ADMIN (SELECTION)</h1>
+            <h1 className="text-xs text-gray-600 text-center">
+                
+                <Link href="/admin/iep-interview/2nd-step/report" className="text-blue-600 font-medium hover:underline text-sm">
+                  PDF
+                </Link>
+              </h1>
+            
             
             {/* --- Date Filter UI --- */}
             <div className="flex items-center gap-2">
