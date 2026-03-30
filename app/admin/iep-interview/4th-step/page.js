@@ -325,7 +325,21 @@ export default function AdminInterviewForm() {
               )}
 
               {formData.result === 'FAILED' && (
-                <input type="text" name="canceledReason" value={formData.canceledReason} onChange={handleChange} placeholder="Rejection Reason" className="w-full p-2 mt-4 border border-red-300 rounded" required />
+                <select
+                  name="canceledReason"
+                  value={formData.canceledReason}
+                  onChange={handleChange}
+                  className="w-full p-2 mt-4 border border-red-300 rounded bg-white"
+                  required
+                >
+                  <option value="">Select Rejection Reason</option>
+                  <option value="A">A</option>
+                  <option value="B">B</option>
+                  <option value="C">C</option>
+                  <option value="D">D</option>
+                  <option value="E">E</option>
+                  <option value="F">F</option>
+                </select>
               )}
             </div>
 

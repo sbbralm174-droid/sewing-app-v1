@@ -83,6 +83,19 @@ export default function VivaInterviewStep1() {
     checkNidExists();
   }, [formData.nid]);
 
+
+
+  //failor reason
+
+  const failureReasons = [
+  "A",
+  "B",
+  "C",
+  "D",
+  "E",
+  "F"
+];
+
   // Extract from XML style
   function extractFromXML(input) {
     const nidMatch = input.match(/<pin>(.*?)<\/pin>/);
@@ -931,15 +944,20 @@ export default function VivaInterviewStep1() {
                   Failure Reason:
                   <span className="text-red-500 ml-1">*</span>
                 </label>
-                <textarea
+                <select
                   name="failureReason"
                   value={formData.failureReason}
                   onChange={handleChange}
-                  rows="3"
-                  className="w-full p-3 rounded-md border border-red-300 bg-white text-gray-900 focus:ring-2 focus:ring-red-500 focus:border-transparent text-base"
-                  placeholder="Explain why the candidate failed..."
-                  required
-                />
+                  className="w-full p-3 rounded-md border border-red-300 bg-white text-gray-900 focus:ring-2 focus:ring-red-500"
+                >
+                  <option value="">-- Select Failure Reason --</option>
+
+                  {failureReasons.map((reason, index) => (
+                    <option key={index} value={reason}>
+                      {reason}
+                    </option>
+                  ))}
+                </select>
                 {formErrors.failureReason && (
                   <div className="mt-1 text-red-600 text-sm">{formErrors.failureReason}</div>
                 )}

@@ -52,6 +52,22 @@ const distDropdownRef = useRef(null); // ডিস্ট্রিক্টের
 
 
 
+
+
+
+
+const FAILURE_REASONS = [
+  "A",
+  "B",
+  "C",
+  "D",
+  "E",
+  "F"
+];
+
+
+
+
   // Outside click handle
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -88,9 +104,6 @@ const distDropdownRef = useRef(null); // ডিস্ট্রিক্টের
   document.addEventListener('mousedown', handleClickOutside);
   return () => document.removeEventListener('mousedown', handleClickOutside);
 }, []);
-
-
-
 
 const filteredDistricts = DISTRICTS.filter(d => 
   d.toLowerCase().includes(distSearchTerm.toLowerCase())
@@ -418,7 +431,19 @@ const filteredDistricts = DISTRICTS.filter(d =>
           {showReasonInput && (
             <div className="mb-4 p-4 bg-red-50 rounded-lg border border-red-200">
               <label className="block text-sm font-medium text-red-700 mb-2">Reason for Failure *</label>
-              <textarea id="failureReason" value={failureReason} onChange={(e) => setFailureReason(e.target.value)} className="w-full px-3 py-2 border border-red-300 rounded-md mb-3" rows="2" />
+              <select
+                id="failureReason"
+                value={failureReason}
+                onChange={(e) => setFailureReason(e.target.value)}
+                className="w-full px-3 py-2 border border-red-300 rounded-md mb-3"
+              >
+                <option value="">Select Failure Reason</option>
+                {FAILURE_REASONS.map((reason, index) => (
+                  <option key={index} value={reason}>
+                    {reason}
+                  </option>
+                ))}
+              </select>
               <div className="flex gap-2">
                 <button onClick={() => handleResultUpdate('FAILED')} className="bg-red-600 text-white py-2 px-4 rounded-md">Confirm Failed</button>
                 <button onClick={() => setShowReasonInput(false)} className="bg-gray-500 text-white py-2 px-4 rounded-md">Cancel</button>

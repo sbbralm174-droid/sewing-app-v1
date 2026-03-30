@@ -190,24 +190,29 @@ export default function CandidateReport() {
                       </div>
                     </td>
                     <td className="px-4 py-2 text-center text-sm font-medium">
-                       <span className={getStepColor(candidate.steps[0]?.result)}>{candidate.steps[0]?.result}</span>
+                       <span className={getStepColor(candidate.steps[0]?.result)}>{candidate.steps[0]?.result}</span><br></br>
+                       <span className={getStepColor(candidate.steps[0]?.result)}>{candidate.steps[0]?.failureReason}</span>
                     </td>
                     <td className="px-4 py-2 text-center text-sm font-bold text-blue-700 bg-blue-50/30">
                       {candidate.floor || 'N/A'}
                     </td>
                     <td className="px-4 py-2 text-center text-sm font-medium">
-                       <span className={getStepColor(candidate.steps[1]?.result)}>{candidate.steps[1]?.result}</span>
+                       <span className={getStepColor(candidate.steps[1]?.result)}>{candidate.steps[1]?.result}</span><br></br>
+                       <span className={getStepColor(candidate.steps[1]?.result)}>{candidate.steps[1]?.failureReason}</span>
                     </td>
                     <td className="px-4 py-2 text-center text-sm">
                       <div className="flex flex-col">
                         <span className={getStepColor(candidate.steps[2]?.result)}>{candidate.steps[2]?.result}</span>
+                        <br></br>
+                       <span className={getStepColor(candidate.steps[2]?.result)}>{candidate.steps[2]?.failureReason}</span>
                         {candidate.steps[2]?.grade && (
                           <span className="text-xs font-bold text-purple-700 mt-1 px-1 bg-purple-50 rounded">Grade: {candidate.steps[2].grade}</span>
                         )}
                       </div>
                     </td>
                     <td className="px-4 py-2 text-center text-sm font-medium">
-                       <span className={getStepColor(candidate.steps[3]?.result)}>{candidate.steps[3]?.result}</span>
+                       <span className={getStepColor(candidate.steps[3]?.result)}>{candidate.steps[3]?.result}</span><br></br>
+                       <span className={getStepColor(candidate.steps[3]?.result)}>{candidate.steps[3]?.failureReason}</span>
                     </td>
                     <td className="px-4 py-2 text-center text-sm text-gray-700">Step {candidate.currentStep}</td>
                     <td className="px-4 py-2 text-center">
