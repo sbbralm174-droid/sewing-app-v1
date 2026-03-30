@@ -50,8 +50,13 @@ export default function BasicInfoSection({ formData, onChange }) {
             required
           >
             <option value="" disabled>Select Interviewer</option>
+            <option value="BOLAI_KUMAR">BOLAI KUMAR</option>
+            <option value="DIPOK_DAS">DIPOK DAS</option>
             <option value="MAHAFUZ">MAHAFUZ</option>
-            <option value="MUSTAKIM">MUSTAKIM</option>
+            <option value="MARUF">MARUF</option>
+            <option value="ZAKARIA">ZAKARIA</option>
+            <option value="RASHED">RASHED</option>
+            <option value="SOHEL">SOHEL</option>
           </select>
         </div>
 
