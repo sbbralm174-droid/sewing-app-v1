@@ -1,4 +1,3 @@
-// app/candidates/report/page.js
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -6,6 +5,7 @@ import { useState, useEffect } from 'react';
 export default function CandidateReport() {
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedFloor, setSelectedFloor] = useState('All');
   const [dateRange, setDateRange] = useState({
     startDate: '',
     endDate: ''
@@ -34,7 +34,6 @@ export default function CandidateReport() {
       setLoading(false);
     }
   };
-  console.log("reportData",reportData);
 
   const handleDateFilter = (e) => {
     e.preventDefault();
@@ -43,8 +42,25 @@ export default function CandidateReport() {
 
   const handleReset = () => {
     setDateRange({ startDate: '', endDate: '' });
+    setSelectedFloor('All');
     fetchReport();
   };
+
+  // Logic to filter candidates based on Floor
+  const filteredCandidates = reportData?.candidates?.filter(candidate => {
+    if (selectedFloor === 'All') return true;
+    return candidate.floor === selectedFloor;
+  }) || [];
+
+  // Recalculate Summary based on filtered results
+  const filteredSummary = {
+    total: filteredCandidates.length,
+    pending: filteredCandidates.filter(c => c.overallStatus === 'PENDING').length,
+    passed: filteredCandidates.filter(c => c.overallStatus === 'PASSED').length,
+    failed: filteredCandidates.filter(c => c.overallStatus === 'FAILED').length,
+  };
+
+  const uniqueFloors = ['All', ...new Set(reportData?.candidates?.map(c => c.floor).filter(Boolean))];
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -68,7 +84,7 @@ export default function CandidateReport() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-xl">Loading...</div>
+        <div className="text-xl font-semibold">Loading...</div>
       </div>
     );
   }
@@ -78,198 +94,133 @@ export default function CandidateReport() {
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold mt-15 text-gray-900 mb-8">Candidate Tracker</h1>
 
-        {/* Summary Section */}
-        {reportData?.summary && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center">
-                <div className="p-3 rounded-full bg-blue-100 text-blue-600">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                  </svg>
-                </div>
-                <div className="ml-4">
-                  <h2 className="text-sm font-medium text-gray-500">Total Candidates</h2>
-                  <p className="text-2xl font-semibold text-gray-900">{reportData.summary.total}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center">
-                <div className="p-3 rounded-full bg-yellow-100 text-yellow-600">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div className="ml-4">
-                  <h2 className="text-sm font-medium text-gray-500">Pending</h2>
-                  <p className="text-2xl font-semibold text-gray-900">{reportData.summary.pending}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center">
-                <div className="p-3 rounded-full bg-green-100 text-green-600">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div className="ml-4">
-                  <h2 className="text-sm font-medium text-gray-500">Passed</h2>
-                  <p className="text-2xl font-semibold text-gray-900">{reportData.summary.passed}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center">
-                <div className="p-3 rounded-full bg-red-100 text-red-600">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div className="ml-4">
-                  <h2 className="text-sm font-medium text-gray-500">Failed</h2>
-                  <p className="text-2xl font-semibold text-gray-900">{reportData.summary.failed}</p>
-                </div>
-              </div>
-            </div>
+        {/* Updated Summary Section */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
+            <h2 className="text-sm font-medium text-gray-500">Total Candidates</h2>
+            <p className="text-2xl font-bold text-gray-900">{filteredSummary.total}</p>
           </div>
-        )}
-
-        {/* Date Filter Section */}
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Filter by Date Range</h2>
-          <form onSubmit={handleDateFilter} className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-              <input
-                type="date"
-                value={dateRange.startDate}
-                onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-              <input
-                type="date"
-                value={dateRange.endDate}
-                onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="flex items-end gap-2">
-              <button
-                type="submit"
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                Apply Filter
-              </button>
-              <button
-                type="button"
-                onClick={handleReset}
-                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
-              >
-                Reset
-              </button>
-            </div>
-          </form>
+          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-500">
+            <h2 className="text-sm font-medium text-gray-500">Pending</h2>
+            <p className="text-2xl font-bold text-gray-900">{filteredSummary.pending}</p>
+          </div>
+          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
+            <h2 className="text-sm font-medium text-gray-500">Passed</h2>
+            <p className="text-2xl font-bold text-gray-900">{filteredSummary.passed}</p>
+          </div>
+          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-red-500">
+            <h2 className="text-sm font-medium text-gray-500">Failed</h2>
+            <p className="text-2xl font-bold text-gray-900">{filteredSummary.failed}</p>
+          </div>
         </div>
 
-        {/* Candidates Table */}
-        {/* Candidates Table */}
-<div className="bg-white rounded-lg shadow overflow-hidden">
-  <div className="overflow-x-auto">
-    <table className="min-w-full divide-y divide-gray-200">
-      <thead className="bg-gray-50">
-        <tr>
-          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">SL</th>
-          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Candidate</th>
-          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">SECURITY</th>
-          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">DOWN ADMIN</th>
-          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">IEP</th>
-          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">ADMIN</th>
-          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Current Step</th>
-          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-        </tr>
-      </thead>
-      <tbody className="bg-white divide-y divide-gray-200">
-{console.log("candidate",reportData)}
+        {/* Filter Section */}
+        <div className="bg-white rounded-lg shadow p-6 mb-8">
+          <div className="flex flex-col md:flex-row justify-between items-end gap-4">
+            <form onSubmit={handleDateFilter} className="flex flex-col sm:flex-row gap-4 flex-grow">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                <input
+                  type="date"
+                  value={dateRange.startDate}
+                  onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                <input
+                  type="date"
+                  value={dateRange.endDate}
+                  onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                />
+              </div>
+              <div className="flex items-end gap-2">
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Apply Filter</button>
+              </div>
+            </form>
 
-  {reportData?.candidates?.slice().reverse().map((candidate, index) => {
-    const stepResults = {};
-    candidate.steps.forEach(step => {
-      stepResults[step.step] = step.result;
-    });
+            <div className="w-full md:w-48">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Floor Filter</label>
+              <select 
+                value={selectedFloor}
+                onChange={(e) => setSelectedFloor(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md font-semibold text-blue-600"
+              >
+                {uniqueFloors.map(floor => (
+                  <option key={floor} value={floor}>{floor}</option>
+                ))}
+              </select>
+            </div>
+            
+            <button onClick={handleReset} className="px-4 py-2 bg-gray-600 text-white rounded-md">Reset</button>
+          </div>
+        </div>
 
-    return (
-      <tr key={candidate.candidateId} className="hover:bg-gray-50">
-        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{reportData.candidates.length - index}</td>
-        
-        <td className="px-4 py-2 whitespace-nowrap">
-  <div className="flex items-center space-x-2">
-    <img 
-      src={candidate.picture || '/default-avatar.png'} 
-      alt="avatar" 
-      className="w-8 h-8 rounded-full" 
-    />
-    <div className="flex flex-col">
-      <span className="text-sm font-medium text-gray-900">{candidate.candidateId}</span>
-      <span className="text-sm font-medium text-gray-900">{candidate.name}</span>
-      <span className="text-sm font-medium text-gray-900">{candidate.nid}</span>
-      
-    </div>
-  </div>
-</td>
-
-        {[1, 2, 3, 4].map(stepNum => {
-  const step = candidate.steps.find(s => s.step === stepNum);
-
-  return (
-    <td key={stepNum} className="px-4 py-2 text-center text-sm font-medium">
-      <div className="flex flex-col items-center">
-        <span className={getStepColor(step?.result || 'NOT_REACHED')}>
-          {step?.result || 'NOT REACHED'}
-        </span>
-        
-        {/* নিচে failure reason দেখানো হবে (যদি থাকে) */}
-        {step?.failureReason && (
-          <span className="text-xs text-red-500 mt-1">
-            ({step.failureReason})
-          </span>
-        )}
-      </div>
-    </td>
-  );
-})}
-
-        <td className="px-4 py-2 text-center text-sm text-gray-900">
-          Step {candidate.currentStep || '-'}
-        </td>
-
-        <td className="px-4 py-2 text-center">
-          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(candidate.overallStatus)}`}>
-            {candidate.overallStatus || 'PENDING'}
-          </span>
-        </td>
-      </tr>
-    );
-  })}
-</tbody>
-
-    </table>
-  </div>
-
-  {(!reportData?.candidates || reportData.candidates.length === 0) && (
-    <div className="text-center py-8 text-gray-500">
-      No candidates found for the selected date range.
-    </div>
-  )}
-</div>
-
+        {/* Table Section */}
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">SL</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Candidate</th>
+                  <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">SECURITY</th>
+                  <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase bg-blue-50">FLOOR</th>
+                  <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">DOWN ADMIN</th>
+                  <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">IEP</th>
+                  <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">ADMIN</th>
+                  <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Current Step</th>
+                  <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredCandidates.slice().reverse().map((candidate, index) => (
+                  <tr key={candidate.candidateId} className="hover:bg-gray-50">
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{filteredCandidates.length - index}</td>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        <img src={candidate.picture || '/default-avatar.png'} alt="avatar" className="w-8 h-8 rounded-full border" />
+                        <div className="flex flex-col">
+                          <span className="text-sm font-bold text-gray-900">{candidate.name}</span>
+                          <span className="text-xs text-gray-500">{candidate.nid ? candidate.nid : candidate.birthCertificate}</span>
+                          <span className="text-xs text-gray-500">{candidate.candidateId}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2 text-center text-sm font-medium">
+                       <span className={getStepColor(candidate.steps[0]?.result)}>{candidate.steps[0]?.result}</span>
+                    </td>
+                    <td className="px-4 py-2 text-center text-sm font-bold text-blue-700 bg-blue-50/30">
+                      {candidate.floor || 'N/A'}
+                    </td>
+                    <td className="px-4 py-2 text-center text-sm font-medium">
+                       <span className={getStepColor(candidate.steps[1]?.result)}>{candidate.steps[1]?.result}</span>
+                    </td>
+                    <td className="px-4 py-2 text-center text-sm">
+                      <div className="flex flex-col">
+                        <span className={getStepColor(candidate.steps[2]?.result)}>{candidate.steps[2]?.result}</span>
+                        {candidate.steps[2]?.grade && (
+                          <span className="text-xs font-bold text-purple-700 mt-1 px-1 bg-purple-50 rounded">Grade: {candidate.steps[2].grade}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2 text-center text-sm font-medium">
+                       <span className={getStepColor(candidate.steps[3]?.result)}>{candidate.steps[3]?.result}</span>
+                    </td>
+                    <td className="px-4 py-2 text-center text-sm text-gray-700">Step {candidate.currentStep}</td>
+                    <td className="px-4 py-2 text-center">
+                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full ${getStatusColor(candidate.overallStatus)}`}>
+                        {candidate.overallStatus}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   );

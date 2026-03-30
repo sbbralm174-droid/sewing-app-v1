@@ -78,7 +78,9 @@ export async function POST(request) {
       },
       
       // Floor information
-      floor: requestData.floor || '', // Add floor field
+      ...(requestData.result === 'PASSED' && {
+    floor: requestData.floor
+  }), // Add floor field
       
       // Additional fields
       otherInfo: requestData.otherInfo || '',

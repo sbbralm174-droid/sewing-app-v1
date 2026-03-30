@@ -1,4 +1,3 @@
-// components/operator-assessment/Mainassessment.js 
 'use client'
 import { useState, useEffect } from 'react'
 import Select from "react-select"
@@ -14,6 +13,8 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
   const [isSearching, setIsSearching] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
   const [isClient, setIsClient] = useState(false)
+  const [updateSuccess, setUpdateSuccess] = useState(false)
+  const [updateError, setUpdateError] = useState('')
 
   // Client-side detection
   useEffect(() => {
@@ -82,6 +83,9 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
     }
 
     setIsSearching(true)
+    setUpdateSuccess(false)
+    setUpdateError('')
+    
     try {
       const response = await fetch(`/api/iep-interview/update-iep-interview-ass-calculator/candidate?candidateId=${searchCandidateId}`)
       
@@ -121,6 +125,8 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
   const handleClearSearch = () => {
     setSearchCandidateId('')
     setSearchResults(null)
+    setUpdateSuccess(false)
+    setUpdateError('')
     if (candidateInfo) {
       initializeNewData()
     } else {
@@ -155,108 +161,163 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
     setOperatorName('')
     setSearchResults(null)
     setSearchCandidateId('')
+    setUpdateSuccess(false)
+    setUpdateError('')
     if (candidateInfo) {
       initializeNewData()
     }
   }
 
-  // Assessment আপডেট করার ফাংশন
-  const handleUpdateAssessment = async () => {
-    if (!assessmentData || !searchResults?.candidateId) {
-      alert('Please search for a candidate first and make changes to update')
-      return
-    }
-
-    const confirmUpdate = window.confirm('Are you sure you want to update this assessment? This will overwrite the existing assessment data.')
-    if (!confirmUpdate) return
-
-    setIsUpdating(true)
-    try {
-      // হিসাব করা রেজাল্ট তৈরি করুন
-      const calculatedResults = calculateResults(assessmentData)
-      
-      const calculateProcessCapacity = (processes) => {
-        const capacityData = {}
-        processes.forEach(process => {
-          if (process.processName && process.capacity) {
-            capacityData[process.processName] = Math.round(process.capacity)
-          }
-        })
-        return capacityData
-      }
-
-      const processCapacity = calculateProcessCapacity(calculatedResults.processes)
-      
-      const supplementaryMachinesData = {}
-      if (assessmentData.supplementaryMachines) {
-        assessmentData.supplementaryMachines.forEach(machine => {
-          if (machine.checked) {
-            supplementaryMachinesData[machine.name] = true
-          }
-        })
-      }
-      
-      const assessmentResult = {
-        candidateInfo: searchResults ? {
-          name: searchResults.name,
-          candidateId: searchResults.candidateId,
-          nid: searchResults.nid,
-          birthCertificate: searchResults.birthCertificate,
-          picture: searchResults.picture
-        } : null,
-        
-        operatorName: assessmentData.operatorName,
-        scores: {
-          machineScore: calculatedResults.scores.machineScore,
-          dopScore: calculatedResults.scores.dopScore,
-          practicalScore: calculatedResults.scores.practicalScore,
-          averageQualityScore: calculatedResults.scores.averageQualityScore,
-          educationScore: calculatedResults.scores.educationScore,
-          attitudeScore: calculatedResults.scores.attitudeScore,
-          totalScore: calculatedResults.scores.totalScore
-        },
-        finalAssessment: {
-          grade: calculatedResults.finalAssessment.grade,
-          level: calculatedResults.finalAssessment.level,
-          designation: calculatedResults.finalAssessment.designation
-        },
-        processCapacity: processCapacity,
-        supplementaryMachines: supplementaryMachinesData,
-        rawData: assessmentData
-      }
-
-      // API কল করুন আপডেট করার জন্য
-      const response = await fetch('/api/iep-interview/update-assessment', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          candidateId: searchResults.candidateId,
-          assessmentData: assessmentResult
-        }),
-      })
-
-      const result = await response.json()
-
-      if (result.success) {
-        alert('Assessment updated successfully!')
-        
-        // রিফ্রেশ করে নতুন ডেটা লোড করুন
-        await handleSearchCandidate()
-        
-        // রেজাল্ট ভিউতে যান
-        setCurrentView('results')
-      } else {
-        throw new Error(result.message || 'Failed to update')
-      }
-    } catch (error) {
-      console.error('Error updating assessment:', error)
-      alert(`Failed to update assessment: ${error.message}`)
-    } finally {
-      setIsUpdating(false)
-    }
+  // Assessment আপডেট করার ফাংশন - UPDATED with better error handling
+  // Assessment আপডেট করার ফাংশন - UPDATED with proper result calculation
+const handleUpdateAssessment = async () => {
+  if (!assessmentData || !searchResults?.candidateId) {
+    alert('Please search for a candidate first and make changes to update')
+    return
   }
+
+  // Validate that there are processes with data
+  const hasValidProcesses = assessmentData.processes.some(
+    process => process.processName && process.processName.trim() !== ''
+  )
+
+  if (!hasValidProcesses) {
+    alert('Please add at least one process with a valid process name before updating')
+    return
+  }
+
+  const confirmUpdate = window.confirm('Are you sure you want to update this assessment? This will overwrite the existing assessment data.')
+  if (!confirmUpdate) return
+
+  setIsUpdating(true)
+  setUpdateSuccess(false)
+  setUpdateError('')
+
+  try {
+    // প্রথমে计算结果 করুন - এইটাই সবচেয়ে গুরুত্বপূর্ণ
+    console.log('Calculating results from assessment data:', assessmentData);
+    
+    // ক্যালকুলেট রেজাল্ট বের করুন
+    const calculatedResults = calculateResults(assessmentData)
+    
+    console.log('Calculated results:', calculatedResults);
+
+    // প্রতিটি প্রসেসের জন্য capacity বের করুন
+    const calculateProcessCapacity = (processes) => {
+      const capacityData = {}
+      processes.forEach(process => {
+        if (process.processName && process.capacity) {
+          capacityData[process.processName] = Math.round(process.capacity)
+        }
+      })
+      return capacityData
+    }
+
+    const processCapacity = calculateProcessCapacity(calculatedResults.processes)
+    
+    // Supplementary machines ডেটা তৈরি করুন
+    const supplementaryMachinesData = {}
+    if (assessmentData.supplementaryMachines) {
+      assessmentData.supplementaryMachines.forEach(machine => {
+        if (machine.checked) {
+          supplementaryMachinesData[machine.name] = true
+        }
+      })
+    }
+    
+    // সম্পূর্ণ assessmentResult তৈরি করুন - এখানে সব计算结果 সঠিকভাবে সংরক্ষণ করুন
+    const assessmentResult = {
+      candidateInfo: searchResults ? {
+        name: searchResults.name,
+        candidateId: searchResults.candidateId,
+        nid: searchResults.nid,
+        birthCertificate: searchResults.birthCertificate,
+        picture: searchResults.picture,
+        floor: searchResults.floor,
+        homeDistrict: searchResults.homeDistrict
+      } : null,
+      
+      operatorName: assessmentData.operatorName,
+      
+      // ✅ স্কোর গুলো সঠিকভাবে সংরক্ষণ করুন
+      scores: {
+        machineScore: calculatedResults.scores.machineScore,
+        dopScore: calculatedResults.scores.dopScore,
+        practicalScore: calculatedResults.scores.practicalScore,
+        averageQualityScore: calculatedResults.scores.averageQualityScore,
+        educationScore: calculatedResults.scores.educationScore,
+        attitudeScore: calculatedResults.scores.attitudeScore,
+        totalScore: calculatedResults.scores.totalScore
+      },
+      
+      // ✅ ফাইনাল অ্যাসেসমেন্ট সঠিকভাবে সংরক্ষণ করুন
+      finalAssessment: {
+        grade: calculatedResults.finalAssessment.grade,
+        level: calculatedResults.finalAssessment.level,
+        designation: calculatedResults.finalAssessment.designation
+      },
+      
+      // ✅ প্রসেস ক্যাপাসিটি সংরক্ষণ করুন
+      processCapacity: processCapacity,
+      
+      // ✅ সাপ্লিমেন্টারি মেশিন সংরক্ষণ করুন
+      supplementaryMachines: supplementaryMachinesData,
+      
+      // ✅ র ডেটা সংরক্ষণ করুন
+      rawData: assessmentData,
+      
+      // ✅ ক্যালকুলেটেড প্রসেস ডেটাও সংরক্ষণ করুন (ঐচ্ছিক)
+      calculatedProcesses: calculatedResults.processes,
+      
+      updatedAt: new Date().toISOString()
+    }
+
+    console.log('Sending to API:', {
+      candidateId: searchResults.candidateId,
+      assessmentData: assessmentResult
+    });
+
+    // API কল করুন আপডেট করার জন্য
+    const response = await fetch('/api/iep-interview/update-assessment', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        candidateId: searchResults.candidateId,
+        assessmentData: assessmentResult
+      }),
+    })
+
+    const result = await response.json()
+    console.log('API Response:', result);
+
+    if (result.success) {
+      setUpdateSuccess(true)
+      
+      // আপডেট হওয়া ডেটা পুনরায় সার্চ করে লোড করুন
+      await handleSearchCandidate()
+      
+      // রেজাল্ট ভিউতে যান
+      setCurrentView('results')
+      
+      // Auto-hide success message after 3 seconds
+      setTimeout(() => {
+        setUpdateSuccess(false)
+      }, 3000)
+
+      alert('Assessment updated successfully!')
+    } else {
+      throw new Error(result.message || 'Failed to update')
+    }
+  } catch (error) {
+    console.error('Error updating assessment:', error)
+    setUpdateError(error.message)
+    alert(`Failed to update assessment: ${error.message}`)
+  } finally {
+    setIsUpdating(false)
+  }
+}
 
   // Assessment সম্পূর্ণ হলে parent component কে ডেটা পাঠানো
   const handleUseAssessment = () => {
@@ -290,7 +351,9 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
           candidateId: searchResults?.candidateId || candidateInfo?.candidateId,
           nid: searchResults?.nid || candidateInfo?.nid,
           birthCertificate: searchResults?.birthCertificate || candidateInfo?.birthCertificate,
-          picture: searchResults?.picture || candidateInfo?.picture
+          picture: searchResults?.picture || candidateInfo?.picture,
+          floor: searchResults?.floor || candidateInfo?.floor,
+          homeDistrict: searchResults?.homeDistrict || candidateInfo?.homeDistrict
         } : null,
         
         operatorName: assessmentData.operatorName,
@@ -403,6 +466,25 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
         </div>
       </div>
 
+      {/* Success/Error Messages */}
+      {updateSuccess && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative">
+            <strong className="font-bold">Success!</strong>
+            <span className="block sm:inline"> Assessment updated successfully.</span>
+          </div>
+        </div>
+      )}
+
+      {updateError && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+            <strong className="font-bold">Error!</strong>
+            <span className="block sm:inline"> {updateError}</span>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {currentView === 'data-entry' ? (
@@ -438,7 +520,7 @@ export default function MainAssessment({ onAssessmentComplete, candidateInfo }) 
   )
 }
 
-// Data Entry Component - UPDATED with hydration fix
+// Data Entry Component - UPDATED with better form handling
 function DataEntry({ 
   onSave, 
   onCancel, 
@@ -607,26 +689,25 @@ function DataEntry({
   }
 
   const addProcess = () => {
-  const lastProcess =
-    formData.processes[formData.processes.length - 1]
+    const lastProcess =
+      formData.processes[formData.processes.length - 1]
 
-  setFormData({
-    ...formData,
-    processes: [
-      ...formData.processes,
-      {
-        machineType: lastProcess?.machineType || 'SNLS/DNLS',
-        processName: '',
-        dop: '',
-        smv: 0,
-        cycleTimes: [0, 0, 0, 0, 0],
-        qualityStatus: lastProcess?.qualityStatus || 'No Defect',
-        remarks: ''
-      }
-    ]
-  })
-}
-
+    setFormData({
+      ...formData,
+      processes: [
+        ...formData.processes,
+        {
+          machineType: lastProcess?.machineType || 'SNLS/DNLS',
+          processName: '',
+          dop: '',
+          smv: 0,
+          cycleTimes: [0, 0, 0, 0, 0],
+          qualityStatus: lastProcess?.qualityStatus || 'No Defect',
+          remarks: ''
+        }
+      ]
+    })
+  }
 
   const removeProcess = (index) => {
     const updatedProcesses = formData.processes.filter((_, i) => i !== index)
@@ -651,6 +732,17 @@ function DataEntry({
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    
+    // Validate that at least one process has data
+    const hasValidProcesses = formData.processes.some(
+      process => process.processName && process.processName.trim() !== ''
+    )
+
+    if (!hasValidProcesses) {
+      alert('Please add at least one process before calculating results')
+      return
+    }
+
     onSave(formData)
   }
 
@@ -715,9 +807,6 @@ function DataEntry({
               >
                 {isUpdating ? 'Updating...' : 'Update Assessment'}
               </button>
-              {/* <p className="text-xs text-gray-500 mt-1">
-                Click to save changes to database
-              </p> */}
             </div>
           )}
         </div>
@@ -860,7 +949,7 @@ function DataEntry({
             </button>
           </div>
 
-          <div className="">
+          <div className="overflow-x-auto">
             <table className="min-w-full bg-white border border-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -1030,13 +1119,27 @@ function DataEntry({
 }
 
 // Assessment Results Component
+// Assessment Results Component - Update to show all data
 function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment, candidateInfo }) {
   const [calculatedResults, setCalculatedResults] = useState(null)
 
   useEffect(() => {
     if (assessmentData) {
-      const results = calculateResults(assessmentData)
-      setCalculatedResults(results)
+      // প্রথমে চেক করুন assessmentData এর মধ্যে কি আছে
+      console.log('Assessment Data in Results:', assessmentData);
+      
+      // যদি assessmentData তে সরাসরি scores থাকে, তাহলে সেগুলো ব্যবহার করুন
+      if (assessmentData.scores && assessmentData.finalAssessment) {
+        setCalculatedResults({
+          processes: assessmentData.calculatedProcesses || [],
+          scores: assessmentData.scores,
+          finalAssessment: assessmentData.finalAssessment
+        });
+      } else {
+        // না থাকলে পুনরায় ক্যালকুলেট করুন
+        const results = calculateResults(assessmentData)
+        setCalculatedResults(results)
+      }
     }
   }, [assessmentData])
 
@@ -1051,6 +1154,8 @@ function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment,
     )
   }
 
+  // বাকি কোড unchanged...
+  
   return (
     <div>
       {/* Candidate Info Card */}
@@ -1158,7 +1263,7 @@ function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment,
         </div>
       )}
 
-      {/* Final Assessment */}
+      {/* Final Assessment - এখানে calculatedResults থেকে দেখাবেন */}
       <div className="bg-white shadow-md rounded-lg p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Final Assessment</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4 mb-6">
@@ -1236,200 +1341,154 @@ function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment,
     </div>
   )
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // Helper function for calculations
 function calculateResults(data) {
-
-
   const processesWithCalculations = data.processes.map(process => {
-  const processName = process.processName
-  const machine = process.machineType
+    const processName = process.processName
+    const machine = process.machineType
 
-  const validCycleTimes = process.cycleTimes.filter(time => time > 0)
-  const avgCycleTime = validCycleTimes.length > 0
-    ? validCycleTimes.reduce((a, b) => a + b, 0) / validCycleTimes.length
-    : 0
+    const validCycleTimes = process.cycleTimes.filter(time => time > 0)
+    const avgCycleTime = validCycleTimes.length > 0
+      ? validCycleTimes.reduce((a, b) => a + b, 0) / validCycleTimes.length
+      : 0
 
-  const target = 60 / process.smv
-  const capacity = 3600 / avgCycleTime
-  const performance = (capacity / target) * 100
+    const target = 60 / process.smv
+    const capacity = 3600 / avgCycleTime
+    const performance = (capacity / target) * 100
 
-  let practicalMarks = 0
+    let practicalMarks = 0
 
-  // SNLS special conditions list
-  const fourProcessAndMachine = [
-    { name: "Pocket-join-(Kangaro)", minCapacity: 85, machine: "SNLS/DNLS" },
-    { name: "Placket-box", minCapacity: 90, machine: "SNLS/DNLS" },
-    { name: "Zipper-join(2nd)", minCapacity: 60, machine: "SNLS/DNLS" },
-    { name: "Back-neck-tape-top-stitch-insert-label", minCapacity: 120, machine: "SNLS/DNLS" },
-    { name: "Placket-join", minCapacity: 86, machine: "SNLS/DNLS" },
-    { name: "Zipper-top-stitch(both-side 1/4 t/s)", minCapacity: 71, machine: "SNLS/DNLS" },
-  ]
+    // SNLS special conditions list
+    const fourProcessAndMachine = [
+      { name: "Pocket-join-(Kangaro)", minCapacity: 85, machine: "SNLS/DNLS" },
+      { name: "Placket-box", minCapacity: 90, machine: "SNLS/DNLS" },
+      { name: "Zipper-join(2nd)", minCapacity: 60, machine: "SNLS/DNLS" },
+      { name: "Back-neck-tape-top-stitch-insert-label", minCapacity: 120, machine: "SNLS/DNLS" },
+      { name: "Placket-join", minCapacity: 86, machine: "SNLS/DNLS" },
+      { name: "Zipper-top-stitch(both-side 1/4 t/s)", minCapacity: 71, machine: "SNLS/DNLS" },
+    ]
 
-  // -------------------------------
-  //     SNLS/DNLS CUSTOM LOGIC
-  // -------------------------------
-  if (machine === "SNLS/DNLS") {
-    const snlsProcesses = data.processes.filter(p => p.machineType === "SNLS/DNLS")
-    let passedCount = 0
+    // -------------------------------
+    //     SNLS/DNLS CUSTOM LOGIC
+    // -------------------------------
+    if (machine === "SNLS/DNLS") {
+      const snlsProcesses = data.processes.filter(p => p.machineType === "SNLS/DNLS")
+      let passedCount = 0
 
-    fourProcessAndMachine.forEach(fp => {
-      const match = snlsProcesses.find(p => p.processName === fp.name)
-      if (match) {
-        const validCT = match.cycleTimes.filter(t => t > 0)
-        const avgCT = validCT.reduce((a, b) => a + b, 0) / validCT.length
-        const cap = 3600 / avgCT
+      fourProcessAndMachine.forEach(fp => {
+        const match = snlsProcesses.find(p => p.processName === fp.name)
+        if (match) {
+          const validCT = match.cycleTimes.filter(t => t > 0)
+          const avgCT = validCT.reduce((a, b) => a + b, 0) / validCT.length
+          const cap = 3600 / avgCT
 
-        if (cap >= fp.minCapacity) passedCount++
+          if (cap >= fp.minCapacity) passedCount++
+        }
+      })
+
+      if (passedCount === 4) practicalMarks = 100
+      else if (passedCount === 3) practicalMarks = 78
+      else if (passedCount === 2) practicalMarks = 61
+      else if (passedCount === 1) practicalMarks = 60
+      else practicalMarks = 40
+    }
+
+    // -------------------------------
+    //     NEW: Over Lock CONDITION
+    // -------------------------------
+    else if (machine === "Over Lock") {
+
+      // BASE SCORING
+      if (processName.toLowerCase() === "neck-join" || processName.toLowerCase() === "neck join") {
+        if (capacity > 150) practicalMarks = 100
+        else if (capacity >= 120) practicalMarks = 80
+        else if (capacity >= 100) practicalMarks = 60
+        else if (capacity >= 80) practicalMarks = 50
+        else practicalMarks = 0
       }
-    })
+      else {
+        if (capacity > 80) practicalMarks = 90
+        else if (capacity >= 70) practicalMarks = 60
+        else if (capacity >= 60) practicalMarks = 50
+        else practicalMarks = 0
+      }
 
-    if (passedCount === 4) practicalMarks = 100
-    else if (passedCount === 3) practicalMarks = 78
-    else if (passedCount === 2) practicalMarks = 61
-    else if (passedCount === 1) practicalMarks = 60
-    else practicalMarks = 40
-  }
-
-  // -------------------------------
-  //     NEW: Over Lock CONDITION
-  // -------------------------------
-  else if (machine === "Over Lock") {
-
-    // BASE SCORING
-    if (processName.toLowerCase() === "neck-join" || processName.toLowerCase() === "neck join") {
-      if (capacity > 150) practicalMarks = 100
-      else if (capacity >= 120) practicalMarks = 80
-      else if (capacity >= 100) practicalMarks = 60
-      else if (capacity >= 80) practicalMarks = 50
-      else practicalMarks = 0
+      // EXTRA BONUS MARKS FOR OVER LOCK MACHINES
+      const overLockProcesses = data.processes.filter(p => p.machineType === "Over Lock")
+      const extraCount = overLockProcesses.length - 2
+      
+      if (extraCount > 0) {
+        practicalMarks += extraCount * 3.3
+      }
     }
+
+    // -------------------------------
+    //     NEW: Flat Lock CONDITION
+    // -------------------------------
+    else if (machine === "Flat Lock") {
+      
+      // Check for Sleeve-hem-Mora condition
+      const hasSleeveHemMora = data.processes.some(p => 
+        p.processName.toLowerCase().includes("sleeve-hem-mora") || 
+        p.processName.toLowerCase().includes("sleeve hem mora")
+      )
+      
+      // Count Flat Lock processes excluding Sleeve-hem-Mora
+      const flatLockProcesses = data.processes.filter(p => 
+        p.machineType === "Flat Lock" && 
+        !(p.processName.toLowerCase().includes("sleeve-hem-mora") || 
+          p.processName.toLowerCase().includes("sleeve hem mora"))
+      )
+      
+      // Calculate extra marks if condition meets
+      let extraMarks = 0
+      if (hasSleeveHemMora && flatLockProcesses.length > 0) {
+        extraMarks = flatLockProcesses.length * 7.5
+      }
+
+      // BASE SCORING
+      if (processName.toLowerCase() === "bottom-hem") {
+        if (capacity > 220) practicalMarks = 100
+        else if (capacity >= 200) practicalMarks = 80
+        else if (capacity >= 180) practicalMarks = 60
+        else if (capacity >= 160) practicalMarks = 50
+        else practicalMarks = 0
+      }
+      else {
+        if (capacity > 119) practicalMarks = 80
+        else if (capacity >= 100) practicalMarks = 60
+        else if (capacity >= 90) practicalMarks = 50
+        else practicalMarks = 0
+      }
+      
+      // ADD EXTRA MARKS FOR FLAT LOCK PROCESSES
+      practicalMarks += extraMarks
+    }
+
+    // -------------------------------
+    //     DEFAULT PERFORMANCE SYSTEM
+    // -------------------------------
     else {
-      if (capacity > 80) practicalMarks = 90
-      else if (capacity >= 70) practicalMarks = 60
-      else if (capacity >= 60) practicalMarks = 50
+      if (performance > 90) practicalMarks = 85
+      else if (performance >= 80) practicalMarks = 80
+      else if (performance >= 70) practicalMarks = 70
+      else if (performance >= 60) practicalMarks = 60
+      else if (performance >= 50) practicalMarks = 50
       else practicalMarks = 0
     }
 
-    // EXTRA BONUS MARKS FOR OVER LOCK MACHINES
-    const overLockProcesses = data.processes.filter(p => p.machineType === "Over Lock")
-    const extraCount = overLockProcesses.length - 2
-    
-    if (extraCount > 0) {
-      practicalMarks += extraCount * 3.3
+    // CAP LIMIT (optional)
+    if (practicalMarks > 100) practicalMarks = 100
+
+    return {
+      ...process,
+      avgCycleTime,
+      target,
+      capacity,
+      performance,
+      practicalMarks
     }
-
-  }
-
-  // -------------------------------
-  //     NEW: Flat Lock CONDITION
-  // -------------------------------
-  else if (machine === "Flat Lock") {
-    
-    // Check for Sleeve-hem-Mora condition
-    const hasSleeveHemMora = data.processes.some(p => 
-      p.processName.toLowerCase().includes("sleeve-hem-mora") || 
-      p.processName.toLowerCase().includes("sleeve hem mora")
-    )
-    
-    // Count Flat Lock processes excluding Sleeve-hem-Mora
-    const flatLockProcesses = data.processes.filter(p => 
-      p.machineType === "Flat Lock" && 
-      !(p.processName.toLowerCase().includes("sleeve-hem-mora") || 
-        p.processName.toLowerCase().includes("sleeve hem mora"))
-    )
-    
-    // Calculate extra marks if condition meets
-    let extraMarks = 0
-    if (hasSleeveHemMora && flatLockProcesses.length > 0) {
-      extraMarks = flatLockProcesses.length * 7.5
-    }
-
-    // BASE SCORING
-    if (processName.toLowerCase() === "bottom-hem") {
-      if (capacity > 220) practicalMarks = 100
-      else if (capacity >= 200) practicalMarks = 80
-      else if (capacity >= 180) practicalMarks = 60
-      else if (capacity >= 160) practicalMarks = 50
-      else practicalMarks = 0
-    }
-    else {
-      if (capacity > 119) practicalMarks = 80
-      else if (capacity >= 100) practicalMarks = 60
-      else if (capacity >= 90) practicalMarks = 50
-      else practicalMarks = 0
-    }
-    
-    // ADD EXTRA MARKS FOR FLAT LOCK PROCESSES
-    practicalMarks += extraMarks
-  }
-
-  // -------------------------------
-  //     DEFAULT PERFORMANCE SYSTEM
-  // -------------------------------
-  else {
-    if (performance > 90) practicalMarks = 85
-    else if (performance >= 80) practicalMarks = 80
-    else if (performance >= 70) practicalMarks = 70
-    else if (performance >= 60) practicalMarks = 60
-    else if (performance >= 50) practicalMarks = 50
-    else practicalMarks = 0
-  }
-
-  // CAP LIMIT (optional)
-  if (practicalMarks > 100) practicalMarks = 100
-
-  return {
-    ...process,
-    avgCycleTime,
-    target,
-    capacity,
-    performance,
-    practicalMarks
-  }
-})
-
-
+  })
 
   const processCapacitySingleNiddle = [
     { name: "Pocket-join-(Kangaro)", minCapacity: 90, machine: "SNLS/DNLS" },
@@ -1534,7 +1593,7 @@ function calculateResults(data) {
   const dopScoreCalculate = dopScores.length > 0 ? 
     Math.min(dopScores.reduce((sum, score) => sum + score, 0) / dopScores.length) : 0
   const dopScore = dopScoreCalculate * 0.20
-// console.log("DOP Score:", dopScores)
+
   // Practical Score Calculation
   const totalPractical = processesWithCalculations.reduce(
     (sum, process) => sum + process.practicalMarks,

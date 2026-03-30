@@ -1,11 +1,39 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Header from '@/components/daily-production/Header';
 import ProductionForm from '@/components/daily-production/ProductionForm';
 import ScanInput from '@/components/daily-production/ScanInput';
 import ProductionTable from '@/components/daily-production/ProductionTable';
 import { Html5QrcodeScanner } from 'html5-qrcode';
+
+// Toast কম্পোনেন্ট
+const Toast = ({ message, type, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose();
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const bgColor = {
+    success: 'bg-green-500',
+    error: 'bg-red-500',
+    warning: 'bg-yellow-500',
+    info: 'bg-blue-500'
+  }[type] || 'bg-gray-500';
+
+  return (
+    <div className={`fixed top-20 right-4 z-50 ${bgColor} text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-slideIn`}>
+      {type === 'success' && '✅'}
+      {type === 'error' && '❌'}
+      {type === 'warning' && '⚠️'}
+      {type === 'info' && 'ℹ️'}
+      <span>{message}</span>
+      <button onClick={onClose} className="ml-2 text-white hover:text-gray-200">✕</button>
+    </div>
+  );
+};
 
 export default function Home() {
   const [productionInfo, setProductionInfo] = useState(null);
@@ -13,6 +41,8 @@ export default function Home() {
   const [selectedRow, setSelectedRow] = useState(null);
   const [scanType, setScanType] = useState('operator');
   const [isMobileScannerOpen, setIsMobileScannerOpen] = useState(false);
+  const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
+  const [isSaving, setIsSaving] = useState(false);
   
   // API states
   const [buyers, setBuyers] = useState([]);
@@ -22,28 +52,17 @@ export default function Home() {
   const [supervisors, setSupervisors] = useState([]);
   const [breakdownFiles, setBreakdownFiles] = useState([]);
   const [loading, setLoading] = useState(true);
-  
-  // সেভ করার সময় লোডিং স্টেট
-  const [isSaving, setIsSaving] = useState(false);
-  
   const [filteredStyles, setFilteredStyles] = useState([]);
   
   const [formData, setFormData] = useState({
-    buyerId: '',
-    buyerName: '',
-    styleId: '',
-    styleName: '',
-    jobNo: '', 
-    breakdownProcessTitle: '',
-    breakdownProcess: '',
-    supervisorId: '',
-    supervisorName: '',
-    date: new Date().toISOString().split('T')[0],
-    floorId: '',
-    floorName: '',
-    lineId: '',
-    lineNumber: ''
+    buyerId: '', buyerName: '', styleId: '', styleName: '', jobNo: '', 
+    breakdownProcessTitle: '', breakdownProcess: '', supervisorId: '',
+    supervisorName: '', date: new Date().toISOString().split('T')[0],
+    floorId: '', floorName: '', lineId: '', lineNumber: ''
   });
+
+  const showToast = (message, type = 'info') => setToast({ show: true, message, type });
+  const hideToast = () => setToast({ show: false, message: '', type: 'info' });
 
   // মোবাইল স্ক্যানার কন্ট্রোল
   useEffect(() => {
@@ -53,34 +72,24 @@ export default function Home() {
         fps: 10,
         qrbox: { width: 250, height: 250 },
       });
-
       scanner.render((decodedText) => {
         handleScan(decodedText);
         setIsMobileScannerOpen(false);
         scanner.clear();
-      }, (error) => {
-        // console.warn(error);
-      });
+      }, (error) => {});
     }
-
-    return () => {
-      if (scanner) scanner.clear();
-    };
+    return () => { if (scanner) scanner.clear(); };
   }, [isMobileScannerOpen]);
 
+  // ডেটা ফেচিং
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         const [buyersRes, stylesRes, floorsRes, floorLinesRes, supervisorsRes, filesRes] = await Promise.all([
-          fetch('/api/buyers'),
-          fetch('/api/styles'),
-          fetch('/api/floors'),
-          fetch('/api/floor-lines'),
-          fetch('/api/supervisors'),
-          fetch('/api/excell-upload/files')
+          fetch('/api/buyers'), fetch('/api/styles'), fetch('/api/floors'),
+          fetch('/api/floor-lines'), fetch('/api/supervisors'), fetch('/api/excell-upload/files')
         ]);
-
         const buyersData = await buyersRes.json();
         const stylesData = await stylesRes.json();
         const floorsData = await floorsRes.json();
@@ -95,21 +104,16 @@ export default function Home() {
         setSupervisors(supervisorsData);
         if (filesData.success) setBreakdownFiles(filesData.data);
       } catch (error) {
-        console.error('Error fetching data:', error);
-      } finally {
-        setLoading(false);
-      }
+        showToast('Error fetching data', 'error');
+      } finally { setLoading(false); }
     };
     fetchData();
   }, []);
 
   useEffect(() => {
     if (formData.buyerId) {
-      const buyerStyles = styles.filter(style => style.buyerId._id === formData.buyerId);
-      setFilteredStyles(buyerStyles);
-    } else {
-      setFilteredStyles([]);
-    }
+      setFilteredStyles(styles.filter(style => style.buyerId._id === formData.buyerId));
+    } else { setFilteredStyles([]); }
   }, [formData.buyerId, styles]);
 
   const filteredLines = floorLines.filter(line => line.floor._id === formData.floorId);
@@ -139,48 +143,150 @@ export default function Home() {
   const handleFormSubmit = () => {
     const requiredFields = ['buyerId', 'styleId', 'floorId', 'lineId', 'supervisorId'];
     if (requiredFields.some(field => !formData[field])) {
-      alert("Please fill all required fields");
+      showToast("Please fill all required fields", 'warning');
       return;
     }
     setProductionInfo({ ...formData });
     setRows([]);
+    showToast("Production info saved! Now scan operators", 'success');
   };
 
-  const handleScan = (data) => {
+ const normalizeKeys = (obj) => {
+  const out = {};
+  Object.keys(obj).forEach(k => {
+    out[k.toLowerCase()] = obj[k];
+  });
+  return out;
+};
+
+const handleScan = (data) => {
+  if (!data || typeof data !== 'string') {
+    showToast('❌ No data received', 'error');
+    return;
+  }
+
+  const lines = data
+    .replace(/\r/g, '')
+    .split('\n')
+    .map(l => l.trim())
+    .filter(Boolean);
+
+  lines.forEach(line => {
+    let raw;
+
     try {
-      const parsedData = JSON.parse(data);
-      if (parsedData.type === 'operator') {
-        const isDuplicate = rows.some(row => row.operator?.operatorId === parsedData.operatorId);
-        if (isDuplicate) {
-          alert(`❌ Operator "${parsedData.name}" already exists`);
-          return;
-        }
-        const newRow = {
-          operator: { id: parsedData.id, operatorId: parsedData.operatorId, name: parsedData.name, designation: parsedData.designation || 'Operator' },
-          machine: null, process: '', breakdownProcess: '', smv: '', workAs: 'operator', target: '', isNew: true
-        };
-        setRows(prev => [...prev, newRow]);
-        setTimeout(() => setRows(prev => prev.map(r => ({ ...r, isNew: false }))), 1500);
-      }
-      if (parsedData.type === 'machine') {
-        const isMachineDuplicate = rows.some(row => row.machine?.uniqueId === parsedData.uniqueId);
-        if (isMachineDuplicate) { alert('Machine already exists'); return; }
-        let targetIndex = selectedRow !== null ? selectedRow : rows.findLastIndex(r => r.operator && !r.machine);
-        if (targetIndex === -1) { alert('Scan operator first'); return; }
-        setRows(prev => prev.map((row, i) => i === targetIndex ? { ...row, machine: { id: parsedData.id, uniqueId: parsedData.uniqueId, machineType: parsedData.machineType } } : row));
-        setSelectedRow(null);
-      }
-    } catch (err) { alert('Invalid QR Data Format'); }
-  };
-
-  const handleSaveToDatabase = async () => {
-    if (!productionInfo || rows.length === 0) {
-      alert('Missing data to save');
+      raw = JSON.parse(line);
+    } catch {
+      console.warn('Invalid JSON skipped:', line);
       return;
     }
 
-    // সেভিং শুরু
+    // 🔥 normalize key names
+    const parsed = normalizeKeys(raw);
+
+    /* ================= OPERATOR ================= */
+    if (parsed.type === 'operator') {
+      const operatorId = parsed.operatorid; // ✅ normalized
+      if (!operatorId) {
+        console.warn('Operator object:', parsed);
+        showToast('❌ Operator ID missing', 'error');
+        return;
+      }
+
+      setRows(prev => {
+        const exists = prev.some(
+          r => r.operator?.operatorId === operatorId
+        );
+
+        if (exists) {
+          showToast(`❌ Operator ${operatorId} already exists`, 'error');
+          return prev;
+        }
+
+        showToast(`✅ Operator ${operatorId} added`, 'success');
+
+        return [
+          ...prev,
+          {
+            operator: {
+              id: parsed.id,
+              operatorId,
+              name: parsed.name,
+              designation: 'Operator',
+            },
+            machine: null,
+            process: '',
+            breakdownProcess: '',
+            smv: '',
+            workAs: 'operator',
+            target: '',
+            isNew: true,
+          },
+        ];
+      });
+    }
+
+    /* ================= MACHINE ================= */
+    else if (parsed.type === 'machine') {
+      const uniqueId = parsed.uniqueid; // ✅ normalized
+      if (!uniqueId) {
+        console.warn('Machine object:', parsed);
+        showToast('❌ Machine ID missing', 'error');
+        return;
+      }
+
+      setRows(prev => {
+        const machineExists = prev.some(
+          r => r.machine?.uniqueId === uniqueId
+        );
+
+        if (machineExists) {
+          showToast('❌ Machine already assigned', 'error');
+          return prev;
+        }
+
+        const idx = [...prev]
+          .reverse()
+          .findIndex(r => r.operator && !r.machine);
+
+        if (idx === -1) {
+          showToast('⚠️ Scan operator first', 'warning');
+          return prev;
+        }
+
+        const realIndex = prev.length - 1 - idx;
+
+        showToast(`✅ Machine ${uniqueId} assigned`, 'success');
+
+        return prev.map((r, i) =>
+          i === realIndex
+            ? {
+                ...r,
+                machine: {
+                  id: parsed.id,
+                  uniqueId,
+                },
+              }
+            : r
+        );
+      });
+    }
+  });
+};
+
+
+
+  // ==========================================
+  // UPDATED SAVE FUNCTION (Bulk Support)
+  // ==========================================
+  const handleSaveToDatabase = async () => {
+    if (!productionInfo || rows.length === 0) {
+      showToast('Please add production info and scan operators first', 'warning');
+      return;
+    }
+
     setIsSaving(true);
+    showToast('Saving to database...', 'info');
 
     const dataToSave = {
       productionInfo: {
@@ -206,6 +312,7 @@ export default function Home() {
         operatorName: row.operator?.name || '',
         operatorDesignation: row.operator?.designation || 'Operator',
         machineUniqueId: row.machine?.uniqueId || '',
+        machineMongoId: row.machine?.id || '', // গুরুত্বপূর্ণ: এটি ব্যাকএন্ডে লাস্টস্ক্যান আপডেটে লাগে
         machineType: row.machine?.machineType || '',
         process: row.process || '',
         breakdownProcess: row.breakdownProcess || '',
@@ -223,30 +330,32 @@ export default function Home() {
       });
       const result = await response.json();
       if (result.success) {
-        alert(`✅ Saved Successfully! Total Manpower: ${rows.length}`);
+        showToast(`✅ Saved! ${result.savedCount || rows.length} operators processed.`, 'success');
         setRows([]);
         setProductionInfo(null);
       } else {
-        alert('Failed to save: ' + (result.message || 'Unknown error'));
+        showToast('Failed to save: ' + (result.message || 'Unknown error'), 'error');
       }
     } catch (error) {
-      alert('Error saving data to database');
-      console.error(error);
+      showToast('Error saving data to database', 'error');
     } finally {
-      // সেভিং শেষ (সাফল্য বা ব্যর্থতা যাই হোক)
       setIsSaving(false);
     }
   };
 
   return (
     <div className="min-h-screen mt-18 bg-gray-50">
+      {toast.show && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
+      <style jsx>{`
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .animate-slideIn { animation: slideIn 0.3s ease-out; }
+      `}</style>
+
       <Header />
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="space-y-6">
           <ProductionForm 
-            formData={formData} 
-            onFormChange={handleFormChange} 
-            onFormSubmit={handleFormSubmit}
+            formData={formData} onFormChange={handleFormChange} onFormSubmit={handleFormSubmit}
             buyers={buyers} filteredStyles={filteredStyles} floors={floors}
             filteredLines={filteredLines} supervisors={supervisors} breakdownFiles={breakdownFiles}
           />
@@ -256,22 +365,11 @@ export default function Home() {
               <div className="bg-white p-4 rounded-lg shadow flex flex-col md:flex-row items-center justify-between border-l-4 border-blue-500 gap-4">
                 <div className="flex items-center space-x-4">
                   <label className="text-lg font-bold text-gray-700">Total Manpower:</label>
-                  <input 
-                    type="number" 
-                    value={rows.length} 
-                    readOnly 
-                    className="w-24 p-2 text-center text-xl font-bold bg-blue-50 text-blue-700 border border-blue-200 rounded-md focus:outline-none"
-                  />
+                  <input type="number" value={rows.length} readOnly className="w-24 p-2 text-center text-xl font-bold bg-blue-50 text-blue-700 border border-blue-200 rounded-md focus:outline-none" />
                 </div>
-
-                <button 
-                  onClick={() => setIsMobileScannerOpen(!isMobileScannerOpen)}
-                  className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-indigo-700 flex items-center"
-                >
+                <button onClick={() => setIsMobileScannerOpen(!isMobileScannerOpen)} className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-indigo-700">
                   {isMobileScannerOpen ? "Close Camera" : "📸 Open Mobile Scanner"}
                 </button>
-
-                <p className="text-sm text-gray-500 italic hidden md:block">* Updates automatically as you scan operators</p>
               </div>
 
               {isMobileScannerOpen && (
@@ -281,7 +379,6 @@ export default function Home() {
               )}
 
               <ScanInput onScan={handleScan} disabled={!productionInfo} scanType={scanType} onScanTypeChange={setScanType} />
-              
               <ProductionTable 
                 rows={rows} productionInfo={productionInfo} selectedRow={selectedRow}
                 onRowSelect={setSelectedRow} onAddRow={() => setRows([...rows, { operator: null, machine: null, isNew: true }])}
@@ -293,21 +390,9 @@ export default function Home() {
                 <button
                   onClick={handleSaveToDatabase}
                   disabled={rows.length === 0 || isSaving}
-                  className={`px-8 py-3 text-white rounded-lg font-bold flex items-center gap-2 transition-all ${
-                    isSaving ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 shadow-lg'
-                  }`}
+                  className={`px-8 py-3 text-white rounded-lg font-bold flex items-center gap-2 transition-all ${isSaving ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 shadow-lg'}`}
                 >
-                  {isSaving ? (
-                    <>
-                      <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Saving to Database...
-                    </>
-                  ) : (
-                    `Save to Database (${rows.length})`
-                  )}
+                  {isSaving ? "Saving to Database..." : `Save to Database (${rows.length})`}
                 </button>
               </div>
             </>

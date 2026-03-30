@@ -36,6 +36,7 @@ export default function AdminInterviewPage() {
   });
 
   const floorOptions = [
+    { value: 'Select', label: 'Select Floor' },
     { value: 'ALL', label: 'All Floors' },
     { value: 'SHAPLA', label: 'Shapla' },
     { value: 'PODDO', label: 'Podddo' },
@@ -600,6 +601,7 @@ export default function AdminInterviewPage() {
                                     type="checkbox"
                                     id={`promote-${item._id}`}
                                     checked={editForm.promotedToOperator}
+                                    
                                     onChange={(e) => handleInputChange('promotedToOperator', e.target.checked)}
                                     className="h-4 w-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
                                   />

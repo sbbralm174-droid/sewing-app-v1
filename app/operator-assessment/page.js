@@ -3,8 +3,10 @@ import Mainassessment from '@/components/operator-assessment/Mainassessment'
 
 function page() {
   return (
-    <div>
-      <Mainassessment/>
+    <div >
+      <div className='mt-30'>
+        <Mainassessment/>
+      </div>
     </div>
   )
 }

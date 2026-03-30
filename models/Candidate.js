@@ -27,8 +27,11 @@ const candidateSchema = new mongoose.Schema({
   floor: {
   type: String,
   enum: ['SHAPLA', 'PODDO', 'KODOM', 'BELLY'],
-  required: true
+  required: function () {
+    return this.result === 'PASSED';
+  }
 },
+
   stepCompleted: {
     type: Number,
     default: 1

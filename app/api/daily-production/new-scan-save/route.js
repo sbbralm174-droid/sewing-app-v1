@@ -5,107 +5,41 @@ import Operator from '@/models/Operator';
 import mongoose from 'mongoose';
 
 export async function POST(request) {
-  console.log('\n================ API HIT ================');
-
   try {
     await connectDB();
-    console.log('✅ DB Connected');
-
     const data = await request.json();
     const { productionInfo, rows } = data;
 
-    // rows.length কেই manpower হিসেবে ধরা হচ্ছে যদি productionInfo তে না থাকে
-    const totalManpower = productionInfo.totalManpower || rows.length;
-
-    console.log('📦 ProductionInfo:', productionInfo);
-    console.log('📦 Rows length:', rows?.length);
-
     if (!productionInfo || !rows || rows.length === 0) {
-      console.log('❌ Missing productionInfo or rows');
-      return Response.json(
-        { success: false, message: 'Invalid payload' },
-        { status: 400 }
-      );
+      return Response.json({ success: false, message: 'Invalid payload' }, { status: 400 });
     }
 
-    // -------------------------
-    // Required field validation
-    // -------------------------
-    const requiredFields = [
-      'supervisor',
-      'floor',
-      'line',
-      'buyerId',
-      'styleId',
-      'supervisorId',
-      'floorId',
-      'lineId',
-      'jobNo',
-      'date'
-    ];
-
-    const missingFields = requiredFields.filter(f => !productionInfo[f]);
-    if (missingFields.length > 0) {
-      console.log('❌ Missing fields:', missingFields);
-      return Response.json(
-        { success: false, message: `Missing fields: ${missingFields.join(', ')}` },
-        { status: 400 }
-      );
-    }
-
-    // -------------------------
-    // ObjectId conversion
-    // -------------------------
-    const buyerId = new mongoose.Types.ObjectId(productionInfo.buyerId);
-    const styleId = new mongoose.Types.ObjectId(productionInfo.styleId);
-    const supervisorId = new mongoose.Types.ObjectId(productionInfo.supervisorId);
-    const floorId = new mongoose.Types.ObjectId(productionInfo.floorId);
-    const lineId = new mongoose.Types.ObjectId(productionInfo.lineId);
     const date = new Date(productionInfo.date);
+    
+    // ১. একবারে এই তারিখের সব বিদ্যমান প্রোডাকশন ডাটা নিয়ে আসা (Duplicate check-এর জন্য)
+    const existingEntries = await DailyProduction.find({ date }, 'operator.operatorId');
+    const existingOperatorIds = new Set(existingEntries.map(e => e.operator.operatorId));
 
     const dailyProductions = [];
-    const machineUpdates = [];
-    const operatorLastScanUpdates = [];
+    const machineBulkOps = [];
+    const operatorBulkOps = [];
 
-    // =========================
-    // MAIN ROW LOOP
-    // =========================
-    for (let index = 0; index < rows.length; index++) {
-      const row = rows[index];
-      console.log(`\n➡️ Processing row ${index + 1}`, row);
+    // ২. লুপের ভেতরে কোনো await নেই (High Speed Processing)
+    rows.forEach((row, index) => {
+      const operatorId = row.operatorId?.trim().toUpperCase();
+      if (!operatorId) return;
 
-      if (!row.operatorId) {
-        console.log('⚠️ operatorId missing, skipping row');
-        continue;
-      }
+      // ডুপ্লিকেট হলে স্কিপ করবে
+      if (existingOperatorIds.has(operatorId)) return;
 
-      const operatorId = row.operatorId.trim().toUpperCase();
-
-      // -------------------------
-      // Duplicate check
-      // -------------------------
-      const exists = await DailyProduction.findOne({
-        date,
-        'operator.operatorId': operatorId
-      });
-
-      if (exists) {
-        console.log(`⚠️ Duplicate DailyProduction for ${operatorId}`);
-        continue;
-      }
-
-      // -------------------------
-      // SMV Type
-      // -------------------------
+      // SMV Type নির্ধারণ
       let smvType = '';
       if (row.smv) {
         if (row.breakdownProcess?.trim()) smvType = 'breakdown';
         else if (row.process?.trim()) smvType = 'process';
       }
 
-      // -------------------------
-      // DailyProduction push
-      // -------------------------
+      // প্রোডাকশন ডাটা তৈরি
       dailyProductions.push({
         date,
         operator: {
@@ -124,122 +58,83 @@ export async function POST(request) {
         machineType: row.machineType || '',
         uniqueMachine: row.machineUniqueId || '',
         target: row.target ? parseInt(row.target) : 0,
-        buyerId,
-        totalManpower: totalManpower,
+        buyerId: new mongoose.Types.ObjectId(productionInfo.buyerId),
         buyerName: productionInfo.buyerName || '',
-        styleId,
+        styleId: new mongoose.Types.ObjectId(productionInfo.styleId),
         styleName: productionInfo.styleName || '',
-        supervisorId,
-        floorId,
-        lineId,
+        supervisorId: new mongoose.Types.ObjectId(productionInfo.supervisorId),
+        floorId: new mongoose.Types.ObjectId(productionInfo.floorId),
+        lineId: new mongoose.Types.ObjectId(productionInfo.lineId),
         workAs: row.workAs || 'operator',
         smv: row.smv?.toString() || '',
         smvType,
-        rowNo: index + 1,
-        hourlyProduction: [],
-        createdAt: new Date(),
-        updatedAt: new Date()
+        rowNo: index + 1
       });
 
-      // -------------------------
-      // Machine lastLocation update
-      // -------------------------
+      // মেশিন আপডেট প্রিপারেশন (Bulk Write)
       if (row.machineUniqueId?.trim()) {
-        console.log('🛠 Preparing machine update:', row.machineUniqueId);
-        machineUpdates.push({
-          uniqueId: row.machineUniqueId,
-          lastLocation: {
-            date,
-            line: lineId,
-            floor: floorId,
-            supervisor: productionInfo.supervisor,
-            updatedAt: new Date()
+        machineBulkOps.push({
+          updateOne: {
+            filter: { uniqueId: row.machineUniqueId },
+            update: {
+              $set: {
+                lastLocation: {
+                  date,
+                  line: new mongoose.Types.ObjectId(productionInfo.lineId),
+                  floor: new mongoose.Types.ObjectId(productionInfo.floorId),
+                  supervisor: productionInfo.supervisor,
+                  updatedAt: new Date()
+                }
+              }
+            }
           }
         });
       }
 
-      // -------------------------
-      // Operator lastScan update
-      // -------------------------
-      
-        console.log('🧠 Preparing operator lastScan for:', operatorId);
-        operatorLastScanUpdates.push({
-          operatorId,
-          lastScan: {
-            date,
-            machine: new mongoose.Types.ObjectId(row.machineMongoId),
-            floor: floorId,
-            line: lineId,
-            process: row.process || '',
-            breakdownProcess: row.breakdownProcess || ''
+      // অপারেটর আপডেট প্রিপারেশন (Bulk Write)
+      // row.operatorMongoId চেক করা হয়েছে যাতে ক্রাশ না করে
+      if (operatorId) {
+        const updateData = {
+          'lastScan.date': date,
+          'lastScan.floor': new mongoose.Types.ObjectId(productionInfo.floorId),
+          'lastScan.line': new mongoose.Types.ObjectId(productionInfo.lineId),
+          'lastScan.process': row.process || '',
+          'lastScan.breakdownProcess': row.breakdownProcess || ''
+        };
+
+        // যদি machineMongoId থাকে তবেই সেটি এড হবে
+        if (row.machineMongoId && mongoose.Types.ObjectId.isValid(row.machineMongoId)) {
+          updateData['lastScan.machine'] = new mongoose.Types.ObjectId(row.machineMongoId);
+        }
+
+        operatorBulkOps.push({
+          updateOne: {
+            filter: { operatorId: operatorId },
+            update: { $set: updateData }
           }
         });
-      
-        
-    }
-
-    console.log('\n📊 SUMMARY');
-    console.log('DailyProductions:', dailyProductions.length);
-    console.log('MachineUpdates:', machineUpdates.length);
-    console.log('OperatorLastScans:', operatorLastScanUpdates.length);
+      }
+    });
 
     if (dailyProductions.length === 0) {
-      return Response.json(
-        { success: false, message: 'No new production data' },
-        { status: 400 }
-      );
+      return Response.json({ success: false, message: 'All rows already exist or invalid' }, { status: 400 });
     }
 
-    // =========================
-    // SAVE DAILY PRODUCTION
-    // =========================
-    const savedProductions = await DailyProduction.insertMany(dailyProductions);
-    console.log('✅ DailyProduction saved:', savedProductions.length);
+    // ৩. ডাটাবেসে একবারে সব ডাটা পাঠানো (Bulk Execution)
+    const [savedResults] = await Promise.all([
+      DailyProduction.insertMany(dailyProductions),
+      machineBulkOps.length > 0 ? Machine.bulkWrite(machineBulkOps) : Promise.resolve(),
+      operatorBulkOps.length > 0 ? Operator.bulkWrite(operatorBulkOps) : Promise.resolve()
+    ]);
 
-    // =========================
-    // MACHINE UPDATE
-    // =========================
-    await Promise.allSettled(
-      machineUpdates.map(update =>
-        Machine.findOneAndUpdate(
-          { uniqueId: update.uniqueId },
-          { $set: { lastLocation: update.lastLocation } }
-        )
-      )
-    );
-    console.log('✅ Machine updates done');
-
-    // =========================
-    // OPERATOR LAST SCAN UPDATE
-    // =========================
-    const operatorResults = await Promise.allSettled(
-      operatorLastScanUpdates.map(op => {
-        console.log('🔄 Updating lastScan for operatorId:', op.operatorId);
-        return Operator.findOneAndUpdate(
-          { operatorId: op.operatorId },
-          { $set: { lastScan: op.lastScan } },
-          { new: true }
-        );
-      })
-    );
-
-    console.log('📊 Operator update results:', operatorResults);
-
-    return Response.json(
-      {
-        success: true,
-        message: 'Production saved, machine & operator lastScan updated',
-        saved: savedProductions.length,
-        operatorsUpdated: operatorResults.length
-      },
-      { status: 201 }
-    );
+    return Response.json({
+      success: true,
+      message: 'Successfully processed all records',
+      count: dailyProductions.length
+    }, { status: 201 });
 
   } catch (error) {
-    console.error('🔥 API ERROR:', error);
-    return Response.json(
-      { success: false, message: error.message },
-      { status: 500 }
-    );
+    console.error('🔥 CRITICAL ERROR:', error);
+    return Response.json({ success: false, message: error.message }, { status: 500 });
   }
 }

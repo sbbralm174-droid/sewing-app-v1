@@ -43,6 +43,15 @@ export default function InterviewStepTwo() {
   const [searchValue, setSearchValue] = useState('');
   const [searchKey, setSearchKey] = useState(0);
 
+
+ // --- District Searchable Dropdown States ---
+const [distSearchTerm, setDistSearchTerm] = useState('');
+const [isDistDropdownOpen, setIsDistDropdownOpen] = useState(false);
+const distDropdownRef = useRef(null); // ডিস্ট্রিক্টের জন্য আলাদা রেফ
+
+
+
+
   // Outside click handle
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -53,6 +62,39 @@ export default function InterviewStepTwo() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const DISTRICTS = [
+    "BARISHAL", "BHOLA", "JHALOKATHI", "PATUAKHALI", "PIROJPUR", "BARGUNA",
+    "CHATTOGRAM", "COX'S BAZAR", "RANGAMATI", "BANDARBAN", "KHAGRACHHARI", "FENI", "LAKSHMIPUR", "CUMILLA", "NOAKHALI", "BRAHMANBARIA",
+    "DHAKA", "GAZIPUR", "KISHOREGANJ", "MANIKGANJ", "MUNSHIGANJ", "NARAYANGANJ", "NARSINGDI", "TANGAIL", "FARIDPUR", "GOPALGANJ", "MADARIPUR", "RAJBARI", "SHARIATPUR",
+    "KHULNA", "BAGERHAT", "SATKHIRA", "JESHORE", "MAGURA", "JHENAIDAH", "NARAIL", "KUSHTIA", "CHUADANGA", "MEHERPUR",
+    "MYMENSINGH", "NETROKONA", "SHERPUR", "JAMALPUR",
+    "RAJSHAHI", "JOYPURHAT", "NAOGAON", "NATORE", "CHAPAINAWABGANJ", "PABNA", "SIRAJGANJ", "BOGURA",
+    "RANGPUR", "DINAJPUR", "KURIGRAM", "GAIBANDHA", "LALMONIRHAT", "NILPHAMARI", "PANCHAGARH", "THAKURGAON",
+    "SYLHET", "HABIGANJ", "MOULVIBAZAR", "SUNAMGANJ"
+  ].sort();
+
+
+  useEffect(() => {
+  const handleClickOutside = (event) => {
+    if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+      setIsDropdownOpen(false);
+    }
+    // District dropdown এর জন্য
+    if (distDropdownRef.current && !distDropdownRef.current.contains(event.target)) {
+      setIsDistDropdownOpen(false);
+    }
+  };
+  document.addEventListener('mousedown', handleClickOutside);
+  return () => document.removeEventListener('mousedown', handleClickOutside);
+}, []);
+
+
+
+
+const filteredDistricts = DISTRICTS.filter(d => 
+  d.toLowerCase().includes(distSearchTerm.toLowerCase())
+);
 
   // Fetch candidates when date changes
   useEffect(() => {
@@ -116,47 +158,64 @@ export default function InterviewStepTwo() {
   };
 
   const handleResultUpdate = async (resultValue) => {
-    if (!selectedCandidate) return;
-    if (resultValue === 'FAILED' && !failureReason.trim()) return;
+  if (!selectedCandidate) return;
 
-    try {
-      setLoading(true);
-      const requestData = {
-        candidateId: selectedCandidate,
-        result: resultValue,
-        name: selectedCandidateData.name,
-        nid: selectedCandidateData.nid,
-        birthCertificate: selectedCandidateData.birthCertificate,
-        picture: selectedCandidateData.picture,
-        homeDistrict,
-        chairmanCertificate,
-        educationCertificate,
-        experienceMachines,
-        designation,
-        floor,
-        otherInfo: otherInfo.trim(),
-        failureReason: resultValue === 'FAILED' ? failureReason : null
-      };
+  // যদি ফলাফল FAILED হয় এবং কারণ লেখা না থাকে, তবে রিটার্ন করবে
+  if (resultValue === 'FAILED' && !failureReason.trim()) {
+    alert("Please provide a reason for failure.");
+    return;
+  }
 
-      const response = await fetch('/api/iep-interview/iep-interview-down-admin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestData),
-      });
+  try {
+    setLoading(true);
+    const requestData = {
+      candidateId: selectedCandidate,
+      result: resultValue,
+      name: selectedCandidateData.name,
+      nid: selectedCandidateData.nid,
+      birthCertificate: selectedCandidateData.birthCertificate,
+      picture: selectedCandidateData.picture,
+      homeDistrict,
+      chairmanCertificate,
+      educationCertificate,
+      experienceMachines,
+      designation,
+      floor: resultValue === 'PASSED' ? floor : '',
+      otherInfo: otherInfo.trim(),
+      failureReason: resultValue === 'FAILED' ? failureReason : null
+    };
 
-      if (response.ok) {
-        setMessage(`Candidate successfully marked as ${resultValue}`);
-        setSelectedCandidate('');
-        setSelectedCandidateData(null);
-        setSearchTerm('');
-        fetchCandidates(); // Refresh list
-      }
-    } catch (error) {
-      setMessage('Network error');
-    } finally {
-      setLoading(false);
+    const response = await fetch('/api/iep-interview/iep-interview-down-admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestData),
+    });
+
+    if (response.ok) {
+      // ১. সাকসেস মেসেজ সেট করা
+      setMessage(`Candidate successfully marked as ${resultValue}`);
+      
+      // ২. সিলেক্টেড ক্যান্ডিডেট ডাটা ক্লিয়ার করা
+      setSelectedCandidate('');
+      setSelectedCandidateData(null);
+      setSearchTerm('');
+
+      // ৩. ফেইলড রিজন বক্সটি হাইড করা (এটি আপনার সমস্যার সমাধান)
+      setShowReasonInput(false); 
+      setFailureReason(''); // কারণটিও ক্লিয়ার করে দেওয়া ভালো
+
+      // ৪. ক্যান্ডিডেট লিস্ট রিফ্রেশ করা
+      fetchCandidates(); 
+    } else {
+      const errorData = await response.json();
+      setMessage(errorData.message || 'Failed to update candidate status');
     }
-  };
+  } catch (error) {
+    setMessage('Network error');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handlePassedButtonClick = () => handleResultUpdate('PASSED');
   const handleFailedButtonClick = () => {
@@ -168,16 +227,7 @@ export default function InterviewStepTwo() {
     `${c.candidateId} ${c.name} ${c.nid || ''}`.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const DISTRICTS = [
-    "BARISHAL", "BHOLA", "JHALOKATHI", "PATUAKHALI", "PIROJPUR", "BARGUNA",
-    "CHATTOGRAM", "COX'S BAZAR", "RANGAMATI", "BANDARBAN", "KHAGRACHHARI", "FENI", "LAKSHMIPUR", "CUMILLA", "NOAKHALI", "BRAHMANBARIA",
-    "DHAKA", "GAZIPUR", "KISHOREGANJ", "MANIKGANJ", "MUNSHIGANJ", "NARAYANGANJ", "NARSINGDI", "TANGAIL", "FARIDPUR", "GOPALGANJ", "MADARIPUR", "RAJBARI", "SHARIATPUR",
-    "KHULNA", "BAGERHAT", "SATKHIRA", "JESHORE", "MAGURA", "JHENAIDAH", "NARAIL", "KUSHTIA", "CHUADANGA", "MEHERPUR",
-    "MYMENSINGH", "NETROKONA", "SHERPUR", "JAMALPUR",
-    "RAJSHAHI", "JOYPURHAT", "NAOGAON", "NATORE", "CHAPAINAWABGANJ", "PABNA", "SIRAJGANJ", "BOGURA",
-    "RANGPUR", "DINAJPUR", "KURIGRAM", "GAIBANDHA", "LALMONIRHAT", "NILPHAMARI", "PANCHAGARH", "THAKURGAON",
-    "SYLHET", "HABIGANJ", "MOULVIBAZAR", "SUNAMGANJ"
-  ].sort();
+  
 
   return (
     <div className="min-h-screen bg-gray-50 mt-10 py-8">
@@ -257,10 +307,46 @@ export default function InterviewStepTwo() {
               
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Home District</label>
-                <select value={homeDistrict} onChange={(e) => setHomeDistrict(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md">
-                  <option value="">Select District</option>
-                  {DISTRICTS.map(dist => <option key={dist} value={dist}>{dist}</option>)}
-                </select>
+                <div className="mb-6 relative" ref={distDropdownRef}>
+  <label className="block text-sm font-medium text-gray-700 mb-2">Home District</label>
+  <input
+    type="text"
+    placeholder="Search district..."
+    value={homeDistrict || distSearchTerm}
+    onFocus={() => {
+      setIsDistDropdownOpen(true);
+      setDistSearchTerm(''); // ফোকাস করলে সার্চ ক্লিয়ার হবে যাতে সব দেখা যায়
+    }}
+    onChange={(e) => {
+      setDistSearchTerm(e.target.value);
+      setHomeDistrict(e.target.value); // টাইপ করার সময়ও স্টেট আপডেট হবে
+      setIsDistDropdownOpen(true);
+    }}
+    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500"
+  />
+  
+  {isDistDropdownOpen && (
+    <div className="absolute z-30 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-xl max-h-60 overflow-auto">
+      {filteredDistricts.length > 0 ? (
+        filteredDistricts.map(dist => (
+          <div 
+            key={dist} 
+            onClick={() => {
+              setHomeDistrict(dist);
+              setDistSearchTerm(dist);
+              setIsDistDropdownOpen(false);
+            }} 
+            className="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b last:border-none text-sm"
+          >
+            {dist}
+          </div>
+        ))
+      ) : (
+        <div className="p-3 text-center text-gray-500 text-sm">No district found</div>
+      )}
+    </div>
+  )}
+</div>
               </div>
 
               <div className="space-y-4">

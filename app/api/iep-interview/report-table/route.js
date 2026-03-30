@@ -66,12 +66,15 @@ export async function GET(request) {
             name: 'Candidate Screening',
             result: step2?.result || (step2 ? 'PENDING' : 'NOT_REACHED'),
             failureReason: step2?.failureReason || null,
+            floor: step2?.floor,
             date: step2?.createdAt
           },
           {
             step: 3,
             name: 'Viva Interview',
             result: step3?.result || (step3 ? 'PENDING' : 'NOT_REACHED'),
+            grade: step3?.grade ,
+            
             failureReason: step3?.canceledReason || null,
             date: step3?.createdAt
           },
@@ -111,6 +114,9 @@ export async function GET(request) {
           name: step1.name,
           nid: step1.nid,
           currentStep,
+          birthCertificate: step1.birthCertificate,
+          grade:step3?.grade,
+          floor: step2?.floor,
           overallStatus,
           steps,
           registeredDate: step1.createdAt
