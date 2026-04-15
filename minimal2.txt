@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>STUDIO — narrative chapters</title>
+  <style>
+    /* ---------- RESET & VARIABLES ---------- */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      cursor: none; /* NEW FEATURE: custom cursor base */
+    }
+
+    :root {
+      --bg-primary: #FDFCF8;
+      --bg-secondary: #F5F3EF;
+      --text-primary: #1A1A1A;
+      --text-secondary: #5A5A5A;
+      --text-muted: #8A8A8A;
+      --border-light: #E8E6E1;
+      --accent: #2C2C2C;
+      --accent-hover: #4A4A4A;
+      --transition-speed: 0.85s;
+      --container-max: 1280px;
+      
+      /* Dynamic background shifts per section (subtle) */
+      --bg-section-0: #FDFCF8;
+      --bg-section-1: #FBF9F5;
+      --bg-section-2: #F8F6F2;
+      --bg-section-3: #F5F3EF;
+      --bg-section-4: #F2F0EC;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-primary: #121212;
+        --bg-secondary: #1E1E1E;
+        --text-primary: #EDEDED;
+        --text-secondary: #B0B0B0;
+        --text-muted: #7A7A7A;
+        --border-light: #2C2C2C;
+        --accent: #DCDCDC;
+        --accent-hover: #F0F0F0;
+        --bg-section-0: #121212;
+        --bg-section-1: #151515;
+        --bg-section-2: #181818;
+        --bg-section-3: #1B1B1B;
+        --bg-section-4: #1E1E1E;
+      }
+    }
+
+    body {
+      font-family: system-ui, -apple-system, 'Inter', 'Helvetica Neue', sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* NEW FEATURE: Custom Cursor (minimal dot) */
+    .custom-cursor {
+      position: fixed;
+      width: 8px;
+      height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 10000;
+      transform: translate(-50%, -50%);
+      transition: width 0.2s ease, height 0.2s ease, background 0.2s ease;
+      mix-blend-mode: difference;
+      will-change: transform;
+    }
+    
+    .custom-cursor.hover-active {
+      width: 32px;
+      height: 32px;
+      background: rgba(44, 44, 44, 0.15);
+      mix-blend-mode: normal;
+    }
+    
+    .custom-cursor.view-active {
+      width: 56px;
+      height: 56px;
+      background: rgba(44, 44, 44, 0.9);
+      mix-blend-mode: normal;
+    }
+    
+    .custom-cursor.view-active::after {
+      content: "View";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+
+    /* fallback for touch devices */
+    @media (hover: none) and (pointer: coarse) {
+      .custom-cursor { display: none; }
+      body { cursor: auto; }
+      button, .project-card, .nav-btn { cursor: pointer; }
+    }
+
+    /* main app container */
+    .app {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .sections-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    .section {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      overflow-y: auto;
+      overflow-x: hidden;
+      visibility: hidden;
+      opacity: 0;
+      background-color: var(--bg-primary);
+      scroll-behavior: smooth;
+      transition: visibility 0s linear 0.3s, opacity 0.35s ease, background-color 0.6s ease;
+    }
+
+    .section.active {
+      visibility: visible;
+      opacity: 1;
+      z-index: 5;
+      transition: visibility 0s linear 0s, opacity 0.35s ease, background-color 0.6s ease;
+    }
+
+    /* NEW FEATURE: Dynamic background shift per section */
+    .section[data-index="0"] { background-color: var(--bg-section-0); }
+    .section[data-index="1"] { background-color: var(--bg-section-1); }
+    .section[data-index="2"] { background-color: var(--bg-section-2); }
+    .section[data-index="3"] { background-color: var(--bg-section-3); }
+    .section[data-index="4"] { background-color: var(--bg-section-4); }
+
+    .section::-webkit-scrollbar {
+      width: 5px;
+    }
+    .section::-webkit-scrollbar-track {
+      background: var(--border-light);
+    }
+    .section::-webkit-scrollbar-thumb {
+      background: var(--text-muted);
+      border-radius: 2px;
+    }
+
+    .container {
+      max-width: var(--container-max);
+      margin: 0 auto;
+      padding: 4rem 1.5rem;
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    /* Typography */
+    h1 {
+      font-size: clamp(2.8rem, 8vw, 5.2rem);
+      line-height: 1.1;
+      margin-bottom: 1rem;
+      font-weight: 450;
+      letter-spacing: -0.02em;
+    }
+    h2 {
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      margin-bottom: 1.2rem;
+      font-weight: 450;
+      letter-spacing: -0.02em;
+    }
+    h3 {
+      font-size: 1.4rem;
+      margin-bottom: 0.75rem;
+      font-weight: 480;
+    }
+    .subtitle {
+      font-size: 1.15rem;
+      color: var(--text-secondary);
+      margin-bottom: 1.8rem;
+      max-width: 560px;
+    }
+    .text-muted {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    /* NEW FEATURE: Chapter label styling */
+    .chapter-label {
+      display: inline-block;
+      font-size: 0.7rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 1.2rem;
+      border-left: 2px solid var(--accent);
+      padding-left: 0.8rem;
+      font-weight: 450;
+    }
+
+    /* NEW FEATURE: Staged animation improvements + line reveal */
+    .staged {
+      opacity: 0;
+      transform: translateY(18px);
+      transition: opacity 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1), transform 0.6s ease;
+    }
+    .staged.revealed {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    
+    /* NEW FEATURE: line reveal animation for hr */
+    hr.line-reveal {
+      width: 0%;
+      height: 1px;
+      background: var(--accent);
+      border: none;
+      margin: 2rem 0;
+      transition: width 0.8s cubic-bezier(0.2, 0.9, 0.3, 1.1);
+    }
+    hr.line-reveal.revealed {
+      width: 80px;
+    }
+    
+    /* letter-by-letter heading (lightweight, applied only on specific headings) */
+    .letter-heading {
+      display: inline-block;
+    }
+    .letter-heading span {
+      display: inline-block;
+      opacity: 0;
+      transform: translateY(8px);
+      animation: letterReveal 0.05s forwards;
+    }
+    @keyframes letterReveal {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* ---------- NAV BUTTONS ---------- */
+    .nav-bottom {
+      position: fixed;
+      bottom: 2rem;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      gap: 1.2rem;
+      z-index: 50;
+    }
+    .nav-btn {
+      background: var(--accent);
+      border: none;
+      color: var(--bg-primary);
+      font-size: 0.85rem;
+      padding: 0.7rem 1.8rem;
+      border-radius: 40px;
+      cursor: pointer;
+      font-weight: 500;
+      letter-spacing: 0.3px;
+      transition: all 0.25s ease;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    .nav-btn:hover { transform: scale(0.96); background: var(--accent-hover); }
+
+    /* NEW FEATURE: Progress Indicator (subtle progress bar top) */
+    .progress-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 2px;
+      background: var(--accent);
+      width: 0%;
+      z-index: 200;
+      transition: width 0.25s ease-out;
+      pointer-events: none;
+    }
+    .progress-index {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      font-size: 0.75rem;
+      font-feature-settings: "tnum";
+      color: var(--text-muted);
+      background: rgba(var(--bg-primary-rgb, 0,0,0), 0.3);
+      backdrop-filter: blur(4px);
+      padding: 0.3rem 0.7rem;
+      border-radius: 40px;
+      z-index: 50;
+      letter-spacing: 0.5px;
+    }
+
+    /* Project cards + NEW FEATURE: Filter UI */
+    .projects-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 2rem;
+      margin-top: 1.5rem;
+    }
+    .filter-bar {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+    }
+    .filter-btn {
+      background: transparent;
+      border: 1px solid var(--border-light);
+      padding: 0.4rem 1rem;
+      border-radius: 40px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      color: var(--text-secondary);
+      transition: 0.2s;
+    }
+    .filter-btn.active {
+      background: var(--accent);
+      color: var(--bg-primary);
+      border-color: var(--accent);
+    }
+    .filter-btn:hover {
+      border-color: var(--accent);
+    }
+    .project-card {
+      background: var(--bg-secondary);
+      padding: 2rem 1.5rem;
+      border-radius: 20px;
+      border: 1px solid var(--border-light);
+      transition: transform 0.2s, opacity 0.3s;
+      cursor: pointer;
+    }
+    .project-card:hover {
+      transform: translateY(-3px);
+    }
+    .project-card.hidden-filter {
+      display: none;
+    }
+    .project-card .year {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+    
+    /* NEW FEATURE: Fullscreen Overlay (Project Detail View) */
+    .fullscreen-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: var(--bg-primary);
+      z-index: 300;
+      visibility: hidden;
+      opacity: 0;
+      transition: visibility 0.2s, opacity 0.3s ease;
+      overflow-y: auto;
+      padding: 3rem 2rem;
+    }
+    .fullscreen-overlay.active {
+      visibility: visible;
+      opacity: 1;
+    }
+    .overlay-content {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 2rem 0;
+    }
+    .close-overlay {
+      position: fixed;
+      top: 2rem;
+      right: 2rem;
+      background: none;
+      border: none;
+      font-size: 2rem;
+      cursor: pointer;
+      color: var(--text-primary);
+      z-index: 301;
+      transition: transform 0.2s;
+    }
+    .close-overlay:hover { transform: scale(0.9); }
+    .overlay-content h2 { margin-bottom: 0.5rem; }
+    .overlay-year { color: var(--text-muted); margin-bottom: 2rem; display: block; }
+    .overlay-desc { line-height: 1.6; color: var(--text-secondary); margin-bottom: 2rem; }
+
+    .menu-btn {
+      position: fixed;
+      top: 2rem;
+      right: 2rem;
+      background: transparent;
+      border: 1px solid var(--border-light);
+      padding: 0.6rem 1.2rem;
+      border-radius: 40px;
+      cursor: pointer;
+      font-weight: 500;
+      backdrop-filter: blur(8px);
+      z-index: 60;
+    }
+
+    .overlay-menu {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.94);
+      backdrop-filter: blur(14px);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      visibility: hidden;
+      opacity: 0;
+      transition: visibility 0.3s, opacity 0.3s ease;
+    }
+    .overlay-menu.active { visibility: visible; opacity: 1; }
+    .menu-links { display: flex; flex-direction: column; gap: 2rem; text-align: center; }
+    .menu-links button { background: none; border: none; font-size: 2rem; font-weight: 400; color: white; cursor: pointer; transition: opacity 0.2s; }
+    .menu-links button:hover { opacity: 0.6; }
+    .close-menu { position: absolute; top: 2rem; right: 2rem; background: none; border: none; color: white; font-size: 2rem; cursor: pointer; }
+
+    .transition-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #000000;
+      z-index: 200;
+      pointer-events: none;
+      transform: translateX(-100%);
+      will-change: transform;
+    }
+    .transition-overlay.animate-sweep {
+      animation: customSweep 0.85s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+    }
+    @keyframes customSweep {
+      0% { transform: translateX(-100%); }
+      35% { transform: translateX(0%); }
+      65% { transform: translateX(0%); }
+      100% { transform: translateX(100%); }
+    }
+    body.transition-active { pointer-events: none; }
+
+    @media (max-width: 700px) {
+      .nav-bottom { bottom: 1.2rem; gap: 0.8rem; }
+      .nav-btn { padding: 0.5rem 1.2rem; font-size: 0.75rem; }
+      .container { padding: 2rem 1.2rem; }
+      .progress-index { bottom: 1rem; right: 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="app">
+  <div class="sections-container">
+    <!-- SECTION 0: Intro -->
+    <section id="section-intro" class="section active" data-index="0">
+      <div class="container">
+        <div class="staged" data-staged="0"><span class="chapter-label">Chapter 01 — Awakening</span></div>
+        <div class="staged" data-staged="1"><h1>Silent<br>Presence</h1></div>
+        <div class="staged" data-staged="2"><div class="subtitle">Design that speaks without noise. Architecture of thought and material.</div></div>
+        <div class="staged" data-staged="3"><button class="nav-btn next-trigger" style="background: var(--accent); color: var(--bg-primary);">Begin journey →</button></div>
+      </div>
+    </section>
+
+    <!-- SECTION 1: About -->
+    <section id="section-about" class="section" data-index="1">
+      <div class="container">
+        <div class="staged" data-staged="0"><span class="chapter-label">Chapter 02 — Foundations</span></div>
+        <div class="staged" data-staged="1"><h2>About</h2></div>
+        <div class="staged" data-staged="2"><p class="subtitle">Studio founded on restraint, clarity, and intention.</p></div>
+        <div class="staged" data-staged="3"><p style="max-width: 640px; color: var(--text-secondary);">We believe in empty spaces, honest materials, and purposeful narratives. Based between Tokyo and Copenhagen, our work spans objects, interiors, and digital experiences.</p></div>
+        <div class="staged" data-staged="4"><hr class="line-reveal"></div>
+      </div>
+    </section>
+
+    <!-- SECTION 2: Projects (with filter) -->
+    <section id="section-projects" class="section" data-index="2">
+      <div class="container">
+        <div class="staged" data-staged="0"><span class="chapter-label">Chapter 03 — Works</span></div>
+        <div class="staged" data-staged="1"><h2>Projects</h2></div>
+        <div class="staged" data-staged="2"><div class="subtitle">Selected works — empty frames for future expansion</div></div>
+        <div class="staged" data-staged="3">
+          <div class="filter-bar">
+            <button class="filter-btn active" data-filter="all">All</button>
+            <button class="filter-btn" data-filter="2025">2025</button>
+            <button class="filter-btn" data-filter="2024">2024</button>
+            <button class="filter-btn" data-filter="2023">2023</button>
+            <button class="filter-btn" data-filter="2022">2022</button>
+            <button class="filter-btn" data-filter="Digital">Digital</button>
+            <button class="filter-btn" data-filter="Residential">Residential</button>
+          </div>
+          <div class="projects-grid" id="projectsGrid">
+            <div class="project-card" data-year="2025" data-type="Residential" data-title="Silent House" data-desc="A meditative residence in rural Japan, blending shadow and light. The structure embraces silence as material, using raw timber and white plaster."><div class="year">2025</div><h4>Silent House</h4><div class="text-muted">Residential · Japan</div></div>
+            <div class="project-card" data-year="2024" data-type="Furniture" data-title="Komorebi Bench" data-desc="Crafted from reclaimed cedar, this bench captures dappled light patterns. An object for contemplation."><div class="year">2024</div><h4>Komorebi Bench</h4><div class="text-muted">Furniture</div></div>
+            <div class="project-card" data-year="2023" data-type="Exhibition" data-title="Monolith Gallery" data-desc="Ephemeral exhibition space, concrete volumes with shifting natural light."><div class="year">2023</div><h4>Monolith Gallery</h4><div class="text-muted">Exhibition</div></div>
+            <div class="project-card" data-year="2022" data-type="Digital" data-title="Pause App" data-desc="Digital wellness interface. Minimal interaction design that encourages slow breathing."><div class="year">2022</div><h4>Pause App</h4><div class="text-muted">Digital</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 3: Story -->
+    <section id="section-experience" class="section" data-index="3">
+      <div class="container">
+        <div class="staged" data-staged="0"><span class="chapter-label">Chapter 04 — Timeline</span></div>
+        <div class="staged" data-staged="1"><h2>Story</h2></div>
+        <div class="staged" data-staged="2"><div class="subtitle">A quiet timeline of practice.</div></div>
+        <div class="staged" data-staged="3">
+          <div class="exp-item"><h3>2023 — present</h3><p>Founding principle: slow studio model, 3 long-term collaborations.</p></div>
+          <div class="exp-item"><h3>2019 — 2023</h3><p>Independent research on minimalist architecture & haptic design.</p></div>
+          <div class="exp-item"><h3>2016 — 2019</h3><p>Partnership with Atelier N. Built works in Kyoto & Berlin.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 4: Contact -->
+    <section id="section-contact" class="section" data-index="4">
+      <div class="container">
+        <div class="staged" data-staged="0"><span class="chapter-label">Chapter 05 — Dialogue</span></div>
+        <div class="staged" data-staged="1"><h2>Contact</h2></div>
+        <div class="staged" data-staged="2"><div class="subtitle">Reach out for commissions or dialogue.</div></div>
+        <div class="staged" data-staged="3">
+          <form class="contact-form" id="demo-contact-form">
+            <input type="text" placeholder="Name">
+            <input type="email" placeholder="Email">
+            <textarea rows="3" placeholder="Message"></textarea>
+            <button type="submit" class="btn-submit">Send inquiry →</button>
+          </form>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="nav-bottom"><button class="nav-btn" id="prevBtn">← Back</button><button class="nav-btn" id="nextBtn">Next →</button></div>
+  <div class="progress-bar" id="progressBar"></div>
+  <div class="progress-index" id="progressIndex">01 / 05</div>
+  <button class="menu-btn" id="menuToggleBtn">Menu</button>
+  <div class="overlay-menu" id="overlayMenu"><button class="close-menu" id="closeMenuBtn">✕</button><div class="menu-links" id="menuLinksContainer"></div></div>
+  <div class="transition-overlay" id="transitionOverlay"></div>
+  <div class="fullscreen-overlay" id="fullscreenOverlay"><button class="close-overlay" id="closeOverlayBtn">✕</button><div class="overlay-content" id="overlayContent"></div></div>
+  <div class="custom-cursor" id="customCursor"></div>
+</div>
+
+<script>
+(function(){
+    // ---------- DOM elements ----------
+    const sections = document.querySelectorAll('.section');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const menuToggle = document.getElementById('menuToggleBtn');
+    const overlayMenu = document.getElementById('overlayMenu');
+    const closeMenuBtn = document.getElementById('closeMenuBtn');
+    const transitionOverlay = document.getElementById('transitionOverlay');
+    const progressBar = document.getElementById('progressBar');
+    const progressIndexSpan = document.getElementById('progressIndex');
+    const fullscreenOverlay = document.getElementById('fullscreenOverlay');
+    const closeOverlayBtn = document.getElementById('closeOverlayBtn');
+    const overlayContentDiv = document.getElementById('overlayContent');
+    
+    let currentIndex = 0;
+    let isTransitioning = false;
+    const totalSections = sections.length;
+    
+    // ---------- LOCAL STORAGE MEMORY SYSTEM ----------
+    function saveState() { localStorage.setItem('lastSectionIndex', currentIndex); }
+    function loadStoredIndex() { const saved = localStorage.getItem('lastSectionIndex'); return saved !== null ? parseInt(saved, 10) : 0; }
+    
+    // ---------- PROGRESS UPDATE ----------
+    function updateProgress() { progressBar.style.width = `${((currentIndex + 1) / totalSections) * 100}%`; progressIndexSpan.innerText = `${String(currentIndex+1).padStart(2,'0')} / ${String(totalSections).padStart(2,'0')}`; }
+    
+    // ---------- STAGED REVEAL (improved timing + line reveal) ----------
+    function revealStagedInSection(sectionElement) {
+      if (!sectionElement) return;
+      const stagedEls = sectionElement.querySelectorAll('.staged');
+      stagedEls.forEach(el => el.classList.remove('revealed'));
+      // also handle line-reveal
+      const lineHr = sectionElement.querySelector('hr.line-reveal');
+      if(lineHr) lineHr.classList.remove('revealed');
+      
+      stagedEls.forEach((el, idx) => {
+        setTimeout(() => {
+          if (sectionElement.classList.contains('active')) {
+            el.classList.add('revealed');
+            // optional letter-by-letter effect on h1/h2
+            if(el.querySelector('h1') && !el.querySelector('h1').hasAttribute('data-lettered')) {
+              applyLetterEffect(el.querySelector('h1'));
+            }
+            if(el.querySelector('h2') && !el.querySelector('h2').hasAttribute('data-lettered')) {
+              applyLetterEffect(el.querySelector('h2'));
+            }
+          }
+        }, idx * 90);
+      });
+      setTimeout(() => { if(lineHr && sectionElement.classList.contains('active')) lineHr.classList.add('revealed'); }, stagedEls.length * 90 + 100);
+    }
+    
+    function applyLetterEffect(heading) {
+      if(heading.getAttribute('data-lettered')) return;
+      const text = heading.innerText;
+      heading.innerHTML = text.split('').map(char => char === ' ' ? ' ' : `<span style="animation-delay: ${Math.random() * 0.03}s">${char}</span>`).join('');
+      heading.setAttribute('data-lettered', 'true');
+      const spans = heading.querySelectorAll('span');
+      spans.forEach((span, idx) => { span.style.animationDelay = `${idx * 0.02}s`; });
+    }
+    
+    // ---------- SECTION NAVIGATION (with smooth overlay) ----------
+    function setActiveSectionImmediately(index, skipStorage = false) {
+      sections.forEach((sec, i) => { sec.classList.remove('active'); });
+      const target = sections[index];
+      target.classList.add('active');
+      currentIndex = index;
+      target.scrollTop = 0;
+      revealStagedInSection(target);
+      updateProgress();
+      if(!skipStorage) saveState();
+      applyDynamicBackground(index);
+    }
+    
+    function navigateToSection(newIndex) {
+      if(isTransitioning || newIndex === currentIndex || newIndex < 0 || newIndex >= totalSections) return;
+      isTransitioning = true;
+      document.body.classList.add('transition-active');
+      const targetSection = sections[newIndex];
+      sections.forEach(sec => sec.classList.remove('active'));
+      targetSection.classList.add('active');
+      targetSection.scrollTop = 0;
+      const oldIndex = currentIndex;
+      currentIndex = newIndex;
+      updateProgress();
+      saveState();
+      applyDynamicBackground(newIndex);
+      transitionOverlay.classList.remove('animate-sweep');
+      void transitionOverlay.offsetWidth;
+      transitionOverlay.classList.add('animate-sweep');
+      const onEnd = () => {
+        transitionOverlay.classList.remove('animate-sweep');
+        revealStagedInSection(targetSection);
+        isTransitioning = false;
+        document.body.classList.remove('transition-active');
+        transitionOverlay.removeEventListener('animationend', onEnd);
+      };
+      transitionOverlay.addEventListener('animationend', onEnd, { once: true });
+      setTimeout(() => { if(isTransitioning) { transitionOverlay.classList.remove('animate-sweep'); revealStagedInSection(targetSection); isTransitioning=false; document.body.classList.remove('transition-active'); } }, 1000);
+    }
+    
+    function nextSection() { if(currentIndex+1 < totalSections) navigateToSection(currentIndex+1); }
+    function prevSection() { if(currentIndex-1 >= 0) navigateToSection(currentIndex-1); }
+    
+    // Dynamic background shift (already handled by CSS classes, but force update)
+    function applyDynamicBackground(index) { document.documentElement.style.setProperty('--bg-primary', `var(--bg-section-${index})`); }
+    
+    // ---------- FULLSCREEN PROJECT DETAIL OVERLAY ----------
+    function openProjectDetail(card) {
+      const title = card.getAttribute('data-title') || card.querySelector('h4')?.innerText || 'Untitled';
+      const year = card.getAttribute('data-year') || card.querySelector('.year')?.innerText || '—';
+      const desc = card.getAttribute('data-desc') || 'No description available.';
+      overlayContentDiv.innerHTML = `<h2>${title}</h2><div class="overlay-year">${year}</div><div class="overlay-desc">${desc}</div><p class="text-muted" style="margin-top:2rem;">A quiet exploration of space and material.</p>`;
+      fullscreenOverlay.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeProjectDetail() { fullscreenOverlay.classList.remove('active'); document.body.style.overflow = ''; }
+    
+    // ---------- PROJECT FILTER SYSTEM ----------
+    function initFilter() {
+      const filterBtns = document.querySelectorAll('.filter-btn');
+      const projectsGrid = document.getElementById('projectsGrid');
+      const allCards = Array.from(document.querySelectorAll('.project-card'));
+      filterBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          filterBtns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const filterValue = btn.getAttribute('data-filter');
+          allCards.forEach(card => {
+            const year = card.getAttribute('data-year');
+            const type = card.getAttribute('data-type');
+            if(filterValue === 'all' || year === filterValue || type === filterValue) card.classList.remove('hidden-filter');
+            else card.classList.add('hidden-filter');
+          });
+        });
+      });
+    }
+    
+    // ---------- TOUCH GESTURES (swipe) ----------
+    let touchStartX = 0;
+    document.addEventListener('touchstart', (e) => { touchStartX = e.changedTouches[0].screenX; }, { passive: true });
+    document.addEventListener('touchend', (e) => {
+      if(isTransitioning) return;
+      const diff = e.changedTouches[0].screenX - touchStartX;
+      if(Math.abs(diff) > 60) { diff > 0 ? prevSection() : nextSection(); }
+    });
+    
+    // ---------- EASTER EGG (konami-style: up,up,down,down,left,right,left,right) ----------
+    let easterEggSequence = [];
+    const secretCode = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight'];
+    window.addEventListener('keydown', (e) => {
+      easterEggSequence.push(e.key);
+      if(easterEggSequence.length > secretCode.length) easterEggSequence.shift();
+      if(JSON.stringify(easterEggSequence) === JSON.stringify(secretCode)) {
+        alert('✨ Silence speaks volumes — thank you for the hidden journey ✨');
+        easterEggSequence = [];
+      }
+    });
+    
+    // ---------- CUSTOM CURSOR ----------
+    const cursor = document.getElementById('customCursor');
+    if(cursor) {
+      document.addEventListener('mousemove', (e) => { cursor.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`; });
+      const interactiveElements = document.querySelectorAll('button, .project-card, .nav-btn, .menu-btn, .filter-btn');
+      interactiveElements.forEach(el => {
+        el.addEventListener('mouseenter', () => { cursor.classList.add('hover-active'); });
+        el.addEventListener('mouseleave', () => { cursor.classList.remove('hover-active', 'view-active'); });
+      });
+      const projectCards = document.querySelectorAll('.project-card');
+      projectCards.forEach(card => {
+        card.addEventListener('mouseenter', () => { cursor.classList.add('view-active'); });
+        card.addEventListener('mouseleave', () => { cursor.classList.remove('view-active'); });
+      });
+    }
+    
+    // ---------- EVENT LISTENERS ----------
+    prevBtn.addEventListener('click', prevSection);
+    nextBtn.addEventListener('click', nextSection);
+    window.addEventListener('keydown', (e) => {
+      if(e.key === 'ArrowLeft') { e.preventDefault(); prevSection(); }
+      if(e.key === 'ArrowRight') { e.preventDefault(); nextSection(); }
+      if(e.key === 'Escape' && fullscreenOverlay.classList.contains('active')) closeProjectDetail();
+      if(e.key === 'Escape' && overlayMenu.classList.contains('active')) overlayMenu.classList.remove('active');
+    });
+    
+    // Menu overlay dynamic
+    function buildMenu() { const container = document.getElementById('menuLinksContainer'); container.innerHTML = ''; sections.forEach((_, idx) => { const btn = document.createElement('button'); btn.innerText = sections[idx].querySelector('.chapter-label')?.innerText || `Section ${idx+1}`; btn.setAttribute('data-nav', idx); btn.addEventListener('click', () => { navigateToSection(idx); overlayMenu.classList.remove('active'); }); container.appendChild(btn); }); }
+    menuToggle.addEventListener('click', () => overlayMenu.classList.add('active'));
+    closeMenuBtn.addEventListener('click', () => overlayMenu.classList.remove('active'));
+    overlayMenu.addEventListener('click', (e) => { if(e.target === overlayMenu) overlayMenu.classList.remove('active'); });
+    buildMenu();
+    
+    document.querySelectorAll('.project-card').forEach(card => card.addEventListener('click', (e) => { e.stopPropagation(); openProjectDetail(card); }));
+    closeOverlayBtn.addEventListener('click', closeProjectDetail);
+    fullscreenOverlay.addEventListener('click', (e) => { if(e.target === fullscreenOverlay) closeProjectDetail(); });
+    document.querySelector('.next-trigger')?.addEventListener('click', () => { if(currentIndex === 0) nextSection(); });
+    document.getElementById('demo-contact-form')?.addEventListener('submit', (e) => { e.preventDefault(); alert('✨ Message received (demo)'); e.target.reset(); });
+    
+    // Initial load with local storage restore
+    const savedIndex = loadStoredIndex();
+    setActiveSectionImmediately(savedIndex, false);
+    initFilter();
+    updateProgress();
+    applyDynamicBackground(currentIndex);
+})();
+</script>
+</body>
+</html>
