@@ -13,16 +13,12 @@ export default function InterviewStepTwo() {
   const [failureReason, setFailureReason] = useState('');
   const [showReasonInput, setShowReasonInput] = useState(false);
   
-  // --- New Date Filter State ---
-  // Default আজকের তারিখ (YYYY-MM-DD format)
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
 
-  // --- Searchable Dropdown States ---
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const dropdownRef = useRef(null);
 
-  // Additional information
   const [chairmanCertificate, setChairmanCertificate] = useState(false);
   const [educationCertificate, setEducationCertificate] = useState(false);
   const [experienceMachines, setExperienceMachines] = useState({
@@ -38,41 +34,23 @@ export default function InterviewStepTwo() {
   const [floor, setFloor] = useState('');
   const [homeDistrict, setHomeDistrict] = useState(''); 
   
-  // Search related states
   const [showSearch, setShowSearch] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const [searchKey, setSearchKey] = useState(0);
 
+  const [distSearchTerm, setDistSearchTerm] = useState('');
+  const [isDistDropdownOpen, setIsDistDropdownOpen] = useState(false);
+  const distDropdownRef = useRef(null);
 
- // --- District Searchable Dropdown States ---
-const [distSearchTerm, setDistSearchTerm] = useState('');
-const [isDistDropdownOpen, setIsDistDropdownOpen] = useState(false);
-const distDropdownRef = useRef(null); // ডিস্ট্রিক্টের জন্য আলাদা রেফ
+  const FAILURE_REASONS = ["A", "B", "C", "D", "E", "F"];
 
-
-
-
-
-
-
-
-const FAILURE_REASONS = [
-  "A",
-  "B",
-  "C",
-  "D",
-  "E",
-  "F"
-];
-
-
-
-
-  // Outside click handle
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsDropdownOpen(false);
+      }
+      if (distDropdownRef.current && !distDropdownRef.current.contains(event.target)) {
+        setIsDistDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -90,26 +68,10 @@ const FAILURE_REASONS = [
     "SYLHET", "HABIGANJ", "MOULVIBAZAR", "SUNAMGANJ"
   ].sort();
 
+  const filteredDistricts = DISTRICTS.filter(d => 
+    d.toLowerCase().includes(distSearchTerm.toLowerCase())
+  );
 
-  useEffect(() => {
-  const handleClickOutside = (event) => {
-    if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-      setIsDropdownOpen(false);
-    }
-    // District dropdown এর জন্য
-    if (distDropdownRef.current && !distDropdownRef.current.contains(event.target)) {
-      setIsDistDropdownOpen(false);
-    }
-  };
-  document.addEventListener('mousedown', handleClickOutside);
-  return () => document.removeEventListener('mousedown', handleClickOutside);
-}, []);
-
-const filteredDistricts = DISTRICTS.filter(d => 
-  d.toLowerCase().includes(distSearchTerm.toLowerCase())
-);
-
-  // Fetch candidates when date changes
   useEffect(() => {
     fetchCandidates();
   }, [filterDate]);
@@ -117,10 +79,8 @@ const filteredDistricts = DISTRICTS.filter(d =>
   const fetchCandidates = async () => {
     try {
       setLoading(true);
-      // নতুন তৈরি করা API টি কল করা হচ্ছে তারিখসহ
       const response = await fetch(`/api/iep-interview/eligible-candidates-down-admin?date=${filterDate}`);
       const data = await response.json();
-      
       if (response.ok) {
         setCandidates(data);
       } else {
@@ -139,8 +99,6 @@ const filteredDistricts = DISTRICTS.filter(d =>
     setSelectedCandidateData(candidate);
     setSearchTerm(`${candidate.candidateId} - ${candidate.name}`);
     setIsDropdownOpen(false);
-    
-    // Reset fields
     setFailureReason('');
     setShowReasonInput(false);
     setChairmanCertificate(false);
@@ -171,64 +129,52 @@ const filteredDistricts = DISTRICTS.filter(d =>
   };
 
   const handleResultUpdate = async (resultValue) => {
-  if (!selectedCandidate) return;
-
-  // যদি ফলাফল FAILED হয় এবং কারণ লেখা না থাকে, তবে রিটার্ন করবে
-  if (resultValue === 'FAILED' && !failureReason.trim()) {
-    alert("Please provide a reason for failure.");
-    return;
-  }
-
-  try {
-    setLoading(true);
-    const requestData = {
-      candidateId: selectedCandidate,
-      result: resultValue,
-      name: selectedCandidateData.name,
-      nid: selectedCandidateData.nid,
-      birthCertificate: selectedCandidateData.birthCertificate,
-      picture: selectedCandidateData.picture,
-      homeDistrict,
-      chairmanCertificate,
-      educationCertificate,
-      experienceMachines,
-      designation,
-      floor: resultValue === 'PASSED' ? floor : '',
-      otherInfo: otherInfo.trim(),
-      failureReason: resultValue === 'FAILED' ? failureReason : null
-    };
-
-    const response = await fetch('/api/iep-interview/iep-interview-down-admin', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestData),
-    });
-
-    if (response.ok) {
-      // ১. সাকসেস মেসেজ সেট করা
-      setMessage(`Candidate successfully marked as ${resultValue}`);
-      
-      // ২. সিলেক্টেড ক্যান্ডিডেট ডাটা ক্লিয়ার করা
-      setSelectedCandidate('');
-      setSelectedCandidateData(null);
-      setSearchTerm('');
-
-      // ৩. ফেইলড রিজন বক্সটি হাইড করা (এটি আপনার সমস্যার সমাধান)
-      setShowReasonInput(false); 
-      setFailureReason(''); // কারণটিও ক্লিয়ার করে দেওয়া ভালো
-
-      // ৪. ক্যান্ডিডেট লিস্ট রিফ্রেশ করা
-      fetchCandidates(); 
-    } else {
-      const errorData = await response.json();
-      setMessage(errorData.message || 'Failed to update candidate status');
+    if (!selectedCandidate) return;
+    if (resultValue === 'FAILED' && !failureReason.trim()) {
+      alert("Please provide a reason for failure.");
+      return;
     }
-  } catch (error) {
-    setMessage('Network error');
-  } finally {
-    setLoading(false);
-  }
-};
+    try {
+      setLoading(true);
+      const requestData = {
+        candidateId: selectedCandidate,
+        result: resultValue,
+        name: selectedCandidateData.name,
+        nid: selectedCandidateData.nid,
+        birthCertificate: selectedCandidateData.birthCertificate,
+        picture: selectedCandidateData.picture,
+        homeDistrict,
+        chairmanCertificate,
+        educationCertificate,
+        experienceMachines,
+        designation,
+        floor: resultValue === 'PASSED' ? floor : '',
+        otherInfo: otherInfo.trim(),
+        failureReason: resultValue === 'FAILED' ? failureReason : null
+      };
+      const response = await fetch('/api/iep-interview/iep-interview-down-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestData),
+      });
+      if (response.ok) {
+        setMessage(`Candidate successfully marked as ${resultValue}`);
+        setSelectedCandidate('');
+        setSelectedCandidateData(null);
+        setSearchTerm('');
+        setShowReasonInput(false); 
+        setFailureReason('');
+        fetchCandidates(); 
+      } else {
+        const errorData = await response.json();
+        setMessage(errorData.message || 'Failed to update candidate status');
+      }
+    } catch (error) {
+      setMessage('Network error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handlePassedButtonClick = () => handleResultUpdate('PASSED');
   const handleFailedButtonClick = () => {
@@ -240,74 +186,108 @@ const filteredDistricts = DISTRICTS.filter(d =>
     `${c.candidateId} ${c.name} ${c.nid || ''}`.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  
-
   return (
-    <div className="min-h-screen bg-gray-50 mt-10 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-[#a162e8] via-[#8a43d6] to-[#6b21a8] mt-10 py-8">
+      
+      {/* CSS For Native Date Picker Animation */}
+      <style jsx global>{`
+        input[type="date"]::-webkit-calendar-picker-indicator {
+          animation: pulseIcon 1.5s infinite;
+          cursor: pointer;
+          border-radius: 4px;
+          padding: 2px;
+        }
+        @keyframes pulseIcon {
+          0% { box-shadow: 0 0 0 0 rgba(138, 67, 214, 0.7); }
+          70% { box-shadow: 0 0 0 6px rgba(138, 67, 214, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(138, 67, 214, 0); }
+        }
+      `}</style>
+
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-            <h1 className="text-2xl font-bold text-gray-900">ADMIN (SELECTION)</h1>
-            <h1 className="text-xs text-gray-600 text-center">
-                
-                <Link href="/admin/iep-interview/2nd-step/report" className="text-blue-600 font-medium hover:underline text-sm">
-                  PDF
-                </Link>
-              </h1>
+        <div className="bg-white rounded-2xl shadow-2xl p-8">
+          
+          {/* Header Section */}
+          <div className="flex flex-col md:flex-row justify-between items-center mb-10 gap-6 border-b border-purple-300 pb-6">
+            <h1 className="text-3xl font-extrabold text-[#6b21a8] drop-shadow-sm tracking-tight">
+              ADMIN (SELECTION)
+            </h1>
             
-            
-            {/* --- Date Filter UI --- */}
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-600">Filter Date:</label>
-              <input 
-                type="date" 
-                value={filterDate}
-                onChange={(e) => setFilterDate(e.target.value)}
-                className="border rounded-md px-2 py-1 text-sm focus:ring-blue-500 outline-none"
-              />
+            <div className="flex items-center gap-6">
+              {/* PDF Text with Hover Background Color */}
+              <Link href="/admin/iep-interview/2nd-step/report" 
+                className="text-sm font-bold text-gray-700 hover:text-[#6b21a8] hover:bg-purple-100 px-3 py-1 rounded-lg transition-all duration-400">
+                PDF
+              </Link>
+              
+              {/* Date Filter */}
+              <div className="flex items-center gap-3 bg-[#f3e8ff] px-4 py-2 rounded-xl border border-[#b384e6]">
+                <label className="text-[10px] font-black text-[#6b21a8] uppercase">Filter Date:</label>
+                <input 
+                  type="date" 
+                  value={filterDate}
+                  onChange={(e) => setFilterDate(e.target.value)}
+                  className="bg-transparent text-[#6b21a8] font-bold text-sm focus:outline-none cursor-pointer"
+                />
+              </div>
             </div>
           </div>
 
-          {/* Searchable Dropdown UI */}
-          <div className="mb-6 relative" ref={dropdownRef}>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Select Candidate</label>
-            <input
-              type="text"
-              placeholder="Search by ID or Name..."
-              value={searchTerm}
-              onFocus={() => setIsDropdownOpen(true)}
-              onChange={(e) => { setSearchTerm(e.target.value); setIsDropdownOpen(true); }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500"
-            />
+          {/* Search Bar & Dropdown UI */}
+          <div className="mb-8 relative   pb-8" ref={dropdownRef}>
+            <div className="flex items-center mb-3">
+               <span className="bg-[#8a43d6] w-2 h-6 rounded-full mr-2"></span>
+               <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">Select Candidate</label>
+            </div>
+            <div className="relative group">
+              <input
+                type="text"
+                placeholder="Search by ID or Name..."
+                value={searchTerm}
+                onFocus={() => setIsDropdownOpen(true)}
+                onChange={(e) => { setSearchTerm(e.target.value); setIsDropdownOpen(true); }}
+                className="w-full px-6 py-4 bg-gray-50 border-2 border-transparent rounded-2xl shadow-inner focus:outline-none focus:border-[#a162e8] focus:bg-white transition-all text-gray-700 placeholder-gray-400 font-semibold"
+              />
+              <div className="absolute right-5 top-4 text-[#a162e8] group-focus-within:animate-ping opacity-60">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+            </div>
+
             {isDropdownOpen && (
-              <div className="absolute z-20 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-xl max-h-60 overflow-auto">
+              <div className="absolute z-20 mt-2 w-full bg-white border border-gray-100 rounded-2xl shadow-2xl max-h-72 overflow-auto animate-in slide-in-from-top-2 duration-200">
                 {filteredCandidatesList.length > 0 ? (
                   filteredCandidatesList.map(c => (
-                    <div key={c.candidateId} onClick={() => handleSelectCandidate(c)} className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b last:border-none">
-                      <div className="font-semibold text-gray-800">{c.candidateId} - {c.name}</div>
-                      <div className="text-xs text-gray-500">{c.nid ? `NID: ${c.nid}` : `BC: ${c.birthCertificate}`}</div>
+                    <div key={c.candidateId} onClick={() => handleSelectCandidate(c)} className="px-6 py-4 hover:bg-[#f3e8ff] cursor-pointer border-b border-gray-50 last:border-none transition-colors group">
+                      <div className="font-bold text-gray-800 group-hover:text-[#6b21a8]">{c.candidateId} - {c.name}</div>
+                      <div className="text-xs text-gray-500 font-medium">{c.nid ? `NID: ${c.nid}` : `BC: ${c.birthCertificate}`}</div>
                     </div>
                   ))
-                ) : <div className="p-4 text-center text-gray-500">No eligible candidates for this date</div>}
+                ) : <div className="p-6 text-center text-gray-400 font-medium">No eligible candidates found</div>}
               </div>
             )}
           </div>
 
           {/* Selected Candidate Details */}
           {selectedCandidateData && (
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg animate-in fade-in duration-300">
-              <div className="flex justify-between items-start mb-3">
-                <h3 className="text-lg font-semibold text-gray-900">Candidate Details</h3>
-                <button onClick={handleSearch} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium flex items-center gap-2 text-sm transition-colors">🔍 View Details</button>
+            <div className="mb-8 p-6 bg-gradient-to-r from-purple-50 to-white rounded-2xl border border-purple-100 shadow-sm animate-in zoom-in-95 duration-300">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-[#6b21a8]">Candidate Profile</h3>
+                <button onClick={handleSearch} className="bg-[#6b21a8] hover:bg-[#581c87] text-white px-5 py-2 rounded-xl font-bold flex items-center gap-2 text-sm transition-all shadow-md active:scale-95">
+                  🔍 View Full Details
+                </button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p><strong>Name:</strong> {selectedCandidateData.name}</p>
-                  <p><strong>Candidate ID:</strong> {selectedCandidateData.candidateId}</p>
-                  <p><strong>ID:</strong> {selectedCandidateData.nid || selectedCandidateData.birthCertificate || 'N/A'}</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                <div className="space-y-2">
+                  <p className="text-gray-600 font-medium"><span className="text-gray-400 font-bold uppercase text-[10px] mr-2">Name:</span> {selectedCandidateData.name}</p>
+                  <p className="text-gray-600 font-medium"><span className="text-gray-400 font-bold uppercase text-[10px] mr-2">Candidate ID:</span> {selectedCandidateData.candidateId}</p>
+                  <p className="text-gray-600 font-medium"><span className="text-gray-400 font-bold uppercase text-[10px] mr-2">Document ID:</span> {selectedCandidateData.nid || selectedCandidateData.birthCertificate || 'N/A'}</p>
                 </div>
                 {selectedCandidateData.picture && (
-                  <img src={selectedCandidateData.picture} alt="Candidate" className="w-24 h-24 object-cover rounded-md mt-2 border" />
+                  <div className="flex justify-center md:justify-end">
+                    <img src={selectedCandidateData.picture} alt="Candidate" className="w-28 h-28 object-cover rounded-2xl shadow-md border-4 border-white ring-1 ring-purple-100" />
+                  </div>
                 )}
               </div>
             </div>
@@ -315,149 +295,124 @@ const filteredDistricts = DISTRICTS.filter(d =>
 
           {/* Additional Info Section */}
           {selectedCandidateData && (
-            <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Additional Information</h3>
+            <div className="mb-8 p-6 bg-[#f9f5ff] rounded-2xl border border-[#e9d5ff]">
+              <h3 className="text-lg font-bold text-[#6b21a8] mb-6">Additional Information</h3>
               
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Home District</label>
-                <div className="mb-6 relative" ref={distDropdownRef}>
-  <label className="block text-sm font-medium text-gray-700 mb-2">Home District</label>
-  <input
-    type="text"
-    placeholder="Search district..."
-    value={homeDistrict || distSearchTerm}
-    onFocus={() => {
-      setIsDistDropdownOpen(true);
-      setDistSearchTerm(''); // ফোকাস করলে সার্চ ক্লিয়ার হবে যাতে সব দেখা যায়
-    }}
-    onChange={(e) => {
-      setDistSearchTerm(e.target.value);
-      setHomeDistrict(e.target.value); // টাইপ করার সময়ও স্টেট আপডেট হবে
-      setIsDistDropdownOpen(true);
-    }}
-    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500"
-  />
-  
-  {isDistDropdownOpen && (
-    <div className="absolute z-30 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-xl max-h-60 overflow-auto">
-      {filteredDistricts.length > 0 ? (
-        filteredDistricts.map(dist => (
-          <div 
-            key={dist} 
-            onClick={() => {
-              setHomeDistrict(dist);
-              setDistSearchTerm(dist);
-              setIsDistDropdownOpen(false);
-            }} 
-            className="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b last:border-none text-sm"
-          >
-            {dist}
-          </div>
-        ))
-      ) : (
-        <div className="p-3 text-center text-gray-500 text-sm">No district found</div>
-      )}
-    </div>
-  )}
-</div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center gap-6">
-                  <label className="flex items-center text-sm text-gray-900 cursor-pointer"><input type="checkbox" checked={chairmanCertificate} onChange={(e) => setChairmanCertificate(e.target.checked)} className="mr-2 h-4 w-4" /> Chairman Certificate</label>
-                  <label className="flex items-center text-sm text-gray-900 cursor-pointer"><input type="checkbox" checked={educationCertificate} onChange={(e) => setEducationCertificate(e.target.checked)} className="mr-2 h-4 w-4" /> Education Certificate</label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="relative" ref={distDropdownRef}>
+                  <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Home District</label>
+                  <input
+                    type="text"
+                    placeholder="Search district..."
+                    value={homeDistrict || distSearchTerm}
+                    onFocus={() => { setIsDistDropdownOpen(true); setDistSearchTerm(''); }}
+                    onChange={(e) => { setDistSearchTerm(e.target.value); setHomeDistrict(e.target.value); setIsDistDropdownOpen(true); }}
+                    className="w-full px-4 py-2.5 bg-white border border-[#d8b4fe] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#a162e8] text-sm font-semibold"
+                  />
+                  {isDistDropdownOpen && (
+                    <div className="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-auto">
+                      {filteredDistricts.map(dist => (
+                        <div key={dist} onClick={() => { setHomeDistrict(dist); setDistSearchTerm(dist); setIsDistDropdownOpen(false); }} 
+                        className="px-4 py-2 hover:bg-[#f3e8ff] cursor-pointer text-sm border-b last:border-none">
+                          {dist}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Experience Machine Name</label>
-                  <div className="flex flex-wrap gap-4">
-                    {Object.keys(experienceMachines).map(machine => (
-                      <label key={machine} className="flex items-center text-sm cursor-pointer"><input type="checkbox" checked={experienceMachines[machine]} onChange={() => handleMachineChange(machine)} className="mr-2 h-4 w-4" /> {machine.replace('_', '/')}</label>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Designation</label>
-                  <div className="flex flex-wrap gap-4">
-                    {Object.keys(designation).map(desig => (
-                      <label key={desig} className="flex items-center text-sm cursor-pointer"><input type="checkbox" checked={designation[desig]} onChange={() => handleDesignation(desig)} className="mr-2 h-4 w-4" /> {desig.replace('_', '/')}</label>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Floor</label>
-                  <select value={floor} onChange={(e) => setFloor(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md">
+                  <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Floor Assignment</label>
+                  <select value={floor} onChange={(e) => setFloor(e.target.value)} className="w-full px-4 py-2.5 bg-white border border-[#d8b4fe] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#a162e8] text-sm font-semibold">
                     <option value="">Select Floor</option>
                     <option value="SHAPLA">SHAPLA</option><option value="PODDO">PODDO</option><option value="KODOM">KODOM</option><option value="BELLY">BELLY</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="mt-8 space-y-6">
+                <div className="flex flex-wrap gap-6">
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <input type="checkbox" checked={chairmanCertificate} onChange={(e) => setChairmanCertificate(e.target.checked)} className="w-5 h-5 rounded border-gray-300 text-[#6b21a8] focus:ring-[#a162e8]" />
+                    <span className="text-sm font-bold text-gray-700 group-hover:text-[#6b21a8]">Chairman Certificate</span>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <input type="checkbox" checked={educationCertificate} onChange={(e) => setEducationCertificate(e.target.checked)} className="w-5 h-5 rounded border-gray-300 text-[#6b21a8] focus:ring-[#a162e8]" />
+                    <span className="text-sm font-bold text-gray-700 group-hover:text-[#6b21a8]">Education Certificate</span>
+                  </label>
+                </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Others</label>
-                  <textarea value={otherInfo} onChange={(e) => setOtherInfo(e.target.value)} placeholder="Other info..." className="w-full px-3 py-2 border border-gray-300 rounded-md" rows="2" />
+                  <label className="block text-[10px] font-black text-[#6b21a8] uppercase mb-3">Experience Machine</label>
+                  <div className="flex flex-wrap gap-3">
+                    {Object.keys(experienceMachines).map(machine => (
+                      <label key={machine} className={`flex items-center px-4 py-2 rounded-xl border-2 transition-all cursor-pointer ${experienceMachines[machine] ? 'bg-[#6b21a8] border-[#6b21a8] text-white' : 'bg-white border-gray-100 text-gray-600 hover:border-purple-200'}`}>
+                        <input type="checkbox" className="hidden" checked={experienceMachines[machine]} onChange={() => handleMachineChange(machine)} />
+                        <span className="text-xs font-bold">{machine.replace('_', '/')}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-[#a162e8] uppercase mb-3">Designation</label>
+                  <div className="flex flex-wrap gap-3">
+                    {Object.keys(designation).map(desig => (
+                      <label key={desig} className={`flex items-center px-4 py-2 rounded-xl border-2 transition-all cursor-pointer ${designation[desig] ? 'bg-[#a162e8] border-[#a162e8] text-white' : 'bg-white border-gray-100 text-gray-600 hover:border-purple-200'}`}>
+                        <input type="checkbox" className="hidden" checked={designation[desig]} onChange={() => handleDesignation(desig)} />
+                        <span className="text-xs font-bold">{desig.replace('_', '/')}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Others Remarks</label>
+                  <textarea value={otherInfo} onChange={(e) => setOtherInfo(e.target.value)} placeholder="Other info..." className="w-full px-4 py-3 bg-white border border-[#d8b4fe] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#a162e8] text-sm font-semibold" rows="2" />
                 </div>
               </div>
             </div>
           )}
 
           {showSearch && (
-            <div className="mb-6 border rounded-lg overflow-hidden">
+            <div className="mb-8 border-4 border-[#f3e8ff] rounded-3xl overflow-hidden shadow-xl">
               <NidOrBirthCertificateSearch key={searchKey} nidOrBirthCertificateValue={searchValue} autoSearch={true} />
             </div>
           )}
 
           {/* Action Buttons */}
           {selectedCandidateData && !showReasonInput && (
-            <div className="flex gap-4 mb-4">
-              <button 
-                onClick={handlePassedButtonClick} 
-                disabled={loading}
-                className="flex-1 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 disabled:opacity-50 transition-colors"
-              >
+            <div className="flex gap-4">
+              <button onClick={handlePassedButtonClick} disabled={loading} className="flex-1 bg-green-500 text-white py-4 rounded-2xl font-bold hover:bg-green-600 disabled:opacity-50 transition-all shadow-lg active:scale-95">
                 Mark as PASSED
               </button>
-              <button 
-                onClick={handleFailedButtonClick} 
-                disabled={loading}
-                className="flex-1 bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 disabled:opacity-50 transition-colors"
-              >
-                Mark as Failed
+              <button onClick={handleFailedButtonClick} disabled={loading} className="flex-1 bg-red-500 text-white py-4 rounded-2xl font-bold hover:bg-red-600 disabled:opacity-50 transition-all shadow-lg active:scale-95">
+                Mark as FAILED
               </button>
             </div>
           )}
 
           {showReasonInput && (
-            <div className="mb-4 p-4 bg-red-50 rounded-lg border border-red-200">
-              <label className="block text-sm font-medium text-red-700 mb-2">Reason for Failure *</label>
-              <select
-                id="failureReason"
-                value={failureReason}
-                onChange={(e) => setFailureReason(e.target.value)}
-                className="w-full px-3 py-2 border border-red-300 rounded-md mb-3"
-              >
+            <div className="mb-4 p-6 bg-red-50 rounded-2xl border border-red-200">
+              <label className="block text-xs font-bold text-red-700 mb-3 uppercase">Reason for Failure *</label>
+              <select id="failureReason" value={failureReason} onChange={(e) => setFailureReason(e.target.value)} className="w-full px-4 py-3 border-2 border-red-100 rounded-xl mb-4 focus:outline-none font-bold">
                 <option value="">Select Failure Reason</option>
                 {FAILURE_REASONS.map((reason, index) => (
-                  <option key={index} value={reason}>
-                    {reason}
-                  </option>
+                  <option key={index} value={reason}>{reason}</option>
                 ))}
               </select>
-              <div className="flex gap-2">
-                <button onClick={() => handleResultUpdate('FAILED')} className="bg-red-600 text-white py-2 px-4 rounded-md">Confirm Failed</button>
-                <button onClick={() => setShowReasonInput(false)} className="bg-gray-500 text-white py-2 px-4 rounded-md">Cancel</button>
+              <div className="flex gap-3">
+                <button onClick={() => handleResultUpdate('FAILED')} className="bg-red-600 text-white py-2.5 px-6 rounded-xl font-bold hover:bg-red-700">Confirm Failed</button>
+                <button onClick={() => setShowReasonInput(false)} className="bg-gray-400 text-white py-2.5 px-6 rounded-xl font-bold hover:bg-gray-500">Cancel</button>
               </div>
             </div>
           )}
 
           {message && (
-            <div className={`p-3 rounded-md text-center mb-4 ${message.includes('successfully') ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'}`}>
+            <div className={`mt-6 p-4 rounded-2xl text-center font-bold animate-in slide-in-from-top-2 ${message.includes('successfully') ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
               {message}
             </div>
           )}
-          
-          
         </div>
       </div>
     </div>

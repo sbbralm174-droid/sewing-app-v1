@@ -16,12 +16,12 @@ export default function ResultSection({ formData, onChange }) {
             className="w-full p-2 rounded-md border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent sm:text-sm"
             required
           >
-            <option value="A">A</option>
+            <option value="Unskill">Unskill</option>
             <option value="A+">A+</option>
             <option value="A++">A++</option>
             <option value="B">B</option>
             <option value="B+">B+</option>
-            <option value="Unskill">Unskill</option>
+            <option value="A">A</option>
           </select>
         </div>
 

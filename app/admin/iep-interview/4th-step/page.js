@@ -247,7 +247,7 @@ export default function AdminInterviewForm() {
                     {filteredCandidates.map((candidate) => (
                       <div key={candidate._id} onClick={() => handleCandidateSelect(candidate._id)} className="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-200">
                         <div className="font-medium">{candidate.name} ({candidate.candidateId})</div>
-                        <div className="text-xs text-gray-500">NID: {candidate.nid || 'N/A'} | Floor: {candidate.floor}</div>
+                        <div className="text-xs text-gray-500">NID: {candidate.nid || 'N/A'} | Floor: {candidate.floor} | Grade: {candidate.grade}</div>
                       </div>
                     ))}
                   </div>

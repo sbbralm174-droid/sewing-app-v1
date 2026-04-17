@@ -40,26 +40,21 @@ export async function GET(request) {
       });
     }
 
-    // --- বাংলাদেশ টাইমজোন অনুযায়ী ডেট ফিল্টার লজিক ---
     if (startDate || endDate) {
       let dateFilter = {};
 
       if (startDate) {
-        // বাংলাদেশের সকাল ০৬:০০ টা মানে UTC অনুযায়ী ওই দিনের রাত ১২:০০ টা। 
-        // অথবা ইনপুট ডেটকে সরাসরি বাংলাদেশের শুরু (00:00:00) ধরে UTC তে রূপান্তর:
+        
         const start = new Date(startDate);
-        start.setUTCHours(0, 0, 0, 0); // দিনের একদম শুরু
-        // বাংলাদেশ সময় UTC থেকে ৬ ঘণ্টা এগিয়ে, তাই UTC তে ডেটা খুঁজতে অফসেট প্রয়োজন হতে পারে
-        // তবে সাধারণত ডাটাবেজে 00:00:00 থাকলে নিচের লজিক কাজ করবে:
+        start.setUTCHours(0, 0, 0, 0); 
         dateFilter.$gte = start;
       }
 
       if (endDate) {
         const end = new Date(endDate);
-        end.setUTCHours(23, 59, 59, 999); // দিনের একদম শেষ
+        end.setUTCHours(23, 59, 59, 999); 
         dateFilter.$lte = end;
       } else if (startDate) {
-        // যদি শুধুমাত্র startDate থাকে, তবে ওই নির্দিষ্ট ১ দিনের ডেটা দেখাবে
         const endOfDay = new Date(startDate);
         endOfDay.setUTCHours(23, 59, 59, 999);
         dateFilter.$lte = endOfDay;

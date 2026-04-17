@@ -662,22 +662,36 @@ function DataEntry({
   }, [candidateInfo, initialData, isClient])
 
   // Process select করলে DOP এবং SMV auto-fill করা
-  const handleProcessSelect = (index, selectedProcessName) => {
-    const selectedProcess = processesList.find(process => process.name === selectedProcessName)
-    
-    if (selectedProcess) {
-      const updatedProcesses = [...formData.processes]
-      updatedProcesses[index] = {
-        ...updatedProcesses[index],
-        processName: selectedProcess.name,
-        dop: selectedProcess.processStatus,
-        smv: selectedProcess.smv
-      }
-      setFormData({ ...formData, processes: updatedProcesses })
-    }
-  }
+//   const handleProcessSelect = (index, processId) => {
+//   const selectedProcess = allProcesses.find(p => p._id === processId);
 
-  const updateProcess = (index, field, value) => {
+//   const updated = [...formData.processes];
+
+//   updated[index].processName = processId;
+//   updated[index].smv = selectedProcess?.smv || '';
+//   updated[index].dop = selectedProcess?.code || '';
+
+//   setFormData({ ...formData, processes: updated });
+// };
+
+const handleProcessSelect = (index, processId) => {
+  const selectedProcess = assessmentProcesses.find(
+    (p) => p._id === processId
+  );
+
+  console.log("Selected Process:", selectedProcess); // 👈 debug
+
+  const updated = [...formData.processes];
+
+  updated[index].processName = selectedProcess?.name;
+  updated[index].smv = selectedProcess?.smv || '';
+  updated[index].dop = selectedProcess?.processStatus || '';
+
+  setFormData({ ...formData, processes: updated });
+};
+
+
+const updateProcess = (index, field, value) => {
     const updatedProcesses = [...formData.processes]
     if (field.startsWith('cycleTime')) {
       const cycleIndex = parseInt(field.split('-')[1])
@@ -748,10 +762,17 @@ function DataEntry({
 
   // শুধুমাত্র isAssessment: true আছে এমন processes ফিল্টার করুন
   const assessmentProcesses = processesList.filter(process => process.isAssessment === true)
-  const processOptions = assessmentProcesses.map((item) => ({
-    value: item.name,
-    label: item.name,
-  }))
+  const getProcessOptions = (machineType) => {
+  return assessmentProcesses
+    .filter((p) => p.machineType === machineType)
+    .map((p) => ({
+      value: p._id,
+      label: p.name,
+      smv: p.smv,
+      code: p.processStatus,
+    }));
+};
+
 
   return (
     <div className="bg-white shadow-md rounded-lg p-6">
@@ -941,7 +962,7 @@ function DataEntry({
             </button>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="min-w-full">
             <table className="min-w-full bg-white border border-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -985,15 +1006,23 @@ function DataEntry({
                     </td>
                     <td className="px-4 py-2 border min-w-[260px] z-10">
                       <Select
-                        options={processOptions}
-                        value={processOptions.find(
-                          (opt) => opt.value === process.processName
-                        )}
+                        options={process.machineType ? getProcessOptions(process.machineType) : []}
+                        
+                        value={
+                          process.machineType
+                            ? getProcessOptions(process.machineType).find(
+                                (opt) => opt.value === process.processName
+                              )
+                            : null
+                        }
+
                         onChange={(selectedOption) =>
                           handleProcessSelect(index, selectedOption.value)
                         }
+
                         className="w-full"
                         classNamePrefix="select"
+                        isDisabled={!process.machineType}
                         isSearchable
                       />
                     </td>
@@ -1333,6 +1362,16 @@ function AssessmentResults({ onBackToDataEntry, assessmentData, onUseAssessment,
     </div>
   )
 }
+
+
+
+
+
+
+
+
+
+
 // Helper function for calculations
 function calculateResults(data) {
   const processesWithCalculations = data.processes.map(process => {

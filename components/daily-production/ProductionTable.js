@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function ProductionTable({ 
   rows, 
@@ -23,6 +23,46 @@ export default function ProductionTable({
     setEditingRow(null);
     setEditData({});
   };
+
+  const newRow = {
+  operator: null,
+  machine: null,
+  process: '',
+  breakdownProcess: '',
+  smv: '',
+  workAs: 'Helper', // ✅ default
+  target: '',
+};
+
+
+const handleMachineAssign = (index, machineData) => {
+  const updatedRow = {
+    ...rows[index],
+    machine: machineData,
+    workAs: 'Operator', // ✅ machine পেলেই auto Operator
+  };
+
+  onUpdateRow(index, updatedRow);
+};
+
+const handleRemoveMachine = (index) => {
+  const updatedRow = {
+    ...rows[index],
+    machine: null,
+    workAs: 'Helper', // ✅ fallback
+  };
+
+  onUpdateRow(index, updatedRow);
+};
+
+
+useEffect(() => {
+  if (editData.machine) {
+    setEditData(prev => ({ ...prev, workAs: 'Operator' }));
+  } else {
+    setEditData(prev => ({ ...prev, workAs: 'Helper' }));
+  }
+}, [editData.machine]);
 
   const handleCancelClick = () => {
     setEditingRow(null);
@@ -116,7 +156,7 @@ export default function ProductionTable({
                 className={`hover:bg-gray-50 ${selectedRow === index ? 'bg-blue-50' : ''} ${row.isNew ? 'bg-green-50 animate-pulse' : ''}`}
               >
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {index + 1}
+                  {rows.length - index}
                 </td>
                 
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -211,23 +251,19 @@ export default function ProductionTable({
                   )}
                 </td>
                 
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {editingRow === index ? (
-                    <select
-                      value={editData.workAs || ''}
-                      onChange={(e) => handleEditChange(e, 'workAs')}
-                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                    >
-                      <option value="">Select...</option>
-                      <option value="Regular">Regular</option>
-                      <option value="Helper">Helper</option>
-                      <option value="Supervisor">Supervisor</option>
-                      <option value="Quality Checker">Quality Checker</option>
-                    </select>
-                  ) : (
-                    row.workAs || '-'
-                  )}
-                </td>
+                  <td>
+  <select
+    value={row.machine ? 'operator' : (row.workAs || 'Helper')}
+    onChange={() => {}}
+    disabled={row.machine}
+    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+  >
+    <option value="Helper">Helper</option>
+    <option value="operator">Operator</option>
+    <option value="Supervisor">Supervisor</option>
+    <option value="Quality Checker">Quality Checker</option>
+  </select>
+</td>
                 
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {editingRow === index ? (

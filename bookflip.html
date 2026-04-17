@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Sabbir's Book Portfolio | Immersive Flipbook</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none; /* Prevents accidental text selection while flipping */
+    }
+
+    body {
+      min-height: 100vh;
+      background: linear-gradient(145deg, #1a1e2a 0%, #0c0f17 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Segoe UI', 'Poppins', 'Inter', system-ui, -apple-system, sans-serif;
+      padding: 20px;
+    }
+
+    /* main container with atmospheric shadow */
+    .book-wrapper {
+      width: 100%;
+      max-width: 1100px;
+      margin: 0 auto;
+      perspective: 2200px;
+      filter: drop-shadow(0 25px 35px rgba(0,0,0,0.5));
+    }
+
+    /* book canvas container */
+    #book {
+      margin: 0 auto;
+      border-radius: 12px;
+      transition: all 0.2s ease;
+    }
+
+    /* --- global page styling (applies to every .page) --- */
+    .page {
+      background: #fef9e8;
+      background-image: radial-gradient(circle at 25% 40%, rgba(210, 180, 140, 0.08) 2%, transparent 2.5%);
+      background-size: 28px 28px;
+      color: #1e2a2e;
+      padding: 2rem 2.2rem;
+      box-sizing: border-box;
+      font-size: 1rem;
+      line-height: 1.5;
+      font-weight: 450;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      box-shadow: 
+        inset 0 0 18px rgba(0,0,0,0.04),
+        0 8px 28px rgba(0,0,0,0.2);
+      transition: box-shadow 0.2s;
+      font-family: 'Georgia', 'Times New Roman', serif;
+    }
+
+    /* subtle page edge texture */
+    .page::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      background: linear-gradient(90deg, rgba(0,0,0,0.02) 0%, rgba(255,255,240,0.05) 50%, rgba(0,0,0,0.02) 100%);
+      border-radius: 4px;
+    }
+
+    /* headings */
+    .page h1 {
+      font-size: 3rem;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.75rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #e6b422, #c97e2c);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-shadow: none;
+    }
+
+    .page h2 {
+      font-size: 2rem;
+      font-weight: 600;
+      border-left: 5px solid #e6b422;
+      padding-left: 18px;
+      margin-bottom: 1.2rem;
+      color: #2c3e2f;
+      letter-spacing: -0.3px;
+    }
+
+    .page p {
+      margin-bottom: 1rem;
+      font-size: 1.08rem;
+      color: #2d3e40;
+    }
+
+    /* cover specific */
+    .cover {
+      background: #0a0c12;
+      background-image: radial-gradient(ellipse at 30% 40%, rgba(230, 180, 40, 0.12) 1%, transparent 2%);
+      background-size: 40px 40px;
+      color: #f2e8cf;
+      text-align: center;
+      justify-content: center;
+      align-items: center;
+      border: 1px solid rgba(230, 180, 60, 0.3);
+    }
+
+    .cover h1 {
+      background: linear-gradient(145deg, #f7d44a, #e0a82b);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      font-size: 3.8rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .cover p {
+      color: #cfc9b0;
+      font-size: 1.2rem;
+      letter-spacing: 1px;
+    }
+
+    .back-cover {
+      background: #0a0c12;
+      background-image: linear-gradient(45deg, #1a1e2a 2%, #0c0f17 98%);
+      color: #d6ccb2;
+      text-align: center;
+      justify-content: center;
+    }
+
+    /* open button styling */
+    button {
+      margin-top: 28px;
+      padding: 12px 28px;
+      border: none;
+      background: #e6b422;
+      color: #111;
+      font-weight: bold;
+      font-size: 1.1rem;
+      border-radius: 40px;
+      cursor: pointer;
+      transition: 0.2s;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.2);
+      font-family: inherit;
+      letter-spacing: 0.5px;
+    }
+
+    button:hover {
+      background: #ffcd4a;
+      transform: scale(1.02);
+      box-shadow: 0 10px 18px rgba(0,0,0,0.25);
+    }
+
+    /* custom tooltip / hint for disabled auto-flip */
+    .info-badge {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(8px);
+      padding: 8px 16px;
+      border-radius: 40px;
+      font-size: 0.8rem;
+      font-family: monospace;
+      color: #ffdd99;
+      pointer-events: none;
+      z-index: 100;
+      font-weight: 500;
+      border-left: 3px solid #e6b422;
+    }
+
+    /* responsive adjustments */
+    @media (max-width: 700px) {
+      .page {
+        padding: 1.5rem;
+      }
+      .page h2 {
+        font-size: 1.6rem;
+      }
+      .info-badge {
+        bottom: 12px;
+        right: 12px;
+        font-size: 0.7rem;
+      }
+    }
+
+    /* disable any default flip-on-hover from library internals — we enforce via config & event block */
+  </style>
+</head>
+<body>
+
+<div class="book-wrapper">
+  <div id="book">
+
+    <!-- FRONT COVER (page 0) -->
+    <div class="page cover">
+      <h1>Sabbir</h1>
+      <p>I create experiences</p>
+      <button id="openBook">📖 Open Book</button>
+    </div>
+
+    <!-- BACK COVER (last page) - placed correctly in order, library will manage positions -->
+    <div class="page">
+      <h2>Welcome</h2>
+      <p>This is my story — crafted with intention, every page reveals a fragment of creative philosophy.</p>
+      <p style="margin-top: 16px; font-style: italic;">"Design is not just what it looks like, but how it feels."</p>
+    </div>
+
+    <!-- SHEET 1 (two pages) -->
+    <div class="page">
+      <h2>About</h2>
+      <p>I design stories, not screens. My work blends minimalism with emotional resonance. Every pixel serves a narrative.</p>
+      <p>📍 Based between imagination & craft.</p>
+    </div>
+
+    <div class="page">
+      <h2>About (cont.)</h2>
+      <p>I focus on emotion, not decoration. Design thinking that bridges human behavior and aesthetics.</p>
+      <p>✨ 6+ years of shaping digital identities.</p>
+    </div>
+
+    <!-- SHEET 2 -->
+    <div class="page">
+      <h2>Project 1</h2>
+      <p><strong>Problem</strong> → No identity / scattered presence</p>
+      <p><strong>Solution</strong> → Bold branding & immersive visual system</p>
+      <p><strong>Result</strong> → 300% growth in engagement + recognition award</p>
+    </div>
+
+    <div class="page">
+      <h2>Project 1 Details</h2>
+      <p>Deep explanation: crafted a modular design language, interactive components, and cohesive typography. The brand now feels unmistakable.</p>
+      <p>📌 Tools: Figma, Spline, GSAP.</p>
+    </div>
+
+    <!-- SHEET 3 -->
+    <div class="page">
+      <h2>Philosophy</h2>
+      <p>Less design. More feeling. I believe in negative space, rhythm, and tactile feedback — digital with soul.</p>
+      <p>“Perfection is achieved not when there is nothing left to add, but nothing left to take away.”</p>
+    </div>
+
+    <div class="page">
+      <h2>Contact & Connect</h2>
+      <p>📧 hello@sabbir.com</p>
+      <p>🐦 @sabbir_creates</p>
+      <p>🌐 sabbir.design</p>
+      <p style="margin-top: 18px;">Open for collaborations — let's tell your story.</p>
+    </div>
+
+    <!-- BACK COVER (final hard cover) -->
+    <div class="page cover back-cover">
+      <h2 style="border-left: none; text-align: center;">✧  End  ✧</h2>
+      <p style="margin-top: 20px;">thank you for flipping through</p>
+      <p style="font-size: 0.9rem;">© Sabbir — every story has a new beginning</p>
+    </div>
+
+  </div>
+</div>
+<div class="info-badge">
+  ⚡ Auto-flip disabled | Click & drag corners to flip
+</div>
+
+<!-- PageFlip library -->
+<script src="https://unpkg.com/page-flip@2.0.7/dist/js/page-flip.browser.js"></script>
+
+<script>
+  (function() {
+    // DOM elements
+    const bookElement = document.getElementById("book");
+    const openBtn = document.getElementById("openBook");
+
+    // --- CRITICAL: DISABLE ANY AUTO-FLIP / HOVER-INDUCED FLIPPING ---
+    // The user reported: "corner e mouse nie gelei auto flip hosse. eta bondho kore dite hobe."
+    // Means: when mouse moves to corner area (probably due to hover zones), the page auto-flips.
+    // We need to completely suppress the library's default hover/mouse corner detection that triggers flip.
+    
+    // Solution: 
+    // 1) Use pageFlip configuration: 'useMouseEvents' set to true BUT we will override event listeners 
+    //    to prevent flip on hover or corner proximity.
+    // 2) Remove any default 'flip on hover' behavior by manipulating internal event listeners after initialization.
+    // 3) Additionally, manually block any 'mouseenter' or 'mousemove' that might come from corner zones.
+    
+    // Initialize PageFlip with explicit settings that discourage unwanted auto-flip:
+    // - clickEventForward: false ensures no accidental clicks pass
+    // - flippingTime standard, but we'll also patch.
+    // - Important: The library may still have 'hover' or 'corner' detection based on 'useMouseEvents'.
+    //   We will aggressively intercept event listeners on the book container to stop corner auto-flip.
+    
+    const pageFlip = new St.PageFlip(bookElement, {
+      width: 350,
+      height: 500,
+      size: "stretch",
+      minWidth: 300,
+      maxWidth: 950,
+      minHeight: 420,
+      maxHeight: 750,
+      showCover: true,
+      useMouseEvents: true,     // We keep true for drag-to-flip but we'll disable corner-hover flip
+      mobileScrollSupport: true,
+      clickEventForward: false,  // avoid unwanted forward
+      swipeDistance: 45,
+      flippingTime: 700,
+      maxShadowOpacity: 0.5,
+      autoSize: true,
+    });
+    
+    // Load all pages (select all .page elements)
+    pageFlip.loadFromHTML(document.querySelectorAll(".page"));
+    
+    // Wait for initialization
+    pageFlip.on("init", () => {
+      // After library initializes, we manually patch/remove any hover or auto-flip triggers.
+      // The library version (page-flip) uses internal 'addEventListener' for mouse events.
+      // To fully stop 'corner hover' flip, we need to detach the internal handlers or prevent default.
+      
+      // 1) Access the book container's children: the library creates a wrapper with class 'stf__wrapper' or similar.
+      // However to be safe we target the parent container and block mousemove events that simulate corner flip.
+      // But better: override the internal 'checkCornerHover' function via prototype monkey-patch?
+      // Since it's a third-party library, we can also stop propagation on specific corner elements.
+      
+      // Approach: disable 'onCornerHover' method of PageFlip instance if possible, but we can remove 
+      // the event listeners added by library on the flip container.
+      // Safer: find the flip container (stf__flip) and overwrite relevant handlers.
+      
+      const bookContainer = bookElement;
+      // The library creates several divs; we will remove 'mouseenter' and 'mousemove' listeners that trigger corner flip.
+      // Because we cannot directly access bound functions, we can clone & replace? Instead:
+      // Add a capturing phase event listener to block any corner-triggered flip.
+      // The library's logic uses 'mouseenter' on corner zones? We'll block any event that leads to flipNext/flipPrev calls.
+      
+      // Override the pageFlip's internal methods responsible for corner flipping.
+      // Many page-flip versions have a method '_onMouseMove' that checks hover on corners. We'll override it to no-op.
+      if (pageFlip._onMouseMove && typeof pageFlip._onMouseMove === 'function') {
+        const originalMouseMove = pageFlip._onMouseMove;
+        pageFlip._onMouseMove = function(e) {
+          // completely ignore mouse move events that would trigger corner flip.
+          // But still allow drag flipping? Actually we want drag (click and drag) to work,
+          // but auto-hover flip should be disabled. The corner hover leads to flipping without click/drag.
+          // To preserve manual drag, we only skip if it's not a dragging intent.
+          // However easier: we disable auto flip flag. But let's suppress only when no mouse button is pressed.
+          if (!(e.buttons === 1)) {
+            // If no primary mouse button down, ignore the move event (prevents hover flip)
+            return;
+          }
+          // if mouse button is pressed, we allow original behavior for dragging flip
+          originalMouseMove.call(pageFlip, e);
+        };
+      }
+      
+      // Additionally, the library uses 'checkCorner' method. Override to return false always (so no auto-flip on hover).
+      if (pageFlip.checkCorner && typeof pageFlip.checkCorner === 'function') {
+        pageFlip.checkCorner = function() {
+          // returns corner type but we don't want any flip on just hover.
+          // Returning null or no action.
+          return null;
+        };
+      }
+      
+      // Override '_startUserTouch' or any start hover flipping detection.
+      // Also remove any 'mouseleave' corner flipping.
+      // Another robust method: find the underlying flip container and attach a 'mouseover' event to stop propagation.
+      const flipContainer = bookElement.querySelector('.stf__flip') || bookElement.querySelector('[class*="flip"]') || bookElement;
+      
+      // Disable all mouseenter/mouseleave events on potential corner overlays
+      const disableAutoFlipOnCorner = (e) => {
+        // If the event target is near corner but no drag, we prevent any flip action from library.
+        // We can stop immediate propagation to internal listeners
+        if (e.type === 'mouseenter' || e.type === 'mousemove') {
+          // check if any associated flip method would be called, we simply prevent default?
+          // we want to ensure library's internal flip method is not invoked.
+          // This is preventive.
+          if (!e.buttons) {
+            e.stopPropagation();
+          }
+        }
+      };
+      
+      // Attach capturing listeners to the book wrapper
+      bookElement.addEventListener('mouseenter', disableAutoFlipOnCorner, true);
+      bookElement.addEventListener('mousemove', disableAutoFlipOnCorner, true);
+      bookElement.addEventListener('mouseleave', (e) => {
+        // no action needed, just ensure no flip
+        e.stopPropagation();
+      }, true);
+      
+      // Also block any custom 'corner' events emitted by library
+      // Override flipNext/flipPrev to not be triggered by hover; but they will be called by user drag only.
+      // extra: add a global flag to ignore programmatic flip from corner
+      let suppressAutoFlip = true;
+      const originalFlipNext = pageFlip.flipNext;
+      const originalFlipPrev = pageFlip.flipPrev;
+      
+      // But we need to differentiate between manual drag vs hover trigger.
+      // The library triggers flip based on internal timer. However we can intercept by tracking if user clicked.
+      let userIsDragging = false;
+      pageFlip.on('startFlip', () => {
+        // track that flip started by user action, not auto
+      });
+      
+      // Because hover triggers a 'flip' without mouse down, we can add a condition: only allow flip if a 'mousedown' happened
+      // on the book previously within a small timeframe? simpler: override flip methods: if no drag active and no button down -> ignore.
+      bookElement.addEventListener('mousedown', () => {
+        userIsDragging = true;
+      });
+      document.addEventListener('mouseup', () => {
+        setTimeout(() => { userIsDragging = false; }, 50);
+      });
+      
+      pageFlip.flipNext = function(...args) {
+        // if auto-flip attempt (hover) occurs without user drag, block it.
+        // but we allow programmatic click (open button) and user drag.
+        // we check if there's an active mouse button or if called from user drag event.
+        if (!userIsDragging && !args._fromOpenButton) {
+          // Also if not from open button, reject hover flip
+          return false;
+        }
+        return originalFlipNext.apply(this, args);
+      };
+      
+      pageFlip.flipPrev = function(...args) {
+        if (!userIsDragging && !args._fromOpenButton) {
+          return false;
+        }
+        return originalFlipPrev.apply(this, args);
+      };
+      
+      // For the open button we can call with flag
+      if (openBtn) {
+        openBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          // open book: flip from cover (first page)
+          // ensure we allow the flip by adding custom flag.
+          try {
+            // Flip to next page (from cover to first spread)
+            // Using pageFlip.flipNext with context of manual override flag
+            // We'll directly invoke original but set userIsDragging temporarily true
+            userIsDragging = true;
+            pageFlip.flipNext();
+            setTimeout(() => { userIsDragging = false; }, 300);
+          } catch (err) {
+            console.warn("flip error", err);
+          }
+        });
+      }
+      
+      // Additional strong measure: find any corner divs generated by the library and kill hover style & event
+      const killCornerHover = () => {
+        const corners = bookElement.querySelectorAll('.stf__corner, .stf__corner-left, .stf__corner-right, [class*="corner"]');
+        corners.forEach(corner => {
+          corner.style.pointerEvents = 'none';   // prevents any hover detection on corner elements
+          // This ensures mouse cannot hover over corner graphic thus library never triggers flip-on-hover
+        });
+        // also disable any hover zones for page flip area
+        const flipArea = bookElement.querySelector('.stf__flip');
+        if (flipArea) {
+          flipArea.style.pointerEvents = 'auto'; // allow drag but corner sub-elements now have pointer-events:none
+        }
+      };
+      
+      // Run after each render or when pages flip? but run once and after a small delay
+      setTimeout(killCornerHover, 100);
+      pageFlip.on('flip', () => {
+        // after flip, reapply corner kill because new corners may be created dynamically
+        setTimeout(killCornerHover, 20);
+      });
+      
+      // Also override the library's internal method _flipOnCorner if exists
+      if (pageFlip._flipOnCorner) {
+        pageFlip._flipOnCorner = function() {};
+      }
+      
+      // one more layer: Remove any existing 'mouseover' listeners that might be attached via event listeners
+      // we can clone & replace but it's risky, but pointer-events: none on corner solves the main issue.
+      console.log("✅ Auto-flip (corner hover) completely disabled. Manual drag & open button works.");
+    });
+    
+    // Fallback: if init doesn't fire, apply kill after 0.5 sec
+    setTimeout(() => {
+      const killCornerHoverDelayed = () => {
+        if (!bookElement) return;
+        const corners = bookElement.querySelectorAll('.stf__corner, [class*="corner"]');
+        corners.forEach(c => c.style.pointerEvents = 'none');
+      };
+      killCornerHoverDelayed();
+    }, 300);
+    
+    // final safety: disable any document-level 'flip' event from being auto-called
+    window.addEventListener('load', () => {
+      // Also manually remove any attribute that might cause flipping
+      const style = document.createElement('style');
+      style.textContent = `
+        /* completely disable any hover effect on corner elements, no pointer events on internal corner zones */
+        .stf__corner, .stf__corner-left, .stf__corner-right, [class*="stf__corner"] {
+          pointer-events: none !important;
+        }
+        /* keep main flip area interactive for drag */
+        .stf__flip {
+          pointer-events: auto !important;
+        }
+      `;
+      document.head.appendChild(style);
+    });
+    
+  })();
+</script>
+</body>
+</html>

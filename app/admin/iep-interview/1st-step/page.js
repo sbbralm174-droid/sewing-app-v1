@@ -5,6 +5,8 @@ import Webcam from 'react-webcam';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import NidOrBirthCertificateSearch from '@/components/NidOrBirthCertificate';
 
+
+
 export default function VivaInterviewStep1() {
   const router = useRouter();
   const [formData, setFormData] = useState({
@@ -30,6 +32,12 @@ export default function VivaInterviewStep1() {
   const [selectedCamera, setSelectedCamera] = useState('');
   const [nidExists, setNidExists] = useState(false);
   const [nidExistsMessage, setNidExistsMessage] = useState('');
+
+  const [todayCount, setTodayCount] = useState(0);
+const [candidates, setCandidates] = useState([]);
+const [showAll, setShowAll] = useState(false);
+
+
   
   const photoFileRef = useRef(null);
   const webcamRef = useRef(null);
@@ -48,6 +56,33 @@ export default function VivaInterviewStep1() {
       setFormErrors(prev => ({ ...prev, [name]: '' }));
     }
   };
+
+
+
+const fetchTodayCandidates = async () => {
+  try {
+    const res = await fetch('/api/iep-interview/step-one/report');
+    const data = await res.json();
+
+    if (data.success) {
+      setTodayCount(data.totalCandidates);
+      setCandidates(data.data);
+    }
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+
+
+useEffect(() => {
+  fetchTodayCandidates();
+
+  // ⏱️ auto refresh every 3 sec (real-time feel)
+  const interval = setInterval(fetchTodayCandidates, 3000);
+
+  return () => clearInterval(interval);
+}, []);
 
   // NID চেঞ্জ হলে চেক করুন
   useEffect(() => {
@@ -450,6 +485,8 @@ export default function VivaInterviewStep1() {
   };
 
   const handleSubmit = async (result) => {
+
+
     setErrorMessage('');
     setSuccessMessage('');
 
@@ -491,6 +528,7 @@ export default function VivaInterviewStep1() {
         setSuccessMessage(`✅ Step 1 completed! Candidate ID: ${responseData.data.candidateId} - Result: ${result}`);
         setShowFailureReason(false);
         
+        fetchTodayCandidates();
         // Form reset
         setFormData({
           name: '',
@@ -557,7 +595,262 @@ export default function VivaInterviewStep1() {
   }, []);
 
   return (
-    <div className="min-h-screen mt-10 bg-gray-50 py-8">
+    <div className="min-h-screen mt-10 bg-gradient-to-br from-[#a162e8] via-[#8a43d6] to-[#6b21a8] text-[#E5E9F0] font-sans py-8">
+   
+ {/* 🚀 ULTRA SMOOTH INTERNAL CSS */}
+<style jsx>{`
+
+/* ===== CORNER COLOR LAYER + SWEEP ===== */
+
+.btn-sweep{
+  position:relative;
+  overflow:hidden;
+  border-radius:14px;
+  font-weight:600;
+  color:#ffffff;
+  z-index:1;
+  transition:transform .25s ease, box-shadow .25s ease;
+}
+
+.top-btn-sweep{
+ position:relative;
+  overflow:hidden;
+  border-radius:14px;
+  font-weight:600;
+  color:#ffffff;
+  z-index:1;
+  transition:transform .25s ease, box-shadow .25s ease;
+
+}
+
+
+
+/* BASE gradient stays */
+.btn-primary{
+  background:linear-gradient(135deg,#a162e8,#6b21a8);
+}
+.btn-success{
+  background:linear-gradient(135deg,#8494FF,#6367FF);
+}
+.btn-danger{
+  background:linear-gradient(135deg,#FF8383,#FF3737);
+}
+.btn-blue{
+  background:linear-gradient(135deg,#D946EF,#450693);
+}
+
+.top-btn-blue{
+  background:linear-gradient(135deg,#D946EF,#450693);
+}
+
+
+.btn-primary-copy{
+  background:linear-gradient(250deg,#D946EF,#450693);
+}
+/* ===== THIS IS THE SECRET LAYER (corner color) ===== */
+.btn-sweep::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  background:linear-gradient(
+    135deg,
+    rgba(255,255,255,0.28) 0%,
+    rgba(255,255,255,0.12) 25%,
+    rgba(255,255,255,0.0) 40%
+  );
+  z-index:0;
+}
+
+.top-btn-sweep::before{
+content:"";
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  background:linear-gradient(
+    135deg,
+    rgba(255,255,255,0.28) 0%,
+    rgba(255,255,255,0.12) 25%,
+    rgba(255,255,255,0.0) 40%
+  );
+  z-index:0;
+}
+
+
+/* ===== MOVING COLOR SWEEP ===== */
+.btn-sweep::after{
+  content:"";
+  position:absolute;
+  top:-120%;
+  left:-120%;
+  width:240%;
+  height:240%;
+  border-radius:inherit;
+  background:linear-gradient(
+    135deg,
+    rgba(255,255,255,0.35),
+    rgba(255,255,255,0.05),
+    rgba(255,255,255,0.35)
+  );
+  transform:rotate(18deg);
+  transition:all .8s cubic-bezier(.22,.61,.36,1);
+  z-index:0;
+}
+
+
+.top-btn-sweep::after{
+ content:"";
+  position:absolute;
+  top:-80%;
+  left:-80%;
+  width:240%;
+  height:240%;
+  border-radius:inherit;
+  background:linear-gradient(
+    135deg,
+    rgba(255,255,255,0.35),
+    rgba(255,255,255,0.05),
+    rgba(255,255,255,0.35)
+  );
+  transform:rotate(50deg);
+  transition:all .8s cubic-bezier(.22,.61,.36,1);
+  z-index:0;
+
+}
+
+.btn-sweep:hover::after{
+  top:0%;
+  left:0%;
+}
+
+.top-btn-sweep:hover::after{
+  top:0%;
+  left:0%;
+}
+
+.btn-sweep:hover{
+  transform:translateY(-3px);
+  box-shadow:0 5px 10px rgba(0,0,0,.35);
+}
+.top-btn-sweep:hover{
+ transform:translateY(-3px);
+  box-shadow:0 5px 10px rgba(0,0,0,.35);
+}
+
+
+.btn-sweep span{
+  position:relative;
+  z-index:2;
+}
+
+.top-btn-sweep{
+
+ position:relative;
+  z-index:2;
+}
+
+
+.clear-anim{
+  position: relative;
+  display: inline-block;
+  font-weight: 600;
+  color: #7c3aed;              /* purple tone */
+  cursor: pointer;
+  transition: color .25s ease, transform .25s ease;
+}
+
+/* underline sweep animation */
+.clear-anim::after{
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -3px;
+  width: 0%;
+  height: 2px;
+  background: linear-gradient(90deg,#a855f7,#ec4899);
+  transition: width .35s ease;
+  border-radius: 4px;
+}
+
+.clear-anim:hover{
+  color: #ec4899;              /* pink accent on hover */
+  transform: translateY(-2px);
+}
+
+.clear-anim:hover::after{
+  width: 100%;
+}
+
+/* ===== ROYAL BUTTON — SMOOTH LUXURY ANIMATION ===== */
+.btn-royal{
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  color: #fff;
+  background: linear-gradient(135deg,#4338ca,#7c3aed);
+  box-shadow: 0 8px 18px rgba(67,56,202,.35);
+  transition: transform .28s ease, box-shadow .28s ease, filter .28s ease;
+  isolation: isolate;
+}
+
+/* soft light layer */
+.btn-royal::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  background: radial-gradient(circle at 30% 30%,
+              rgba(255,255,255,.35),
+              transparent 45%);
+  opacity:.35;
+  transition: opacity .35s ease, transform .6s ease;
+}
+
+/* liquid sweep highlight */
+.btn-royal::after{
+  content:"";
+  position:absolute;
+  top:0;
+  left:-150%;
+  width:120%;
+  height:100%;
+  border-radius:inherit;
+  background: linear-gradient(
+    120deg,
+    transparent 0%,
+    rgba(255,255,255,.55) 45%,
+    transparent 80%
+  );
+  transform: skewX(-20deg);
+  transition: left .9s cubic-bezier(.22,.61,.36,1);
+}
+
+/* HOVER EFFECT */
+.btn-royal:hover{
+  transform: translateY(-3px);
+  box-shadow: 0 14px 32px rgba(67,56,202,.45);
+  filter: brightness(1.05);
+}
+
+.btn-royal:hover::after{
+  left:130%;
+}
+
+.btn-royal:hover::before{
+  opacity:.55;
+  transform: scale(1.08);
+}
+
+/* CLICK PRESS FEEL */
+.btn-royal:active{
+  transform: translateY(1px) scale(.98);
+  box-shadow: 0 6px 14px rgba(67,56,202,.35);
+}
+
+`}</style>
+   
+   
+   
       <div className="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow-lg">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-indigo-900">Employee Assessment 1st Step (Security)</h1>
@@ -574,7 +867,7 @@ export default function VivaInterviewStep1() {
               <button
                 type="button"
                 onClick={startScanner}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2"
+                className="top-btn-sweep btn-primary px-6 py-3 text-md font-bold" 
               >
                 <span>🔍 Open Scanner</span>
               </button>
@@ -586,7 +879,7 @@ export default function VivaInterviewStep1() {
                   stopScanner();
                   setShowScanner(false);
                 }}
-                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md font-medium text-sm"
+                className="top-btn-sweep btn-danger px-6 py-3 text-md font-bold"
               >
                 ❌ Close Scanner
               </button>
@@ -619,6 +912,64 @@ export default function VivaInterviewStep1() {
               </select>
             </div>
           )}
+
+          <div className="max-w-2xl mx-auto mb-6">
+  <div className="bg-indigo-600 text-white p-4 rounded-lg shadow flex justify-between items-center">
+    
+    <div>
+      <h2 className="text-lg font-semibold">Today Candidates</h2>
+      <p className="text-3xl font-bold">{todayCount}</p>
+    </div>
+
+    <button
+      onClick={() => setShowAll(true)}
+      className="bg-white text-indigo-600 px-4 py-2 rounded-md font-medium hover:bg-gray-100"
+    >
+      View All
+    </button>
+    
+  </div>
+</div>
+
+{showAll && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="bg-white w-full max-w-2xl p-6 rounded-lg shadow-lg max-h-[80vh] overflow-y-auto">
+
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold">All Candidates (Today)</h2>
+        <button
+          onClick={() => setShowAll(false)}
+          className="text-red-600 font-bold"
+        >
+          ✕
+        </button>
+      </div>
+
+      <table className="w-full border">
+        <thead>
+          <tr className="bg-gray-100">
+            <th className="p-2 border">Name</th>
+            <th className="p-2 border">ID</th>
+            <th className="p-2 border">Candidate ID</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {candidates.map((c, i) => (
+            <tr key={i} className="text-center">
+              <td className="p-2 border">{c.name}</td>
+              <td className="p-2 border">
+                {c.nid || c.birthCertificate}
+              </td>
+              <td className="p-2 border">{c.candidateId}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+    </div>
+  </div>
+)}
           
           {showScanner && (
             <div className="border-2 border-dashed border-purple-400 rounded-lg p-4 bg-purple-50 mb-4">
@@ -652,7 +1003,7 @@ export default function VivaInterviewStep1() {
               <button
                 type="button"
                 onClick={startScanner}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-md font-medium flex items-center justify-center gap-2 mx-auto"
+                className="top-btn-sweep btn-primary-copy px-6 py-3 text-md font-bold"
               >
                 <span className="text-xl">📷</span>
                 <span>Open Camera Scanner</span>
@@ -676,7 +1027,7 @@ export default function VivaInterviewStep1() {
           <textarea
             ref={textAreaRef}
             rows={3}
-            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            className="w-full p-3 text-gray-700 border border-purple-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
             placeholder="Paste scanned data here or use camera scanner above..."
             onPaste={handleTextAreaPaste}
             onBlur={(e) => {
@@ -699,7 +1050,7 @@ export default function VivaInterviewStep1() {
                   textAreaRef.current.value = '';
                 }
               }}
-              className="text-red-600 hover:text-red-800 text-sm"
+             className="clear-anim text-sm"
             >
               Clear
             </button>
@@ -707,15 +1058,15 @@ export default function VivaInterviewStep1() {
         </div>
 
         {/* Search Section */}
-        <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <h3 className="text-lg font-semibold text-blue-800 mb-2">🔍 Operator Search</h3>
-          <p className="text-sm text-blue-600 mb-3">
+        <div className="mb-6 p-4 bg-[#FFDFEF] rounded-lg border border-purple-500">
+          <h3 className="text-lg font-semibold text-gray-800 mb-2">🔍 Operator Search</h3>
+          <p className="text-sm text-gray-800 mb-3">
             NID বা Birth Certificate number দিয়ে operator এর details দেখুন
           </p>
           <button 
             onClick={handleSearch}
             disabled={!formData.nid.trim() && !formData.birthCertificate.trim()}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-3 rounded-md font-medium transition-colors flex items-center justify-center gap-2"
+           className="w-full btn-royal disabled:bg-gray-400 disabled:cursor-not-allowed px-4 py-3 rounded-md font-medium flex items-center justify-center gap-2"
           >
             <span>View Operator Details</span>
             <span className="text-sm">({formData.nid ? 'NID' : formData.birthCertificate ? 'Birth Certificate' : 'None'})</span>
@@ -775,6 +1126,9 @@ export default function VivaInterviewStep1() {
           </div>
         )}
 
+
+
+
         <form className="space-y-6">
           {/* Name Field */}
           <div>
@@ -787,7 +1141,7 @@ export default function VivaInterviewStep1() {
               name="name"
               value={formData.name}
               onChange={handleChange}
-              className="w-full p-3 rounded-md border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-base"
+              className="w-full p-3 rounded-md text-gray-700 border border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
               placeholder="Enter candidate full name (auto-filled from scanner)"
               required
             />
@@ -808,7 +1162,7 @@ export default function VivaInterviewStep1() {
                 name="nid"
                 value={formData.nid}
                 onChange={handleChange}
-                className={`w-full p-3 rounded-md border ${nidExists ? 'border-red-500 bg-red-50' : 'border-gray-300'} bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-base`}
+                className={`w-full p-3 rounded-md border ${nidExists ? 'border-red-500 bg-red-50' : 'border-gray-300'} text-gray-700 border border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"`}
                 placeholder="Enter NID number (auto-filled from scanner)"
               />
               {formErrors.nid && (
@@ -823,11 +1177,20 @@ export default function VivaInterviewStep1() {
                 name="birthCertificate"
                 value={formData.birthCertificate}
                 onChange={handleChange}
-                className="w-full p-3 rounded-md border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-base"
+                className="w-full p-3 rounded-md text-gray-700 border border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                 placeholder="Enter birth certificate ID"
               />
             </div>
           </div>
+
+
+
+
+
+
+
+
+
 
           {formErrors.idValidation && (
             <div className="p-3 bg-red-50 text-red-700 rounded-md text-sm">
@@ -847,17 +1210,17 @@ export default function VivaInterviewStep1() {
             </label>
             
             <div className="flex space-x-4 mb-4">
-              <button
-                type="button"
-                onClick={startCamera}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium transition-colors"
-              >
-                📷 Take Photo
-              </button>
+             <button
+  type="button"
+  onClick={startCamera}
+  className="flex-1 btn-sweep btn-primary px-6 py-3 text-md font-bold"
+>
+  <span>📷 Take Photo</span>
+</button>
               <button
                 type="button"
                 onClick={() => document.getElementById('fileInput').click()}
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-medium transition-colors"
+                className="flex-1 btn-sweep btn-blue px-6 py-3 text-md font-bold"
               >
                 📁 Upload File
               </button>
@@ -990,7 +1353,7 @@ export default function VivaInterviewStep1() {
                 type="button"
                 onClick={() => handleSubmit('PASSED')}
                 disabled={loading || (formData.nid && nidExists)}
-                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-3 rounded-md shadow-sm font-medium text-base transition-colors"
+                className="w-full btn-sweep btn-success px-6 py-3 text-md font-bold disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 {loading ? 'Processing...' : 'PASSED'}
               </button>
@@ -999,7 +1362,7 @@ export default function VivaInterviewStep1() {
                 type="button"
                 onClick={() => handleSubmit('FAILED')}
                 disabled={loading || (formData.nid && nidExists)}
-                className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-3 rounded-md shadow-sm font-medium text-base transition-colors"
+                className="w-full btn-sweep btn-danger px-6 py-3 text-md font-bold disabled:cursor-not-allowed " 
               >
                 {loading ? 'Processing...' : 'FAILED'}
               </button>
@@ -1007,7 +1370,7 @@ export default function VivaInterviewStep1() {
           )}
         </form>
 
-        <div className="mt-8 pt-4 border-t border-gray-200 text-center text-sm text-gray-500">
+        <div className="mt-8 pt-4 border-t border-purple-600 text-center text-sm text-gray-500">
           <p>📋 Instructions:</p>
           <ol className="list-decimal list-inside mt-2 text-left max-w-md mx-auto">
             <li>Use camera scanner to scan NID/barcode for automatic data entry</li>

@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Sabbir's Book Portfolio | Immersive Flipbook</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none; /* Prevents accidental text selection while flipping */
+    }
+
+    body {
+      min-height: 100vh;
+      background: linear-gradient(145deg, #1a1e2a 0%, #0c0f17 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Segoe UI', 'Poppins', 'Inter', system-ui, -apple-system, sans-serif;
+      padding: 20px;
+      /* Scrollbar hide korar jonno nichei line ti add kora hoyeche */
+      overflow: hidden; 
+    }
+
+    /* main container with atmospheric shadow */
+    .book-wrapper {
+      width: 100%;
+      max-width: 1100px;
+      margin: 0 auto;
+      perspective: 2200px;
+      filter: drop-shadow(0 25px 35px rgba(0,0,0,0.5));
+    }
+
+    /* book canvas container */
+    #book {
+      margin: 0 auto;
+      border-radius: 12px;
+      transition: all 0.2s ease;
+    }
+
+    /* --- global page styling (applies to every .page) --- */
+    .page {
+      background: #fef9e8;
+      background-image: radial-gradient(circle at 25% 40%, rgba(210, 180, 140, 0.08) 2%, transparent 2.5%);
+      background-size: 28px 28px;
+      color: #1e2a2e;
+      padding: 2rem 2.2rem;
+      box-sizing: border-box;
+      font-size: 1rem;
+      line-height: 1.5;
+      font-weight: 450;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      box-shadow: 
+        inset 0 0 18px rgba(0,0,0,0.04),
+        0 8px 28px rgba(0,0,0,0.2);
+      transition: box-shadow 0.2s;
+      font-family: 'Georgia', 'Times New Roman', serif;
+    }
+
+    /* subtle page edge texture */
+    .page::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      background: linear-gradient(90deg, rgba(0,0,0,0.02) 0%, rgba(255,255,240,0.05) 50%, rgba(0,0,0,0.02) 100%);
+      border-radius: 4px;
+    }
+
+    /* headings */
+    .page h1 {
+      font-size: 3rem;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.75rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #e6b422, #c97e2c);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-shadow: none;
+    }
+
+    .page h2 {
+      font-size: 2rem;
+      font-weight: 600;
+      border-left: 5px solid #e6b422;
+      padding-left: 18px;
+      margin-bottom: 1.2rem;
+      color: #2c3e2f;
+      letter-spacing: -0.3px;
+    }
+
+    .page p {
+      margin-bottom: 1rem;
+      font-size: 1.08rem;
+      color: #2d3e40;
+    }
+
+    /* cover specific */
+    .cover {
+      background: #0a0c12;
+      background-image: radial-gradient(ellipse at 30% 40%, rgba(230, 180, 40, 0.12) 1%, transparent 2%);
+      background-size: 40px 40px;
+      color: #f2e8cf;
+      text-align: center;
+      justify-content: center;
+      align-items: center;
+      border: 1px solid rgba(230, 180, 60, 0.3);
+    }
+
+    .cover h1 {
+      background: linear-gradient(145deg, #f7d44a, #e0a82b);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      font-size: 3.8rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .cover p {
+      color: #cfc9b0;
+      font-size: 1.2rem;
+      letter-spacing: 1px;
+    }
+
+    .back-cover {
+      background: #0a0c12;
+      background-image: linear-gradient(45deg, #1a1e2a 2%, #0c0f17 98%);
+      color: #d6ccb2;
+      text-align: center;
+      justify-content: center;
+    }
+
+    /* open button styling */
+    button {
+      margin-top: 28px;
+      padding: 12px 28px;
+      border: none;
+      background: #e6b422;
+      color: #111;
+      font-weight: bold;
+      font-size: 1.1rem;
+      border-radius: 40px;
+      cursor: pointer;
+      transition: 0.2s;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.2);
+      font-family: inherit;
+      letter-spacing: 0.5px;
+    }
+
+    button:hover {
+      background: #ffcd4a;
+      transform: scale(1.02);
+      box-shadow: 0 10px 18px rgba(0,0,0,0.25);
+    }
+
+    /* custom tooltip / hint for disabled auto-flip */
+    .info-badge {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(8px);
+      padding: 8px 16px;
+      border-radius: 40px;
+      font-size: 0.8rem;
+      font-family: monospace;
+      color: #ffdd99;
+      pointer-events: none;
+      z-index: 100;
+      font-weight: 500;
+      border-left: 3px solid #e6b422;
+    }
+
+    /* responsive adjustments */
+    @media (max-width: 700px) {
+      .page {
+        padding: 1.5rem;
+      }
+      .page h2 {
+        font-size: 1.6rem;
+      }
+      .info-badge {
+        bottom: 12px;
+        right: 12px;
+        font-size: 0.7rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="book-wrapper">
+  <div id="book">
+
+    <div class="page cover">
+      <h1>Sabbir</h1>
+      <p>I create experiences</p>
+      <button id="openBook">📖 Open Book</button>
+    </div>
+
+    <div class="page">
+      <h2>Welcome</h2>
+      <p>This is my story — crafted with intention, every page reveals a fragment of creative philosophy.</p>
+      <p style="margin-top: 16px; font-style: italic;">"Design is not just what it looks like, but how it feels."</p>
+    </div>
+
+    <div class="page">
+      <h2>About</h2>
+      <p>I design stories, not screens. My work blends minimalism with emotional resonance. Every pixel serves a narrative.</p>
+      <p>📍 Based between imagination & craft.</p>
+    </div>
+
+    <div class="page">
+      <h2>About (cont.)</h2>
+      <p>I focus on emotion, not decoration. Design thinking that bridges human behavior and aesthetics.</p>
+      <p>✨ 6+ years of shaping digital identities.</p>
+    </div>
+
+    <div class="page">
+      <h2>Project 1</h2>
+      <p><strong>Problem</strong> → No identity / scattered presence</p>
+      <p><strong>Solution</strong> → Bold branding & immersive visual system</p>
+      <p><strong>Result</strong> → 300% growth in engagement + recognition award</p>
+    </div>
+
+    <div class="page">
+      <h2>Project 1 Details</h2>
+      <p>Deep explanation: crafted a modular design language, interactive components, and cohesive typography. The brand now feels unmistakable.</p>
+      <p>📌 Tools: Figma, Spline, GSAP.</p>
+    </div>
+
+    <div class="page">
+      <h2>Philosophy</h2>
+      <p>Less design. More feeling. I believe in negative space, rhythm, and tactile feedback — digital with soul.</p>
+      <p>“Perfection is achieved not when there is nothing left to add, but nothing left to take away.”</p>
+    </div>
+
+    <div class="page">
+      <h2>Contact & Connect</h2>
+      <p>📧 hello@sabbir.com</p>
+      <p>🐦 @sabbir_creates</p>
+      <p>🌐 sabbir.design</p>
+      <p style="margin-top: 18px;">Open for collaborations — let's tell your story.</p>
+    </div>
+
+    <div class="page cover back-cover">
+      <h2 style="border-left: none; text-align: center;">✧  End  ✧</h2>
+      <p style="margin-top: 20px;">thank you for flipping through</p>
+      <p style="font-size: 0.9rem;">© Sabbir — every story has a new beginning</p>
+    </div>
+
+  </div>
+</div>
+<div class="info-badge">
+  ⚡ Auto-flip disabled | Click & drag corners to flip
+</div>
+
+<script src="https://unpkg.com/page-flip@2.0.7/dist/js/page-flip.browser.js"></script>
+
+<script>
+  (function() {
+    const bookElement = document.getElementById("book");
+    const openBtn = document.getElementById("openBook");
+    
+    const pageFlip = new St.PageFlip(bookElement, {
+      width: 350,
+      height: 500,
+      size: "stretch",
+      minWidth: 300,
+      maxWidth: 950,
+      minHeight: 420,
+      maxHeight: 750,
+      showCover: true,
+      useMouseEvents: true,
+      mobileScrollSupport: true,
+      clickEventForward: false,
+      swipeDistance: 45,
+      flippingTime: 700,
+      maxShadowOpacity: 0.5,
+      autoSize: true,
+    });
+    
+    pageFlip.loadFromHTML(document.querySelectorAll(".page"));
+    
+    pageFlip.on("init", () => {
+      if (pageFlip._onMouseMove && typeof pageFlip._onMouseMove === 'function') {
+        const originalMouseMove = pageFlip._onMouseMove;
+        pageFlip._onMouseMove = function(e) {
+          if (!(e.buttons === 1)) return;
+          originalMouseMove.call(pageFlip, e);
+        };
+      }
+      
+      if (pageFlip.checkCorner && typeof pageFlip.checkCorner === 'function') {
+        pageFlip.checkCorner = function() { return null; };
+      }
+      
+      const disableAutoFlipOnCorner = (e) => {
+        if (!e.buttons) e.stopPropagation();
+      };
+      
+      bookElement.addEventListener('mouseenter', disableAutoFlipOnCorner, true);
+      bookElement.addEventListener('mousemove', disableAutoFlipOnCorner, true);
+      
+      let userIsDragging = false;
+      bookElement.addEventListener('mousedown', () => { userIsDragging = true; });
+      document.addEventListener('mouseup', () => { setTimeout(() => { userIsDragging = false; }, 50); });
+      
+      const originalFlipNext = pageFlip.flipNext;
+      const originalFlipPrev = pageFlip.flipPrev;
+      
+      pageFlip.flipNext = function(...args) {
+        if (!userIsDragging && !args._fromOpenButton) return false;
+        return originalFlipNext.apply(this, args);
+      };
+      
+      pageFlip.flipPrev = function(...args) {
+        if (!userIsDragging && !args._fromOpenButton) return false;
+        return originalFlipPrev.apply(this, args);
+      };
+      
+      if (openBtn) {
+        openBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          try {
+            userIsDragging = true;
+            pageFlip.flipNext();
+            setTimeout(() => { userIsDragging = false; }, 300);
+          } catch (err) { console.warn("flip error", err); }
+        });
+      }
+      
+      const killCornerHover = () => {
+        const corners = bookElement.querySelectorAll('.stf__corner, .stf__corner-left, .stf__corner-right, [class*="corner"]');
+        corners.forEach(corner => { corner.style.pointerEvents = 'none'; });
+      };
+      
+      setTimeout(killCornerHover, 100);
+      pageFlip.on('flip', () => { setTimeout(killCornerHover, 20); });
+
+      if (pageFlip._flipOnCorner) pageFlip._flipOnCorner = function() {};
+    });
+
+    window.addEventListener('load', () => {
+      const style = document.createElement('style');
+      style.textContent = `
+        .stf__corner, .stf__corner-left, .stf__corner-right, [class*="stf__corner"] {
+          pointer-events: none !important;
+        }
+        .stf__flip { pointer-events: auto !important; }
+      `;
+      document.head.appendChild(style);
+    });
+  })();
+</script>
+</body>
+</html>

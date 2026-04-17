@@ -218,7 +218,7 @@ const handleScan = (data) => {
             process: '',
             breakdownProcess: '',
             smv: '',
-            workAs: 'operator',
+            workAs: 'Helper', // ✅ default,
             target: '',
             isNew: true,
           },
@@ -266,6 +266,7 @@ const handleScan = (data) => {
                   id: parsed.id,
                   uniqueId,
                 },
+                workAs: 'operator',
               }
             : r
         );
@@ -317,7 +318,7 @@ const handleScan = (data) => {
         process: row.process || '',
         breakdownProcess: row.breakdownProcess || '',
         smv: row.smv ? parseFloat(row.smv) : 0,
-        workAs: row.workAs || 'operator',
+        workAs: row.machine ? 'operator' : 'Helper',
         target: row.target ? parseInt(row.target) : 0
       }))
     };
@@ -380,11 +381,20 @@ const handleScan = (data) => {
 
               <ScanInput onScan={handleScan} disabled={!productionInfo} scanType={scanType} onScanTypeChange={setScanType} />
               <ProductionTable 
-                rows={rows} productionInfo={productionInfo} selectedRow={selectedRow}
-                onRowSelect={setSelectedRow} onAddRow={() => setRows([...rows, { operator: null, machine: null, isNew: true }])}
-                onUpdateRow={(idx, data) => setRows(rows.map((r, i) => i === idx ? { ...r, ...data } : r))}
-                onDeleteRow={(idx) => setRows(rows.filter((_, i) => i !== idx))}
-              />
+  rows={[...rows].reverse()}  // 🔥 শুধু এখানেই change
+  productionInfo={productionInfo}
+  selectedRow={selectedRow}
+  onRowSelect={setSelectedRow}
+  onAddRow={() => setRows([...rows, { operator: null, machine: null, isNew: true }])}
+  onUpdateRow={(idx, data) => {
+    const realIndex = rows.length - 1 - idx; // 🔥 important
+    setRows(rows.map((r, i) => i === realIndex ? { ...r, ...data } : r));
+  }}
+  onDeleteRow={(idx) => {
+    const realIndex = rows.length - 1 - idx; // 🔥 important
+    setRows(rows.filter((_, i) => i !== realIndex));
+  }}
+/>
               
               <div className="flex justify-end pt-4">
                 <button

@@ -298,120 +298,119 @@ export default function FloatingLayout() {
   );
 
   return (
-    <>
-      {/* Navbar - Full Width Top - No Border Radius */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled 
-          ? 'bg-white/95 backdrop-blur-lg shadow-xl border-b border-gray-200/50' 
-          : 'bg-white/90 backdrop-blur-md border-b border-gray-200/30'
-        }`}>
-        <div className="px-6 py-3">
-          <div className="flex justify-between items-center">
-            {/* Left side - Menu button and logo */}
-            <div className="flex items-center space-x-4">
+  <>
+    {/* Navbar - Full Width Top */}
+   <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+      isScrolled 
+        ? 'bg-[#8a43d6] backdrop-blur-lg shadow-[0_10px_30px_-10px_rgba(0,0,0,0.3)] border-b border-white/10' 
+        : 'bg-[#8a43d6] backdrop-blur-md border-b border-white/20 shadow-lg'
+    }`}>
+      <div className="px-6 py-3 relative">
+        <div className="flex justify-between items-center">
+          {/* Left side - Menu button and logo */}
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-2 rounded-md bg-white/80 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 border border-gray-200/50"
+            >
+              <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            
+            <Link href="/" className="flex items-center">
+              <div className="relative w-32 h-8 md:w-40 md:h-10">
+                <div className="hidden text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  Your Logo
+                </div>
+              </div>
+            </Link>
+          </div>
+
+          {/* Centered Desktop Nav Items */}
+{/* Centered Desktop Nav Items */}
+<div className="hidden lg:flex absolute left-1/2 transform -translate-x-1/2 space-x-8">
+  {navItems.map((item) => (
+    <Link
+      key={item.name}
+      href={item.href}
+      className="relative group font-bold text-lg text-white px-4 py-2 rounded-full overflow-hidden"
+    >
+      {/* Background animated span */}
+     <span className="absolute inset-0 rounded-full transform -translate-x-full 
+                 bg-blue-600 group-hover:bg-[#9656da] 
+                 group-hover:translate-x-0 transition-all duration-500 ease-in-out"></span>
+      {/* Text over background */}
+      <span className="relative z-10">{item.name}</span>
+    </Link>
+  ))}
+</div>
+
+          {/* Right side - Notifications & Mobile Menu */}
+          <div className="flex items-center space-x-4">
+            {/* Notification Bell Icon */}
+            <div className="relative" ref={notifRef}>
               <button
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                className="p-2 rounded-md bg-white/80 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 border border-gray-200/50"
+                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                className="p-2 rounded-full bg-white/80 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 border border-gray-200/50 relative"
+              >
+                <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-2.805A20.088 20.088 0 0018 10.5V6a2 2 0 00-2-2H8a2 2 0 00-2 2v4.5a20.088 20.088 0 00-1.595 4.695L4 17h5m6 0v2a2 2 0 01-2 2H11a2 2 0 01-2-2v-2m6 0H9" />
+                </svg>
+                
+                {notifications.length > 0 && (
+                  <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full">
+                    {notifications.length}
+                  </span>
+                )}
+              </button>
+              
+              {isNotificationsOpen && (
+                <NotificationsDropdown 
+                  notifications={notifications} 
+                  isLoading={isLoading} 
+                  error={error} 
+                />
+              )}
+            </div>
+
+            {/* Mobile Menu Button */}
+            <div className="lg:hidden">
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="p-2 rounded-md bg-white/90 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 border border-gray-200/50"
               >
                 <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
-              
-              <Link href="/" className="flex items-center">
-                <div className="relative w-32 h-8 md:w-40 md:h-10">
-                  <div className="hidden text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                    Your Logo
-                  </div>
-                </div>
-              </Link>
-            </div>
-
-            {/* Desktop Navigation & Actions */}
-            <div className="flex items-center space-x-4">
-              {/* Desktop Nav Items */}
-              <div className="hidden lg:flex items-center space-x-8">
-                {navItems.map((item) => (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    className={`font-medium transition-colors duration-300 relative group text-sm ${
-                      isActiveLink(item.href)
-                        ? 'text-blue-600'
-                        : 'text-gray-700 hover:text-blue-600'
-                    }`}
-                  >
-                    {item.name}
-                    <span className={`absolute bottom-0 left-0 h-0.5 bg-blue-600 transition-all duration-300 ${
-                      isActiveLink(item.href) ? 'w-full' : 'w-0 group-hover:w-full'
-                    }`}></span>
-                  </Link>
-                ))}
-              </div>
-              
-              {/* Notification Bell Icon */}
-              <div className="relative" ref={notifRef}>
-                <button
-                  onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                  className="p-2 rounded-full bg-white/80 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 border border-gray-200/50 relative"
-                >
-                  <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-2.805A20.088 20.088 0 0018 10.5V6a2 2 0 00-2-2H8a2 2 0 00-2 2v4.5a20.088 20.088 0 00-1.595 4.695L4 17h5m6 0v2a2 2 0 01-2 2H11a2 2 0 01-2-2v-2m6 0H9" />
-                  </svg>
-                  
-                  {notifications.length > 0 && (
-                    <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full">
-                      {notifications.length}
-                    </span>
-                  )}
-                </button>
-                
-                {isNotificationsOpen && (
-                  <NotificationsDropdown 
-                    notifications={notifications} 
-                    isLoading={isLoading} 
-                    error={error} 
-                  />
-                )}
-              </div>
-              
-              {/* Mobile Menu Button */}
-              <div className="lg:hidden">
-                <button
-                  onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                  className="p-2 rounded-md bg-white/90 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 border border-gray-200/50"
-                >
-                  <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                  </svg>
-                </button>
-              </div>
             </div>
           </div>
-
-          {/* Mobile Menu */}
-          {isMobileMenuOpen && (
-            <div className="lg:hidden mt-4 pb-4 border-t border-gray-200/50 pt-4">
-              <div className="flex flex-col space-y-3">
-                {navItems.map((item) => (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className={`font-medium transition-colors duration-300 py-2 px-3 rounded-md hover:bg-blue-50 text-sm ${
-                      isActiveLink(item.href)
-                        ? 'text-blue-600 bg-blue-50'
-                        : 'text-gray-700 hover:text-blue-600'
-                    }`}
-                  >
-                    {item.name}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
-      </nav>
+
+        {/* Mobile Menu */}
+        {isMobileMenuOpen && (
+          <div className="lg:hidden mt-4 pb-4 border-t border-gray-200/50 pt-4">
+            <div className="flex flex-col space-y-3">
+              {navItems.map((item) => (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`font-medium transition-colors duration-300 py-2 px-3 rounded-md hover:bg-blue-50 text-sm ${
+                    isActiveLink(item.href)
+                      ? 'text-blue-600 bg-blue-50'
+                      : 'text-gray-700 hover:text-blue-600'
+                  }`}
+                >
+                  {item.name}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </nav>
 
       {/* Dynamic Sidebar based on permissions */}
       <div className={`fixed left-0 z-40 transition-all duration-500 ease-in-out ${

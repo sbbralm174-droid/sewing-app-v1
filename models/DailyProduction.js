@@ -44,7 +44,7 @@ const DailyProductionSchema = new mongoose.Schema({
   totalManpower: { type: Number, default: 0 },
   buyerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Buyer', required: true },
   styleId: { type: mongoose.Schema.Types.ObjectId, ref: 'Style', required: true },
-  workAs: { type: String, enum: ['operator', 'helper'], required: true },
+  workAs: { type: String, enum: ['operator', 'helper', 'Helper'], required: true },
   smv: { type: String, default: "" },
   smvType: { type: String, enum: ['process', 'breakdown', ''], default: "" },
   rowNo: { type: Number, default: 0 },

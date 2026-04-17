@@ -111,6 +111,7 @@ export async function GET(request) {
         return {
           candidateId,
           picture: step1.picture,
+          date: step1.createdAt,
           name: step1.name,
           nid: step1.nid,
           currentStep,

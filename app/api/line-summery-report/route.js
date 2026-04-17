@@ -1,3 +1,121 @@
+// import { NextResponse } from 'next/server';
+// import { connectDB } from '@/lib/db';
+// import DailyProduction from '@/models/DailyProduction';
+
+// export async function GET(request) {
+//   try {
+//     await connectDB();
+
+//     const { searchParams } = new URL(request.url);
+
+//     const date      = searchParams.get('date');       // YYYY-MM-DD
+//     const floor     = searchParams.get('floor');
+//     const line      = searchParams.get('line');
+//     const startDate = searchParams.get('startDate');
+//     const endDate   = searchParams.get('endDate');
+
+//     // Match stage
+//     const match = {};
+
+//     if (date) {
+//       const targetDate = new Date(date);
+//       match.date = {
+//         $gte: new Date(targetDate.setHours(0, 0, 0, 0)),
+//         $lte: new Date(targetDate.setHours(23, 59, 59, 999))
+//       };
+//     } else if (startDate && endDate) {
+//       match.date = {
+//         $gte: new Date(startDate),
+//         $lte: new Date(endDate)
+//       };
+//     }
+
+//     if (floor) match.floor = floor;
+//     if (line)  match.line  = line;
+
+//     const summary = await DailyProduction.aggregate([
+//       { $match: match },
+
+//       {
+//         $group: {
+//           _id: {
+//             date:  { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
+//             floor: "$floor",
+//             line:  "$line"
+//           },
+//           // ==================== সবচেয়ে গুরুত্বপূর্ণ অংশ ====================
+//           totalManpower: { $sum: 1 },                    // প্রতি document = ১ জন
+//           totalOperator: {
+//             $sum: {
+//               $cond: [
+//                 { $eq: [{ $toLower: "$workAs" }, "operator"] }, 
+//                 1, 
+//                 0
+//               ]
+//             }
+//           },
+//           totalHelper: {
+//             $sum: {
+//               $cond: [
+//                 { $eq: [{ $toLower: "$workAs" }, "helper"] }, 
+//                 1, 
+//                 0
+//               ]
+//             }
+//           },
+//           hourlyTarget: { 
+//             $sum: { $ifNull: ["$hourlyTarget", "$target"] } 
+//           },
+//           totalSMV: { 
+//             $sum: { 
+//               $convert: { 
+//                 input: "$smv", 
+//                 to: "double", 
+//                 onError: 0, 
+//                 onNull: 0 
+//               } 
+//             } 
+//           },
+//           totalRecords: { $sum: 1 },
+//           supervisors: { $addToSet: "$supervisor" }
+//         }
+//       },
+
+//       { $sort: { "_id.date": -1, "_id.floor": 1, "_id.line": 1 } },
+
+//       {
+//         $project: {
+//           _id: 0,
+//           date:           "$_id.date",
+//           floor:          "$_id.floor",
+//           line:           "$_id.line",
+//           totalManpower:  1,
+//           totalOperator:  1,
+//           totalHelper:    1,
+//           hourlyTarget:   { $round: ["$hourlyTarget", 2] },
+//           totalSMV:       { $round: ["$totalSMV", 2] },
+//           totalRecords:   1,
+//           supervisors:    1
+//         }
+//       }
+//     ]);
+
+//     return NextResponse.json({
+//       success: true,
+//       data: summary,
+//       count: summary.length
+//     });
+
+//   } catch (error) {
+//     console.error("Production summary API error:", error);
+//     return NextResponse.json(
+//       { success: false, message: error.message || "Internal Server Error" },
+//       { status: 500 }
+//     );
+//   }
+// }
+
+
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import DailyProduction from '@/models/DailyProduction';

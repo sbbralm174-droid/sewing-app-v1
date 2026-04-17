@@ -170,7 +170,8 @@ candidateSchema.methods.markAsFailed = function(reason) {
   return this.save();
 };
 
-// Check if model already exists to prevent OverwriteModelError
+
 const Candidate = mongoose.models.Candidate || mongoose.model('Candidate', candidateSchema);
 
 export default Candidate;
+

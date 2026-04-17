@@ -188,3 +188,333 @@ export default function LineSummaryReport() {
     </div>
   )
 }
+
+
+
+
+
+
+// 'use client';
+
+// import { useState, useEffect } from 'react';
+
+// export default function ProductionSummary() {
+//   const today = new Date().toISOString().split('T')[0];
+
+//   const [activeTab, setActiveTab] = useState('summary');
+//   const [summaryData, setSummaryData] = useState([]);
+//   const [mismatchData, setMismatchData] = useState([]);
+//   const [loading, setLoading] = useState(false);
+//   const [error, setError] = useState('');
+
+//   const [filters, setFilters] = useState({
+//     date: today,
+//     floor: '',
+//     line: '',
+//     type: 'operator-workAs-helper'   // default mismatch type
+//   });
+
+//   const [floors, setFloors] = useState([]);
+//   const [lines, setLines] = useState([]);
+
+//   // Fetch Summary (তোমার আগের summary API)
+//   const fetchSummary = async () => {
+//     setLoading(true);
+//     setError('');
+//     let url = `/api/line-summery-report?date=${filters.date}`;
+//     if (filters.floor) url += `&floor=${encodeURIComponent(filters.floor)}`;
+//     if (filters.line) url += `&line=${encodeURIComponent(filters.line)}`;
+
+//     try {
+//       const res = await fetch(url);
+//       const result = await res.json();
+//       if (result.success) {
+//         setSummaryData(result.data || []);
+//         const uniqueFloors = [...new Set((result.data || []).map(item => item.floor))];
+//         const uniqueLines = [...new Set((result.data || []).map(item => item.line))];
+//         setFloors(uniqueFloors);
+//         setLines(uniqueLines);
+//       } else {
+//         setError(result.message || 'Failed to load summary');
+//       }
+//     } catch (err) {
+//       setError('Failed to fetch summary data');
+//       console.error(err);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   // Fetch Mismatch using YOUR provided API
+//   const fetchMismatch = async () => {
+//     setLoading(true);
+//     setError('');
+//     let url = `/api/reportnewdataentry/workasoperatorandhelper?date=${filters.date}&type=${filters.type}`;
+    
+//     if (filters.floor) url += `&floor=${encodeURIComponent(filters.floor)}`;
+//     if (filters.line) url += `&line=${encodeURIComponent(filters.line)}`;
+
+//     try {
+//       const res = await fetch(url);
+//       const result = await res.json();
+
+//       if (result && result.data) {
+//         setMismatchData(result.data);
+//       } else if (result && result.count !== undefined) {
+//         // যদি তোমার API এর ফরম্যাট count + data হয়
+//         setMismatchData(result.data || []);
+//       } else {
+//         setMismatchData([]);
+//       }
+//     } catch (err) {
+//       setError('Failed to fetch mismatch data');
+//       console.error(err);
+//       setMismatchData([]);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   // Load data when filters or tab changes
+//   useEffect(() => {
+//     if (activeTab === 'summary') {
+//       fetchSummary();
+//     } else {
+//       fetchMismatch();
+//     }
+//   }, [filters.date, filters.floor, filters.line, activeTab, filters.type]);
+
+//   const handleFilterChange = (e) => {
+//     const { name, value } = e.target;
+//     setFilters(prev => ({ ...prev, [name]: value }));
+//   };
+
+//   const resetFilters = () => {
+//     setFilters({
+//       date: today,
+//       floor: '',
+//       line: '',
+//       type: 'operator-workAs-helper'
+//     });
+//   };
+
+//   // Grand Total Calculation
+//   const grandTotal = summaryData.reduce((acc, item) => ({
+//     manpower: acc.manpower + (item.totalManpower || 0),
+//     operator: acc.operator + (item.totalOperator || 0),
+//     helper: acc.helper + (item.totalHelper || 0),
+//     hourlyTarget: acc.hourlyTarget + (item.hourlyTarget || 0),
+//     totalSMV: acc.totalSMV + (item.totalSMV || 0),
+//   }), { manpower: 0, operator: 0, helper: 0, hourlyTarget: 0, totalSMV: 0 });
+
+//   return (
+//     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-8">
+//       <div className="max-w-7xl mx-auto px-4">
+//         <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+//           Production Report
+//         </h1>
+//         {/* <p className="text-gray-600 dark:text-gray-400 mb-8">Summary & Designation vs WorkAs Mismatch</p> */}
+
+//         {/* Tabs */}
+//         <div className="flex border-b border-gray-200 dark:border-gray-700 mb-8">
+//           <button
+//             onClick={() => setActiveTab('summary')}
+//             className={`px-8 py-4 font-semibold text-lg transition-all ${activeTab === 'summary'
+//               ? 'border-b-4 border-blue-600 text-blue-600 font-bold'
+//               : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'}`}
+//           >
+//             Summary
+//           </button>
+//           <button
+//             onClick={() => setActiveTab('mismatch')}
+//             className={`px-8 py-4 font-semibold text-lg transition-all ${activeTab === 'mismatch'
+//               ? 'border-b-4 border-blue-600 text-blue-600 font-bold'
+//               : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'}`}
+//           >
+//             Work as Report
+//           </button>
+//         </div>
+
+//         {/* Filters */}
+//         <div className="bg-white dark:bg-gray-900 rounded-3xl shadow p-6 mb-8">
+//           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+//             <div>
+//               <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Date</label>
+//               <input
+//                 type="date"
+//                 name="date"
+//                 value={filters.date}
+//                 onChange={handleFilterChange}
+//                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+//               />
+//             </div>
+
+//             <div>
+//               <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Floor</label>
+//               <select name="floor" value={filters.floor} onChange={handleFilterChange}
+//                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500">
+//                 <option value="">All Floors</option>
+//                 {floors.map(f => <option key={f} value={f}>{f}</option>)}
+//               </select>
+//             </div>
+
+//             <div>
+//               <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Line</label>
+//               <select name="line" value={filters.line} onChange={handleFilterChange}
+//                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500">
+//                 <option value="">All Lines</option>
+//                 {lines.map(l => <option key={l} value={l}>{l}</option>)}
+//               </select>
+//             </div>
+
+//             {activeTab === 'mismatch' && (
+//               <div>
+//                 <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Mismatch Type</label>
+//                 <select 
+//                   name="type" 
+//                   value={filters.type} 
+//                   onChange={handleFilterChange}
+//                   className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+//                 >
+//                   <option value="operator-workAs-helper">Designation Operator + WorkAs Helper</option>
+//                   <option value="helper-workAs-operator">Designation Helper + WorkAs Operator</option>
+//                 </select>
+//               </div>
+//             )}
+
+//             <div className="flex items-end">
+//               <button
+//                 onClick={resetFilters}
+//                 className="w-full py-3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-2xl font-medium transition"
+//               >
+//                 Reset Filters
+//               </button>
+//             </div>
+//           </div>
+//         </div>
+
+//         {error && <div className="bg-red-100 text-red-700 p-4 rounded-2xl mb-6">{error}</div>}
+
+//         {/* ==================== SUMMARY TAB ==================== */}
+//         {activeTab === 'summary' && (
+//           <>
+//             {/* Grand Total Cards */}
+//             <div className="grid grid-cols-2 md:grid-cols-5 gap-6 mb-10">
+//               {[
+//                 { label: "Total Manpower", value: grandTotal.manpower, color: "blue" },
+//                 { label: "Total Operator", value: grandTotal.operator, color: "emerald" },
+//                 { label: "Total Helper", value: grandTotal.helper, color: "amber" },
+//                 //{ label: "Hourly Target", value: Math.round(grandTotal.hourlyTarget), color: "violet" },
+//                 { label: "Total SMV", value: grandTotal.totalSMV.toFixed(2), color: "rose" },
+//               ].map((card, i) => (
+//                 <div key={i} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow border border-gray-100 dark:border-gray-800">
+//                   <p className="text-gray-500 dark:text-gray-400 text-sm">{card.label}</p>
+//                   <p className={`text-4xl font-bold mt-3 text-${card.color}-600 dark:text-${card.color}-400`}>
+//                     {card.value}
+//                   </p>
+//                 </div>
+//               ))}
+//             </div>
+
+//             {/* Summary Table */}
+//             <div className="bg-white dark:bg-gray-900 rounded-3xl shadow overflow-hidden">
+//               <table className="w-full">
+//                 <thead className="bg-gray-100 dark:bg-gray-800">
+//                   <tr>
+//                     <th className="px-6 py-5 text-left">Date</th>
+//                     <th className="px-6 py-5 text-left">Floor</th>
+//                     <th className="px-6 py-5 text-left">Line</th>
+//                     <th className="px-6 py-5 text-center">Manpower</th>
+//                     <th className="px-6 py-5 text-center">Operator</th>
+//                     <th className="px-6 py-5 text-center">Helper</th>
+//                     {/* <th className="px-6 py-5 text-center">Hourly Target</th> */}
+//                     <th className="px-6 py-5 text-center">Total SMV</th>
+//                   </tr>
+//                 </thead>
+//                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+//                   {loading ? (
+//                     <tr><td colSpan={8} className="py-16 text-center text-gray-500">Loading summary...</td></tr>
+//                   ) : summaryData.length === 0 ? (
+//                     <tr><td colSpan={8} className="py-16 text-center text-gray-500">No data found</td></tr>
+//                   ) : (
+//                     summaryData.map((item, idx) => (
+//                       <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+//                         <td className="px-6 py-5">{item.date}</td>
+//                         <td className="px-6 py-5">{item.floor}</td>
+//                         <td className="px-6 py-5 font-medium">{item.line}</td>
+//                         <td className="px-6 py-5 text-center text-xl font-bold text-blue-600">{item.totalManpower}</td>
+//                         <td className="px-6 py-5 text-center text-xl font-bold text-emerald-600">{item.totalOperator}</td>
+//                         <td className="px-6 py-5 text-center text-xl font-bold text-amber-600">{item.totalHelper}</td>
+//                         {/* <td className="px-6 py-5 text-center font-semibold">{item.hourlyTarget}</td> */}
+//                         <td className="px-6 py-5 text-center font-semibold">{item.totalSMV}</td>
+//                       </tr>
+//                     ))
+//                   )}
+//                 </tbody>
+//               </table>
+//             </div>
+//           </>
+//         )}
+
+//         {/* ==================== MISMATCH TAB (তোমার API ব্যবহার করে) ==================== */}
+//         {activeTab === 'mismatch' && (
+//           <div className="bg-white dark:bg-gray-900 rounded-3xl shadow overflow-hidden">
+//             <div className="p-6 border-b bg-gray-50 dark:bg-gray-800">
+//               <h2 className="text-2xl font-semibold">
+//                 {filters.type === "operator-workAs-helper" 
+//                   ? "Designation Operator BUT WorkAs Helper" 
+//                   : "Designation Helper BUT WorkAs Operator"}
+//               </h2>
+//               <p className="text-gray-600 dark:text-gray-400 mt-1">
+//                 Total Records: <span className="font-bold text-red-600">{mismatchData.length}</span>
+//               </p>
+//             </div>
+
+//             <div className="overflow-x-auto">
+//               <table className="w-full">
+//                 <thead className="bg-gray-100 dark:bg-gray-800 sticky top-0">
+//                   <tr>
+//                     <th className="px-6 py-4 text-left">Floor</th>
+//                     <th className="px-6 py-4 text-left">Line</th>
+//                     <th className="px-6 py-4 text-left">Operator ID</th>
+//                     <th className="px-6 py-4 text-left">Name</th>
+//                     <th className="px-6 py-4 text-left">Designation</th>
+//                     <th className="px-6 py-4 text-left">WorkAs</th>
+//                     <th className="px-6 py-4 text-left">Machine</th>
+//                   </tr>
+//                 </thead>
+//                 <tbody className="divide-y">
+//                   {loading ? (
+//                     <tr><td colSpan={7} className="py-20 text-center">Loading mismatch records...</td></tr>
+//                   ) : mismatchData.length === 0 ? (
+//                     <tr><td colSpan={7} className="py-20 text-center text-red-500">No mismatch found for this filter</td></tr>
+//                   ) : (
+//                     mismatchData.map((item, idx) => (
+//                       <tr key={idx} className="hover:bg-red-50 dark:hover:bg-red-950/20 transition">
+//                         <td className="px-6 py-5">{item.floor}</td>
+//                         <td className="px-6 py-5">{item.line}</td>
+//                         <td className="px-6 py-5 font-mono text-sm">{item.operator?.operatorId || item.operatorId}</td>
+//                         <td className="px-6 py-5 font-medium">{item.operator?.name || item.name}</td>
+//                         <td className="px-6 py-5">
+//                           <span className="px-3 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 rounded-full">
+//                             {item.operator?.designation || item.designation}
+//                           </span>
+//                         </td>
+//                         <td className="px-6 py-5">
+//                           <span className="px-3 py-1 text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 rounded-full">
+//                             {item.workAs}
+//                           </span>
+//                         </td>
+//                         <td className="px-6 py-5 text-gray-600">{item.uniqueMachine || '-'}</td>
+//                       </tr>
+//                     ))
+//                   )}
+//                 </tbody>
+//               </table>
+//             </div>
+//           </div>
+//         )}
+//       </div>
+//     </div>
+//   );
+// }

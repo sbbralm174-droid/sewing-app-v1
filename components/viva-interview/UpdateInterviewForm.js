@@ -18,7 +18,7 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
     department: '',
     vivaDetails: [{ question: '', answer: '', remark: '' }],
     processAndScore: {},
-    grade: 'C',
+    grade: 'Unskill',
     result: 'PENDING',
     remarks: '',
     promotedToAdmin: false,
@@ -466,7 +466,7 @@ export default function InterviewForm({ candidateInfo, onBackToSearch }) {
                       setFormData(prev => ({
                         ...prev,
                         processAndScore: {},
-                        grade: 'C',
+                        grade: 'Unskill',
                         supplementaryMachines: {}
                       }));
                     }}

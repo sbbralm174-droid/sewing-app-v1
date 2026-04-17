@@ -1,4 +1,4 @@
-// app/api/search/route.js
+// app/findOperatorByNidOrBirtcirtificate/route.js
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import IepInterviewStepOne from '@/models/IepInterviewStepOne';
@@ -22,6 +22,14 @@ export async function GET(request) {
       );
     }
 
+    // $or কুয়েরি ব্যবহার করা হয়েছে যাতে nid অথবা birthCertificate যেকোনো একটার সাথে মিললেই ডেটা আসে
+    const searchQuery = {
+      $or: [
+        { nid: nidOrBirthCertificate },
+        { birthCertificate: nidOrBirthCertificate }
+      ]
+    };
+
     // সকল মডেল থেকে একসাথে তথ্য সংগ্রহ
     const [
       stepOneResults,
@@ -31,33 +39,36 @@ export async function GET(request) {
       operatorResults,
       resignHistoryResults
     ] = await Promise.all([
-      // Model 1: IepInterviewStepOne - nid field এ সার্চ
-      IepInterviewStepOne.find({ nid: nidOrBirthCertificate }),
+      // Model 1: IepInterviewStepOne
+      IepInterviewStepOne.find(searchQuery),
       
-      // Model 2: IepInterviewDownAdmin - nid এবং interviewData.nid এ সার্চ
-      IepInterviewDownAdmin.find({ 
+      // Model 2: IepInterviewDownAdmin (এখানে nested interviewData এর ভেতরও চেক করা হয়েছে)
+      IepInterviewDownAdmin.find({
         $or: [
           { nid: nidOrBirthCertificate },
-          { 'interviewData.nid': nidOrBirthCertificate }
+          { birthCertificate: nidOrBirthCertificate },
+          { 'interviewData.nid': nidOrBirthCertificate },
+          { 'interviewData.birthCertificate': nidOrBirthCertificate }
         ]
       }),
       
-      // Model 3: IepInterview - nid field এ সার্চ
-      IepInterview.find({ nid: nidOrBirthCertificate }),
+      // Model 3: IepInterview
+      IepInterview.find(searchQuery),
       
-      // Model 4: AdminInterview - nid এবং candidateId.nid এ সার্চ
-      AdminInterview.find({ 
+      // Model 4: AdminInterview (CandidateId এর ভেতরেও চেক করার চেষ্টা করবে যদি স্কিমা সাপোর্ট করে)
+      AdminInterview.find({
         $or: [
           { nid: nidOrBirthCertificate },
+          { birthCertificate: nidOrBirthCertificate },
           { 'candidateId.nid': nidOrBirthCertificate }
         ]
       }).populate('candidateId'),
       
-      // Model 5: Operator - nid field এ সার্চ
-      Operator.find({ nid: nidOrBirthCertificate }),
+      // Model 5: Operator
+      Operator.find(searchQuery),
       
-      // Model 6: ResignHistory - nid field এ সার্চ
-      ResignHistory.find({ nid: nidOrBirthCertificate })
+      // Model 6: ResignHistory
+      ResignHistory.find(searchQuery)
     ]);
 
     const responseData = {
@@ -122,7 +133,7 @@ export async function GET(request) {
     return NextResponse.json(
       { 
         success: false, 
-        message: 'সার্চ করতে সমস্যা হয়েছে',
+        message: 'সার্চ করতে সমস্যা হয়েছে',
         error: error.message 
       },
       { status: 500 }
@@ -145,7 +156,13 @@ export async function POST(request) {
       );
     }
 
-    // Search logic same as GET
+    const searchQuery = {
+      $or: [
+        { nid: nidOrBirthCertificate },
+        { birthCertificate: nidOrBirthCertificate }
+      ]
+    };
+
     const [
       stepOneResults,
       downAdminResults,
@@ -154,22 +171,24 @@ export async function POST(request) {
       operatorResults,
       resignHistoryResults
     ] = await Promise.all([
-      IepInterviewStepOne.find({ nid: nidOrBirthCertificate }),
-      IepInterviewDownAdmin.find({ 
+      IepInterviewStepOne.find(searchQuery),
+      IepInterviewDownAdmin.find({
         $or: [
           { nid: nidOrBirthCertificate },
+          { birthCertificate: nidOrBirthCertificate },
           { 'interviewData.nid': nidOrBirthCertificate }
         ]
       }),
-      IepInterview.find({ nid: nidOrBirthCertificate }),
-      AdminInterview.find({ 
+      IepInterview.find(searchQuery),
+      AdminInterview.find({
         $or: [
           { nid: nidOrBirthCertificate },
+          { birthCertificate: nidOrBirthCertificate },
           { 'candidateId.nid': nidOrBirthCertificate }
         ]
       }).populate('candidateId'),
-      Operator.find({ nid: nidOrBirthCertificate }),
-      ResignHistory.find({ nid: nidOrBirthCertificate })
+      Operator.find(searchQuery),
+      ResignHistory.find(searchQuery)
     ]);
 
     const responseData = {
@@ -234,7 +253,7 @@ export async function POST(request) {
     return NextResponse.json(
       { 
         success: false, 
-        message: 'সার্চ করতে সমস্যা হয়েছে',
+        message: 'সার্চ করতে সমস্যা হয়েছে',
         error: error.message 
       },
       { status: 500 }
