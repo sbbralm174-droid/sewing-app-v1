@@ -129,10 +129,6 @@ const duplicateCount = useMemo(() => {
 
 
 
-
-
-  
-
   const filteredSummary = {
     total: filteredCandidates.length,
     pending: filteredCandidates.filter(c => c.overallStatus === 'PENDING').length,
@@ -388,7 +384,7 @@ const duplicateCount = useMemo(() => {
                           </span>
                           <span className="text-xs text-gray-500">{candidate.nid ? candidate.nid : candidate.birthCertificate}</span>
                           <span className="text-xs text-gray-400">{candidate.candidateId}</span>
-                          <span className="text-xs text-gray-400">{(candidate.date).toString()}</span>
+                          <span className="text-xs text-gray-400">{new Date(candidate.date).toISOString().split('T')[0]}</span>
                         </div>
                       </div>
                     </td>

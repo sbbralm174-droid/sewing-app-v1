@@ -20,7 +20,7 @@ export default function InterviewStepTwo() {
   const dropdownRef = useRef(null);
 
   const [chairmanCertificate, setChairmanCertificate] = useState(false);
-  const [educationCertificate, setEducationCertificate] = useState(false);
+  const [educationCertificate, setEducationCertificate] = useState(true); // Changed: Default true
   const [experienceMachines, setExperienceMachines] = useState({
     SNLS_DNLS: false,
     OverLock: false,
@@ -28,7 +28,7 @@ export default function InterviewStepTwo() {
   });
   const [designation, setDesignation] = useState({
     ASST_OPERATOR: false,
-    OPERATOR: false,
+    OPERATOR: true, // Changed: Default true for OPERATOR
   });
   const [otherInfo, setOtherInfo] = useState('');
   const [floor, setFloor] = useState('');
@@ -94,29 +94,55 @@ export default function InterviewStepTwo() {
     }
   };
 
-  const handleSelectCandidate = (candidate) => {
+  const handleSelectCandidate = async (candidate) => {
     setSelectedCandidate(candidate.candidateId);
     setSelectedCandidateData(candidate);
     setSearchTerm(`${candidate.candidateId} - ${candidate.name}`);
     setIsDropdownOpen(false);
     setFailureReason('');
     setShowReasonInput(false);
-    setChairmanCertificate(false);
+    setChairmanCertificate(true);
     setEducationCertificate(false);
     setExperienceMachines({ SNLS_DNLS: false, OverLock: false, FlatLock: false });
-    setDesignation({ ASST_OPERATOR: false, OPERATOR: false });
+    setDesignation({ ASST_OPERATOR: false, OPERATOR: true });
     setOtherInfo('');
-    setFloor('');
+    setHomeDistrict('');
     setMessage('');
     setShowSearch(false);
+
+    // --- API Call to check duplicate NID/BC ---
+    try {
+      const idToCheck = candidate.nid || candidate.birthCertificate;
+      if (idToCheck) {
+        const res = await fetch(`/api/iep-interview/check-nid-ignore-today?nid=${idToCheck}`);
+        const data = await res.json();
+
+        if (data.exists) {
+          // নির্দিষ্ট ফরম্যাটে মেসেজ সেট করা হচ্ছে
+          setMessage(`⚠️ This ${candidate.nid ? 'NID' : 'Birth Certificate'} (${idToCheck}) already exists in database. Candidate: ${data.name}`);
+        }
+      }
+    } catch (error) {
+      console.error("Error checking duplicate candidate:", error);
+    }
   };
+
 
   const handleMachineChange = (machine) => {
     setExperienceMachines(prev => ({ ...prev, [machine]: !prev[machine] }));
   };
 
   const handleDesignation = (desig) => {
-    setDesignation(prev => ({ ...prev, [desig]: !prev[desig] }));
+    setDesignation(prev => {
+      // Create new object with all false
+      const newState = {
+        ASST_OPERATOR: false,
+        OPERATOR: false
+      };
+      // Set the clicked one to true (toggle)
+      newState[desig] = !prev[desig];
+      return newState;
+    });
   };
 
   const handleSearch = () => {
@@ -130,10 +156,18 @@ export default function InterviewStepTwo() {
 
   const handleResultUpdate = async (resultValue) => {
     if (!selectedCandidate) return;
+    
+    // District validation - must be submitted
+    if (!homeDistrict.trim()) {
+      alert("Please select Home District before submitting.");
+      return;
+    }
+    
     if (resultValue === 'FAILED' && !failureReason.trim()) {
       alert("Please provide a reason for failure.");
       return;
     }
+    
     try {
       setLoading(true);
       const requestData = {
@@ -176,8 +210,21 @@ export default function InterviewStepTwo() {
     }
   };
 
-  const handlePassedButtonClick = () => handleResultUpdate('PASSED');
+  const handlePassedButtonClick = () => {
+    // District validation before passing
+    if (!homeDistrict.trim()) {
+      alert("Please select Home District before submitting.");
+      return;
+    }
+    handleResultUpdate('PASSED');
+  };
+  
   const handleFailedButtonClick = () => {
+    // District validation before showing reason input
+    if (!homeDistrict.trim()) {
+      alert("Please select Home District before submitting.");
+      return;
+    }
     setShowReasonInput(true);
     setTimeout(() => document.getElementById('failureReason')?.focus(), 100);
   };
@@ -234,7 +281,7 @@ export default function InterviewStepTwo() {
           </div>
 
           {/* Search Bar & Dropdown UI */}
-          <div className="mb-8 relative   pb-8" ref={dropdownRef}>
+          <div className="mb-8 relative pb-8" ref={dropdownRef}>
             <div className="flex items-center mb-3">
                <span className="bg-[#8a43d6] w-2 h-6 rounded-full mr-2"></span>
                <label className="text-sm font-bold text-gray-700 uppercase tracking-wider">Select Candidate</label>
@@ -269,6 +316,18 @@ export default function InterviewStepTwo() {
             )}
           </div>
 
+          {message && (
+  <div className={` mb-6 p-4 rounded-2xl text-center font-bold animate-in slide-in-from-top-2 border shadow-sm ${
+    message.includes('⚠️') 
+      ? 'bg-amber-50 text-red-600 border-amber-200' // Warning style
+      : message.includes('successfully') 
+        ? 'bg-green-50 text-green-700 border-green-100' // Success style
+        : 'bg-red-50 text-red-700 border-red-100' // Error style
+  }`}>
+    {message}
+  </div>
+)}
+
           {/* Selected Candidate Details */}
           {selectedCandidateData && (
             <div className="mb-8 p-6 bg-gradient-to-r from-purple-50 to-white rounded-2xl border border-purple-100 shadow-sm animate-in zoom-in-95 duration-300">
@@ -300,7 +359,7 @@ export default function InterviewStepTwo() {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="relative" ref={distDropdownRef}>
-                  <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Home District</label>
+                  <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Home District <span className="text-red-500">*</span></label>
                   <input
                     type="text"
                     placeholder="Search district..."
@@ -308,6 +367,7 @@ export default function InterviewStepTwo() {
                     onFocus={() => { setIsDistDropdownOpen(true); setDistSearchTerm(''); }}
                     onChange={(e) => { setDistSearchTerm(e.target.value); setHomeDistrict(e.target.value); setIsDistDropdownOpen(true); }}
                     className="w-full px-4 py-2.5 bg-white border border-[#d8b4fe] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#a162e8] text-sm font-semibold"
+                    required
                   />
                   {isDistDropdownOpen && (
                     <div className="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-auto">
@@ -325,7 +385,10 @@ export default function InterviewStepTwo() {
                   <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Floor Assignment</label>
                   <select value={floor} onChange={(e) => setFloor(e.target.value)} className="w-full px-4 py-2.5 bg-white border border-[#d8b4fe] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#a162e8] text-sm font-semibold">
                     <option value="">Select Floor</option>
-                    <option value="SHAPLA">SHAPLA</option><option value="PODDO">PODDO</option><option value="KODOM">KODOM</option><option value="BELLY">BELLY</option>
+                    <option value="SHAPLA">SHAPLA</option>
+                    <option value="PODDO">PODDO</option>
+                    <option value="KODOM">KODOM</option>
+                    <option value="BELLY">BELLY</option>
                   </select>
                 </div>
               </div>
@@ -355,7 +418,7 @@ export default function InterviewStepTwo() {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-black text-[#a162e8] uppercase mb-3">Designation</label>
+                  <label className="block text-[10px] font-black text-[#a162e8] uppercase mb-3">Designation (Radio style - only one selectable)</label>
                   <div className="flex flex-wrap gap-3">
                     {Object.keys(designation).map(desig => (
                       <label key={desig} className={`flex items-center px-4 py-2 rounded-xl border-2 transition-all cursor-pointer ${designation[desig] ? 'bg-[#a162e8] border-[#a162e8] text-white' : 'bg-white border-gray-100 text-gray-600 hover:border-purple-200'}`}>
@@ -408,11 +471,7 @@ export default function InterviewStepTwo() {
             </div>
           )}
 
-          {message && (
-            <div className={`mt-6 p-4 rounded-2xl text-center font-bold animate-in slide-in-from-top-2 ${message.includes('successfully') ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
-              {message}
-            </div>
-          )}
+          
         </div>
       </div>
     </div>

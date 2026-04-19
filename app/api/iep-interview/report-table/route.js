@@ -1,4 +1,5 @@
 // app/api/iep-interview/report-table/route.js
+
 import { connectDB } from '@/lib/db';
 import VivaInterviewStep1 from '@/models/IepInterviewStepOne';
 import Candidate from '@/models/Candidate';
@@ -13,7 +14,7 @@ export async function GET(request) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    // Build date filter
+    // Date filter (same as before)
     let dateFilter = {};
     if (startDate && endDate) {
       dateFilter = {
@@ -23,12 +24,12 @@ export async function GET(request) {
         }
       };
     } else {
-      // Default to today
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
-      
+
       dateFilter = {
         createdAt: {
           $gte: today,
@@ -37,95 +38,129 @@ export async function GET(request) {
       };
     }
 
-    // Get all candidates from step 1 (base candidates)
+    // 🔥 STEP 1: Get base candidates
     const step1Candidates = await VivaInterviewStep1.find(dateFilter).lean();
-    
-    const reportData = await Promise.all(
-      step1Candidates.map(async (step1) => {
-        const candidateId = step1.candidateId;
-        
-        // Get data from all steps
-        const step2 = await Candidate.findOne({ candidateId }).lean();
-        const step3 = await VivaInterview.findOne({ candidateId }).lean();
-        let step4 = null;
-    if (step3?._id) {
-      step4 = await AdminInterview.findOne({ candidateId: step3._id }).lean();
-    }
 
-        // Determine current step and results
-        const steps = [
-          {
-            step: 1,
-            name: 'Initial Registration',
-            result: step1?.result, // Step 1 is always passed since they registered
-            failureReason: step1?.failureReason || null,
-            date: step1.createdAt
-          },
-          {
-            step: 2,
-            name: 'Candidate Screening',
-            result: step2?.result || (step2 ? 'PENDING' : 'NOT_REACHED'),
-            failureReason: step2?.failureReason || null,
-            floor: step2?.floor,
-            date: step2?.createdAt
-          },
-          {
-            step: 3,
-            name: 'Viva Interview',
-            result: step3?.result || (step3 ? 'PENDING' : 'NOT_REACHED'),
-            grade: step3?.grade ,
-            
-            failureReason: step3?.canceledReason || null,
-            date: step3?.createdAt
-          },
-          {
-            step: 4,
-            name: 'Admin Interview',
-            result: step4?.result || (step4 ? 'PENDING' : 'NOT_REACHED'),
-            failureReason: step4?.canceledReason || null,
-            date: step4?.createdAt
-          }
-        ];
+    const candidateIds = step1Candidates.map(c => c.candidateId);
 
-        // Find current step (last step with data)
-        let currentStep = 1;
-        for (let i = 4; i >= 1; i--) {
-          if ((i === 1 && step1) || (i === 2 && step2) || (i === 3 && step3) || (i === 4 && step4)) {
-            currentStep = i;
-            break;
-          }
-        }
+    // 🔥 STEP 2: Bulk fetch সব data
+    const step2Data = await Candidate.find({
+      candidateId: { $in: candidateIds }
+    }).lean();
 
-        // Overall status
-        let overallStatus = 'PENDING';
-        if (steps.some(step => step.result === 'FAILED')) {
-          overallStatus = 'FAILED';
-        } else if (steps.every(step => step.result === 'PASSED' || step.result === 'NOT_REACHED')) {
-          if (currentStep === 4 && steps[3].result === 'PASSED') {
-            overallStatus = 'PASSED';
-          } else {
-            overallStatus = 'PENDING';
-          }
-        }
+    const step3Data = await VivaInterview.find({
+      candidateId: { $in: candidateIds }
+    }).lean();
 
-        return {
-          candidateId,
-          picture: step1.picture,
-          date: step1.createdAt,
-          name: step1.name,
-          nid: step1.nid,
-          currentStep,
-          birthCertificate: step1.birthCertificate,
-          grade:step3?.grade,
-          floor: step2?.floor,
-          overallStatus,
-          steps,
-          registeredDate: step1.createdAt
-        };
-      })
+    const step3Ids = step3Data.map(s => s._id);
+
+    const step4Data = await AdminInterview.find({
+      candidateId: { $in: step3Ids }
+    }).lean();
+
+    // 🔥 STEP 3: Map তৈরি (O(1) lookup)
+    const step2Map = new Map(
+      step2Data.map(item => [item.candidateId, item])
     );
 
-    // Calculate summary
+    const step3Map = new Map(
+      step3Data.map(item => [item.candidateId, item])
+    );
+
+    const step4Map = new Map(
+      step4Data.map(item => [item.candidateId.toString(), item])
+    );
+
+    // 🔥 STEP 4: Build report (NO DB CALL HERE)
+    const reportData = step1Candidates.map((step1) => {
+      const candidateId = step1.candidateId;
+
+      const step2 = step2Map.get(candidateId);
+      const step3 = step3Map.get(candidateId);
+      const step4 = step3 ? step4Map.get(step3._id.toString()) : null;
+
+      // Same steps logic (unchanged)
+      const steps = [
+        {
+          step: 1,
+          name: 'Initial Registration',
+          result: step1?.result,
+          failureReason: step1?.failureReason || null,
+          date: step1.createdAt
+        },
+        {
+          step: 2,
+          name: 'Candidate Screening',
+          result: step2?.result || (step2 ? 'PENDING' : 'NOT_REACHED'),
+          failureReason: step2?.failureReason || null,
+          floor: step2?.floor,
+          date: step2?.createdAt
+        },
+        {
+          step: 3,
+          name: 'Viva Interview',
+          result: step3?.result || (step3 ? 'PENDING' : 'NOT_REACHED'),
+          grade: step3?.grade,
+          failureReason: step3?.canceledReason || null,
+          date: step3?.createdAt
+        },
+        {
+          step: 4,
+          name: 'Admin Interview',
+          result: step4?.result || (step4 ? 'PENDING' : 'NOT_REACHED'),
+          failureReason: step4?.canceledReason || null,
+          date: step4?.createdAt
+        }
+      ];
+
+      // currentStep logic (unchanged)
+      let currentStep = 1;
+      for (let i = 4; i >= 1; i--) {
+        if (
+          (i === 1 && step1) ||
+          (i === 2 && step2) ||
+          (i === 3 && step3) ||
+          (i === 4 && step4)
+        ) {
+          currentStep = i;
+          break;
+        }
+      }
+
+      // overallStatus logic (unchanged)
+      let overallStatus = 'PENDING';
+
+      if (steps.some(step => step.result === 'FAILED')) {
+        overallStatus = 'FAILED';
+      } else if (
+        steps.every(step =>
+          step.result === 'PASSED' || step.result === 'NOT_REACHED'
+        )
+      ) {
+        if (currentStep === 4 && steps[3].result === 'PASSED') {
+          overallStatus = 'PASSED';
+        } else {
+          overallStatus = 'PENDING';
+        }
+      }
+
+      return {
+        candidateId,
+        picture: step1.picture,
+        date: step1.createdAt,
+        name: step1.name,
+        nid: step1.nid,
+        currentStep,
+        birthCertificate: step1.birthCertificate,
+        grade: step3?.grade,
+        floor: step2?.floor,
+        overallStatus,
+        steps,
+        registeredDate: step1.createdAt
+      };
+    });
+
+    // Summary (same)
     const totalCandidates = reportData.length;
     const pending = reportData.filter(c => c.overallStatus === 'PENDING').length;
     const passed = reportData.filter(c => c.overallStatus === 'PASSED').length;
@@ -148,6 +183,7 @@ export async function GET(request) {
 
   } catch (error) {
     console.error('Error fetching candidate report:', error);
+
     return Response.json(
       { success: false, error: error.message },
       { status: 500 }

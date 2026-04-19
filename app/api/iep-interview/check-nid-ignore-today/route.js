@@ -1,3 +1,5 @@
+// /api/iep-interview/check-nid-ignore-today
+
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import VivaInterviewStep1 from '@/models/IepInterviewStepOne';
@@ -38,9 +40,9 @@ if (!idFromQuery) {
         { birthCertificate: idFromQuery },
       ].filter(Boolean),
      // 👉 ignore today's data
-      // createdAt: {
-      //   $lt: todayStart, // today er age
-      // },
+      createdAt: {
+        $lt: todayStart, // today er age
+      },
     });
 
     const existings = await VivaInterviewStep1.findOne({
