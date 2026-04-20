@@ -66,6 +66,8 @@ export default function NidOrBirthCertificateSearch({
     setResults(null);
   };
 
+  console.log(results)
+
   return (
     <>
       {showPopup && (
@@ -94,72 +96,78 @@ export default function NidOrBirthCertificateSearch({
             ) : results && typeof results === 'object' ? (
               results.success ? (
                 <>
-                  <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f0f8ff', borderRadius: '5px' }}>
-                    <p><strong>Total Records Found:</strong> {results.summary?.totalRecords || 0}</p>
-                    <p><strong>Data Sections:</strong> {
-                      results.summary?.modelsWithData
-                        ? results.summary.modelsWithData.map(m => displayNames[m] || m).join(', ')
-                        : 'None'
-                    }</p>
-                  </div>
+                  
 
                   {results.results && Object.entries(results.results).map(([key, modelData]) => (
                     modelData.count > 0 && (
                       <div key={key} style={{ marginBottom: '25px', border: '1px solid #ddd', borderRadius: '5px', overflow: 'hidden' }}>
                         <h4 style={{ backgroundColor: '#f8f9fa', padding: '10px', margin: 0, borderBottom: '1px solid #ddd' }}>
-                          {displayNames[modelData.model] || modelData.model} ({modelData.count})
+                          {displayNames[modelData.model] || modelData.model} 
                         </h4>
                         
                         <div style={{ overflowX: 'auto' }}>
                           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead style={{ backgroundColor: '#f1f1f1' }}>
                               <tr>
-                                <th style={{ padding: '10px', border: '1px solid #ddd' }}>Candidate ID</th>
-                                {modelData.model === 'AdminInterview' ? (
-                                  <>
-                                    <th style={{ padding: '10px', border: '1px solid #ddd' }}>NID / Birth Cert</th>
-                                    <th style={{ padding: '10px', border: '1px solid #ddd' }}>Result</th>
-                                    {modelData.data.some(d => d.result === 'FAILED') && (
-                                      <th style={{ padding: '10px', border: '1px solid #ddd' }}>Cancel Reason</th>
-                                    )}
-                                  </>
-                                ) : (
-                                  <>
-                                    <th style={{ padding: '10px', border: '1px solid #ddd' }}>Result</th>
-                                  </>
-                                )}
-                                <th style={{ padding: '10px', border: '1px solid #ddd' }}>Date</th>
+                                <th style={{ padding: '10px', border: '1px solid #ddd' }}>
+                                  {modelData.model === 'ResignHistory' ? 'Operator ID' : 'Candidate ID'}
+                                </th>
+
+                                <th style={{ padding: '10px', border: '1px solid #ddd' }}>
+                                  {modelData.model === 'ResignHistory' ? 'Reason' : 'Result'}
+                                </th>
+
+                                <th style={{ padding: '10px', border: '1px solid #ddd' }}>
+                                  Date
+                                </th>
                               </tr>
                             </thead>
+
                             <tbody>
-                              {modelData.data.map((item, idx) => (
-                                <tr key={idx}>
-                                  <td style={{ padding: '10px', border: '1px solid #ddd' }}>
-                                    {/* এখানে চেক করা হচ্ছে: candidateId যদি অবজেক্ট হয় তবে ভেতর থেকে মান নিবে, নাহলে সরাসরি মান দেখাবে */}
-                                    {typeof item.candidateId === 'object' 
-                                      ? (item.candidateId?.candidateId || 'N/A') 
-                                      : (item.candidateId || 'N/A')}
-                                  </td>
-                                  
-                                  {modelData.model === 'AdminInterview' ? (
-                                    <>
-                                      <td style={{ padding: '10px', border: '1px solid #ddd' }}>{String(item.nid || item.birthCertificate || 'N/A')}</td>
-                                      <td style={{ padding: '10px', border: '1px solid #ddd', color: item.result === 'FAILED' ? 'red' : 'green', fontWeight: 'bold' }}>
-                                        {String(item.result || 'N/A')}
-                                      </td>
-                                      {modelData.data.some(d => d.result === 'FAILED') && (
-                                        <td style={{ padding: '10px', border: '1px solid #ddd', color: 'red' }}>
-                                          {item.result === 'FAILED' ? String(item.canceledReason || 'Not Specified') : '-'}
-                                        </td>
-                                      )}
-                                    </>
-                                  ) : (
-                                    <td style={{ padding: '10px', border: '1px solid #ddd' }}>{String(item.result || 'N/A')}</td>
-                                  )}
-                                  
-                                  <td style={{ padding: '10px', border: '1px solid #ddd' }}>{formatDate(item.createdAt || item.interviewDate)}</td>
-                                </tr>
-                              ))}
+                              {modelData.data.map((item, idx) => {
+                                // candidateId handle (object or string)
+                                const candidateId =
+                                  typeof item.candidateId === 'object'
+                                    ? item.candidateId?.candidateId
+                                    : item.candidateId;
+
+                                return (
+                                  <tr key={idx}>
+                                    {/* ID */}
+                                    <td style={{ padding: '10px', border: '1px solid #ddd' }}>
+                                      {modelData.model === 'ResignHistory'
+                                        ? item.operatorId || 'N/A'
+                                        : candidateId || 'N/A'}
+                                    </td>
+
+                                    {/* Result / Reason */}
+                                    <td
+                                      style={{
+                                        padding: '10px',
+                                        border: '1px solid #ddd',
+                                        color:
+                                          modelData.model === 'ResignHistory'
+                                            ? '#333'
+                                            : item.result === 'FAILED'
+                                            ? 'red'
+                                            : 'green',
+                                        fontWeight: modelData.model === 'ResignHistory' ? 'normal' : 'bold'
+                                      }}
+                                    >
+                                      {modelData.model === 'ResignHistory'
+                                        ? item.reason || 'N/A'
+                                        : item.result || 'N/A'}
+                                    </td>
+
+                                    {/* Date */}
+                                    <td style={{ padding: '10px', border: '1px solid #ddd' }}>
+                                      {modelData.model === 'ResignHistory'
+                                        ? formatDate(item.resignationDate || item.createdAt)
+                                        : formatDate(item.createdAt || item.interviewDate)}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>

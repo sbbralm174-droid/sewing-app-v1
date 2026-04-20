@@ -1,8 +1,7 @@
-// /api/iep-interview/check-nid-ignore-today
-
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import VivaInterviewStep1 from '@/models/IepInterviewStepOne';
+import ResignHistory from '@/models/ResignHistory';
 
 export async function GET(request) {
   try {
@@ -12,51 +11,65 @@ export async function GET(request) {
     const nid = searchParams.get('nid');
     const birthCertificate = searchParams.get('birthCertificate');
 
-    if (!nid && !birthCertificate) {
-      return NextResponse.json(
-        { exists: false },
-        { status: 200 }
-      );
+    const idFromQuery = nid || birthCertificate;
+
+    if (!idFromQuery) {
+      return NextResponse.json({ exists: false }, { status: 200 });
     }
 
-    // 👉 Today start & end (UTC based)
+    // 👉 Today start (UTC)
     const todayStart = new Date();
     todayStart.setUTCHours(0, 0, 0, 0);
 
-    const todayEnd = new Date();
-    todayEnd.setUTCHours(23, 59, 59, 999);
-
-    // ১. ইউজার যেটাই পাঠাক (nid অথবা birthCertificate) সেটা ধরুন
-const idFromQuery = searchParams.get('nid') || searchParams.get('birthCertificate');
-
-if (!idFromQuery) {
-  return NextResponse.json({ exists: false }, { status: 200 });
-}
-
-    // 👉 Query
+    // ================================
+    // 1️⃣ VivaInterviewStep1 check (ignore today)
+    // ================================
     const existing = await VivaInterviewStep1.findOne({
       $or: [
-        {nid :  idFromQuery },
+        { nid: idFromQuery },
         { birthCertificate: idFromQuery },
-      ].filter(Boolean),
-     // 👉 ignore today's data
+      ],
       createdAt: {
-        $lt: todayStart, // today er age
+        $lt: todayStart,
       },
     });
 
-    const existings = await VivaInterviewStep1.findOne({
-      $or: [
-        { nid: idFromQuery },
-        { birthCertificate: idFromQuery }
-      ]
+    // ================================
+    // 2️⃣ ResignHistory check
+    // ================================
+    const resignData = await ResignHistory.findOne({
+      nid: idFromQuery,
     });
 
+    // ================================
+    // FINAL RESPONSE LOGIC
+    // ================================
+
+    // 👉 Case 1: VivaInterviewStep1 found
+    if (existing) {
+      return NextResponse.json({
+        exists: true,
+        source: 'interview',
+        candidateId: existing?.candidateId || null,
+        result: existing?.result || null,
+        name: existing?.name || null,
+      });
+    }
+
+    // 👉 Case 2: ResignHistory found
+    if (resignData) {
+      return NextResponse.json({
+        exists: true,
+        source: 'resigned',
+        name: resignData?.name || null,
+        reason: resignData?.reason || null,
+        performanceMark: resignData?.performanceMark || null,
+      });
+    }
+
+    // 👉 Case 3: Not found anywhere
     return NextResponse.json({
-      exists: !!existing,
-      candidateId: existing?.candidateId || null,
-      result: existing?.result || null,
-      name: existing?.name || null,
+      exists: false,
     });
 
   } catch (error) {
