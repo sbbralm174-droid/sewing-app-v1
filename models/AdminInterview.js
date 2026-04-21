@@ -13,7 +13,7 @@ const AdminInterviewSchema = new mongoose.Schema({
   },
   salary: {
     type: Number,
-    required: [true, 'Salary must be specified']
+    required: true,
   },
   joiningDate: {
     type: Date,

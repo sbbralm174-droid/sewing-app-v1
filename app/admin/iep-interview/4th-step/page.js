@@ -120,13 +120,17 @@ export default function AdminInterviewForm() {
     setFormData(prev => {
       const updated = { ...prev, [name]: type === 'checkbox' ? checked : value };
       if (name === 'result') {
-        if (value === 'PASSED') {
-          updated.promotedToOperator = true;
-        } else {
-          updated.promotedToOperator = false;
-          updated.canceledReason = value === 'FAILED' ? updated.canceledReason : '';
-        }
-      }
+  if (value === 'PASSED') {
+    updated.promotedToOperator = true;
+    updated.canceledReason = '';
+  } else if (value === 'FAILED') {
+    updated.promotedToOperator = false;
+    updated.canceledReason = 'A'; // ✅ auto first option
+  } else {
+    updated.promotedToOperator = false;
+    updated.canceledReason = '';
+  }
+}
       return updated;
     });
   };
@@ -134,7 +138,6 @@ export default function AdminInterviewForm() {
   const validateForm = () => {
     const errors = {};
     if (!formData.candidateId) errors.candidateId = 'Please select a candidate';
-    if (!formData.salary) errors.salary = 'Salary is required';
     if (formData.result === 'FAILED' && !formData.canceledReason) errors.canceledReason = 'Reason required';
     if (formData.promotedToOperator && (!formData.operatorId || !formData.joiningDate)) {
       errors.operatorId = 'Operator Info Required';
@@ -150,7 +153,7 @@ export default function AdminInterviewForm() {
     try {
       const submissionData = {
         ...formData,
-        salary: parseFloat(formData.salary),
+        salary: formData.salary ? parseFloat(formData.salary) : 0,
         designation: formData.designation || 'Operator'
       };
 
@@ -298,7 +301,7 @@ export default function AdminInterviewForm() {
             {/* Salary Section */}
             <div className="border border-gray-200 rounded-md p-4 bg-gray-50">
               <h2 className="text-lg font-semibold mb-3 text-indigo-600">Salary Information</h2>
-              <input type="number" name="salary" value={formData.salary} onChange={handleChange} placeholder="Enter salary" className="w-full p-2 rounded-md border border-gray-300 bg-white" required />
+              <input type="number" name="salary" value={formData.salary} onChange={handleChange} placeholder="Enter salary" className="w-full p-2 rounded-md border border-gray-300 bg-white"/>
             </div>
 
             {/* Result Section */}
