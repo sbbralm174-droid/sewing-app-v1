@@ -49,7 +49,11 @@ export default function OperatorResignForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+    console.log({
+  operatorId: operator.operatorId,
+  nid: editableNid,
+  formData
+});
     if (!operator) {
       showMessage('Please search and select an operator first', 'error');
       return;
@@ -65,7 +69,7 @@ export default function OperatorResignForm() {
         },
         body: JSON.stringify({
           operatorId: operator.operatorId,
-          nid: editableNid,
+          nid: editableNid?.trim(),
           ...formData
         }),
       });

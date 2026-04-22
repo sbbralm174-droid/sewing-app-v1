@@ -12,6 +12,7 @@ export async function POST(request) {
     const {
       operatorId,
       department,
+      nid,
       approvedBy,
       reason,
       performanceMark,
@@ -45,7 +46,7 @@ export async function POST(request) {
     const resignHistoryData = {
       operatorId: operator.operatorId,
       name: operator.name,
-      nid: operator.nid,
+      nid: nid.trim(),
       designation: operator.designation,
       grade: operator.grade,
       joiningDate: operator.joiningDate,
