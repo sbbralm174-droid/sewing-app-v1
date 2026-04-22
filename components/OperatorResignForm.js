@@ -8,6 +8,7 @@ export default function OperatorResignForm() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
+  const [editableNid, setEditableNid] = useState('');
 
   const [formData, setFormData] = useState({
     department: '',
@@ -32,6 +33,7 @@ export default function OperatorResignForm() {
 
       if (result.success) {
         setOperator(result.data);
+        setEditableNid(result.data.nid || '');
         showMessage('Operator found successfully', 'success');
       } else {
         setOperator(null);
@@ -63,6 +65,7 @@ export default function OperatorResignForm() {
         },
         body: JSON.stringify({
           operatorId: operator.operatorId,
+          nid: editableNid,
           ...formData
         }),
       });
@@ -114,6 +117,7 @@ export default function OperatorResignForm() {
   const resetForm = () => {
     setOperator(null);
     setSearchId('');
+    setEditableNid('');
     setFormData({
       department: '',
       approvedBy: '',
@@ -187,7 +191,12 @@ export default function OperatorResignForm() {
               </div>
               <div className="flex flex-col">
                 <span className="font-medium text-gray-600">National ID</span>
-                <span className="text-gray-800">{operator.nid}</span>
+                <input
+  type="text"
+  value={editableNid}
+  onChange={(e) => setEditableNid(e.target.value)}
+  className="text-gray-800 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+/>
               </div>
               <div className="flex flex-col">
                 <span className="font-medium text-gray-600">Designation</span>
