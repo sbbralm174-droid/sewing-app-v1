@@ -40,6 +40,14 @@ export default function InterviewStepTwo() {
 
   const [distSearchTerm, setDistSearchTerm] = useState('');
   const [isDistDropdownOpen, setIsDistDropdownOpen] = useState(false);
+
+  const [floorSummary, setFloorSummary] = useState({
+  SHAPLA: 0,
+  PODDO: 0,
+  KODOM: 0,
+  BELLY: 0
+});
+
   const distDropdownRef = useRef(null);
 
   const FAILURE_REASONS = ["A", "B", "C", "D", "E", "F"];
@@ -57,6 +65,22 @@ export default function InterviewStepTwo() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const fetchFloorSummary = async () => {
+  try {
+    const response = await fetch(
+      `/api/iep-interview/candidateFloorWise?date=${filterDate}`
+    );
+
+    const data = await response.json();
+
+    if (response.ok && data.success) {
+      setFloorSummary(data.data);
+    }
+  } catch (error) {
+    console.error("Floor summary fetch error:", error);
+  }
+};
+
   const DISTRICTS = [
     "BARISHAL", "BHOLA", "JHALOKATHI", "PATUAKHALI", "PIROJPUR", "BARGUNA",
     "CHATTOGRAM", "COX'S BAZAR", "RANGAMATI", "BANDARBAN", "KHAGRACHHARI", "FENI", "LAKSHMIPUR", "CUMILLA", "NOAKHALI", "BRAHMANBARIA",
@@ -72,9 +96,7 @@ export default function InterviewStepTwo() {
     d.toLowerCase().includes(distSearchTerm.toLowerCase())
   );
 
-  useEffect(() => {
-    fetchCandidates();
-  }, [filterDate]);
+  
 
   const fetchCandidates = async () => {
     try {
@@ -93,6 +115,11 @@ export default function InterviewStepTwo() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+  fetchCandidates();
+  fetchFloorSummary();
+}, [filterDate]);
 
   const handleSelectCandidate = async (candidate) => {
     setSelectedCandidate(candidate.candidateId);
@@ -126,6 +153,18 @@ export default function InterviewStepTwo() {
       console.error("Error checking duplicate candidate:", error);
     }
   };
+
+  const handleClearSelectedCandidate = () => {
+  setSelectedCandidate('');
+  setSelectedCandidateData(null);
+  setSearchTerm('');
+  setMessage('');
+  setShowReasonInput(false);
+  setFailureReason('');
+  setShowSearch(false);
+  setHomeDistrict('');
+  setFloor('');
+};
 
 
   const handleMachineChange = (machine) => {
@@ -280,6 +319,26 @@ export default function InterviewStepTwo() {
             </div>
           </div>
 
+          {/* Floor Wise Summary */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          {Object.entries(floorSummary).map(([floorName, count]) => (
+            <div
+              key={floorName}
+              className="bg-gradient-to-br from-[#f3e8ff] to-white border border-purple-200 rounded-2xl p-5 shadow-sm"
+            >
+              <p className="text-xs font-black text-[#6b21a8] uppercase mb-2">
+                {floorName}
+              </p>
+              <h2 className="text-3xl font-extrabold text-gray-800">
+                {count}
+              </h2>
+              <p className="text-xs text-gray-400 font-semibold mt-1">
+                Total Passed
+              </p>
+            </div>
+          ))}
+        </div>
+
           {/* Search Bar & Dropdown UI */}
           <div className="mb-8 relative pb-8" ref={dropdownRef}>
             <div className="flex items-center mb-3">
@@ -295,11 +354,34 @@ export default function InterviewStepTwo() {
                 onChange={(e) => { setSearchTerm(e.target.value); setIsDropdownOpen(true); }}
                 className="w-full px-6 py-4 bg-gray-50 border-2 border-transparent rounded-2xl shadow-inner focus:outline-none focus:border-[#a162e8] focus:bg-white transition-all text-gray-700 placeholder-gray-400 font-semibold"
               />
-              <div className="absolute right-5 top-4 text-[#a162e8] group-focus-within:animate-ping opacity-60">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
+              <div className="absolute right-4 top-3 flex items-center gap-2">
+  {searchTerm && (
+    <button
+      type="button"
+      onClick={handleClearSelectedCandidate}
+      className="w-8 h-8 rounded-full bg-red-100 hover:bg-red-200 text-red-600 font-bold text-lg flex items-center justify-center transition"
+    >
+      ×
+    </button>
+  )}
+
+  <div className="text-[#a162e8] opacity-60">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      className="h-6 w-6"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2.5}
+        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+      />
+    </svg>
+  </div>
+</div>
             </div>
 
             {isDropdownOpen && (

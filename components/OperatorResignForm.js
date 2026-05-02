@@ -369,19 +369,7 @@ export default function OperatorResignForm() {
           </div>
         )}
 
-        {/* Instructions */}
-        {!operator && !message && (
-          <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <h4 className="font-medium text-yellow-800 mb-2">Instructions:</h4>
-            <ul className="text-sm text-yellow-700 list-disc list-inside space-y-1">
-              <li>Enter Operator ID or National ID to search for an operator</li>
-              <li>After finding the operator, fill out the resignation form</li>
-              <li>All fields marked with * are required</li>
-              <li>Upon submission, operator data will be moved to resignation history</li>
-              <li>Operator will be removed from active operators list</li>
-            </ul>
-          </div>
-        )}
+        
       </div>
     </div>
   );
