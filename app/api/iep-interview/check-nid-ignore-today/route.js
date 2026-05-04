@@ -38,7 +38,10 @@ export async function GET(request) {
     // 2️⃣ ResignHistory check
     // ================================
     const resignData = await ResignHistory.findOne({
-      nid: idFromQuery,
+      $or: [
+        { nid: idFromQuery },
+        { birthCertificate: idFromQuery },
+      ],
     });
 
     // ================================
