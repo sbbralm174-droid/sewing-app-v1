@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import VivaInterviewStep1 from '@/models/IepInterviewStepOne';
+import ResignHistory from '@/models/ResignHistory';
 
 export async function GET(request) {
   try {
@@ -10,51 +11,58 @@ export async function GET(request) {
     const nid = searchParams.get('nid');
     const birthCertificate = searchParams.get('birthCertificate');
 
-    if (!nid && !birthCertificate) {
-      return NextResponse.json(
-        { exists: false },
-        { status: 200 }
-      );
+    const idFromQuery = nid || birthCertificate;
+
+    if (!idFromQuery) {
+      return NextResponse.json({ exists: false }, { status: 200 });
     }
 
-    // 👉 Today start & end (UTC based)
-    const todayStart = new Date();
-    todayStart.setUTCHours(0, 0, 0, 0);
-
-    const todayEnd = new Date();
-    todayEnd.setUTCHours(23, 59, 59, 999);
-
-    // ১. ইউজার যেটাই পাঠাক (nid অথবা birthCertificate) সেটা ধরুন
-const idFromQuery = searchParams.get('nid') || searchParams.get('birthCertificate');
-
-if (!idFromQuery) {
-  return NextResponse.json({ exists: false }, { status: 200 });
-}
-
-    // 👉 Query
-    const existing = await VivaInterviewStep1.findOne({
-      $or: [
-        {nid :  idFromQuery },
-        { birthCertificate: idFromQuery },
-      ].filter(Boolean),
-     // 👉 ignore today's data
-      // createdAt: {
-      //   $lt: todayStart, // today er age
-      // },
-    });
-
-    const existings = await VivaInterviewStep1.findOne({
+    // =========================
+    // 1️⃣ VivaInterviewStep1 check
+    // =========================
+    const interviewData = await VivaInterviewStep1.findOne({
       $or: [
         { nid: idFromQuery },
-        { birthCertificate: idFromQuery }
-      ]
+        { birthCertificate: idFromQuery },
+      ],
     });
 
+    // =========================
+    // 2️⃣ ResignHistory check
+    // =========================
+    const resignData = await ResignHistory.findOne({
+      $or: [
+        { nid: idFromQuery },
+        { birthCertificate: idFromQuery },
+      ],
+    });
+
+    // =========================
+    // FINAL RESPONSE
+    // =========================
+
+    if (interviewData) {
+      return NextResponse.json({
+        exists: true,
+        source: 'interview',
+        candidateId: interviewData?.candidateId || null,
+        result: interviewData?.result || null,
+        name: interviewData?.name || null,
+      });
+    }
+
+    if (resignData) {
+      return NextResponse.json({
+        exists: true,
+        source: 'resigned',
+        name: resignData?.name || null,
+        reason: resignData?.reason || null,
+        performanceMark: resignData?.performanceMark || null,
+      });
+    }
+
     return NextResponse.json({
-      exists: !!existing,
-      candidateId: existing?.candidateId || null,
-      result: existing?.result || null,
-      name: existing?.name || null,
+      exists: false,
     });
 
   } catch (error) {
