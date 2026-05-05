@@ -453,14 +453,14 @@ export default function InterviewStepTwo() {
                     value={homeDistrict || distSearchTerm}
                     onFocus={() => { setIsDistDropdownOpen(true); setDistSearchTerm(''); }}
                     onChange={(e) => { setDistSearchTerm(e.target.value); setHomeDistrict(e.target.value); setIsDistDropdownOpen(true); }}
-                    className="w-full px-4 py-2.5 bg-white border border-[#d8b4fe] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#a162e8] text-sm font-semibold"
+                    className="w-full px-4 py-2.5 bg-white border text-black border-[#d8b4fe] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#a162e8] text-sm font-semibold"
                     required
                   />
                   {isDistDropdownOpen && (
                     <div className="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-auto">
                       {filteredDistricts.map(dist => (
                         <div key={dist} onClick={() => { setHomeDistrict(dist); setDistSearchTerm(dist); setIsDistDropdownOpen(false); }} 
-                        className="px-4 py-2 hover:bg-[#f3e8ff] cursor-pointer text-sm border-b last:border-none">
+                        className="px-4 py-2 hover:bg-[#f3e8ff] text-black cursor-pointer text-sm border-b last:border-none">
                           {dist}
                         </div>
                       ))}
@@ -469,8 +469,8 @@ export default function InterviewStepTwo() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Floor Assignment</label>
-                  <select value={floor} onChange={(e) => setFloor(e.target.value)} className="w-full px-4 py-2.5 bg-white border border-[#d8b4fe] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#a162e8] text-sm font-semibold">
+                  <label className="block  text-xs font-bold text-gray-500 mb-2 uppercase">Floor Assignment</label>
+                  <select value={floor} onChange={(e) => setFloor(e.target.value)} className="w-full text-black px-4 py-2.5 bg-white border border-[#d8b4fe] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#a162e8] text-sm font-semibold">
                     <option value="">Select Floor</option>
                     <option value="SHAPLA">SHAPLA</option>
                     <option value="PODDO">PODDO</option>
