@@ -50,7 +50,12 @@ export default function InterviewStepTwo() {
 
   const distDropdownRef = useRef(null);
 
-  const FAILURE_REASONS = ["A", "B", "C", "D", "E", "F"];
+  const FAILURE_REASONS = [
+    "Past employment history", 
+    "Skills did not match job requirements", 
+    "Reapeted application", 
+    "Unverifiable documents", 
+  ];
 
   useEffect(() => {
     const handleClickOutside = (event) => {

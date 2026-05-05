@@ -25,26 +25,24 @@ export default function NidOrBirthCertificateSearch({
   }, [nidOrBirthCertificateValue, autoSearch]);
 
   const handleSearch = async () => {
-    if (!nidOrBirthCertificateValue || !nidOrBirthCertificateValue.trim()) {
-      return;
-    }
-    
+    if (!nidOrBirthCertificateValue?.trim()) return;
+
     setLoading(true);
     setShowPopup(true);
-    
+
     try {
       const params = new URLSearchParams();
       params.append('nidOrBirthCertificate', nidOrBirthCertificateValue);
-      
-      const response = await fetch(`/api/findOperatorByNidOrBirtcirtificate?${params}`);
-      const data = await response.json();
-      
+
+      const res = await fetch(`/api/findOperatorByNidOrBirtcirtificate?${params}`);
+      const data = await res.json();
+
       setResults(data);
     } catch (error) {
-      console.error('Search error:', error);
+      console.error(error);
       setResults({
         success: false,
-        message: 'Search failed. Please try again.'
+        message: 'Search failed'
       });
     } finally {
       setLoading(false);
@@ -54,9 +52,8 @@ export default function NidOrBirthCertificateSearch({
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-BD');
-    } catch (e) {
+      return new Date(dateString).toLocaleDateString('en-BD');
+    } catch {
       return 'Invalid Date';
     }
   };
@@ -66,124 +63,187 @@ export default function NidOrBirthCertificateSearch({
     setResults(null);
   };
 
-  console.log(results)
-
   return (
     <>
       {showPopup && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-          backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
-          justifyContent: 'center', alignItems: 'center', zIndex: 9999
-        }}>
-          <div style={{
-            backgroundColor: 'white', padding: '20px', borderRadius: '8px',
-            width: '95%', maxWidth: '1200px', maxHeight: '90vh',
-            overflow: 'auto', position: 'relative', boxShadow: '0 4px 15px rgba(0,0,0,0.3)'
-          }}>
-            <button onClick={closePopup} style={{
-                position: 'absolute', top: '10px', right: '15px',
-                background: '#eee', border: 'none', fontSize: '20px',
-                cursor: 'pointer', borderRadius: '50%', width: '30px', height: '30px'
-              }}>×</button>
+        <div style={styles.overlay}>
+          <div style={styles.modal}>
+            
+            {/* Close Button */}
+            <button onClick={closePopup} style={styles.closeBtn}>×</button>
 
-            <h2 style={{ marginBottom: '20px', color: '#333', borderBottom: '2px solid #eee', paddingBottom: '10px' }}>
-              Search Results for: {String(nidOrBirthCertificateValue)}
+            <h2 style={styles.title}>
+              Search Results: {nidOrBirthCertificateValue}
             </h2>
 
+            {/* Loading */}
             {loading ? (
-              <div style={{ textAlign: 'center', padding: '40px' }}><p>Searching... Please wait</p></div>
-            ) : results && typeof results === 'object' ? (
-              results.success ? (
-                <>
-                  
+              <p style={styles.center}>Searching...</p>
+            ) : results?.success ? (
 
-                  {results.results && Object.entries(results.results).map(([key, modelData]) => (
-                    modelData.count > 0 && (
-                      <div key={key} style={{ marginBottom: '25px', border: '1px solid #ddd', borderRadius: '5px', overflow: 'hidden' }}>
-                        <h4 style={{ backgroundColor: '#f8f9fa', padding: '10px', margin: 0, borderBottom: '1px solid #ddd' }}>
-                          {displayNames[modelData.model] || modelData.model} 
-                        </h4>
-                        
-                        <div style={{ overflowX: 'auto' }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead style={{ backgroundColor: '#f1f1f1' }}>
-                              <tr>
-                                <th style={{ padding: '10px', border: '1px solid #ddd' }}>
-                                  {modelData.model === 'ResignHistory' ? 'Operator ID' : 'Candidate ID'}
-                                </th>
+              <>
+                {results.results && Object.entries(results.results).map(([key, modelData]) => (
+                  modelData.count > 0 && (
+                    <div key={key} style={styles.card}>
+                      
+                      <h4 style={styles.cardTitle}>
+                        {displayNames[modelData.model] || modelData.model}
+                      </h4>
 
-                                <th style={{ padding: '10px', border: '1px solid #ddd' }}>
-                                  {modelData.model === 'ResignHistory' ? 'Reason' : 'Result'}
-                                </th>
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={styles.table}>
+                          <thead>
+                            <tr style={styles.thead}>
+                              <th style={styles.th}>
+                                {modelData.model === 'ResignHistory' ? 'Operator ID' : 'Candidate ID'}
+                              </th>
+                              <th style={styles.th}>
+                                {modelData.model === 'ResignHistory' ? 'Reason' : 'Result'}
+                              </th>
+                              <th style={styles.th}>
+                                {modelData.model === 'ResignHistory' ? 'Floor' : 'Floor'}
+                              </th>
+                              <th style={styles.th}>Date (M/D/Y)</th>
+                            </tr>
+                          </thead>
 
-                                <th style={{ padding: '10px', border: '1px solid #ddd' }}>
-                                  Date
-                                </th>
-                              </tr>
-                            </thead>
+                          <tbody>
+                            {modelData.data.map((item, idx) => {
+                              const candidateId =
+                                typeof item.candidateId === 'object'
+                                  ? item.candidateId?.candidateId
+                                  : item.candidateId;
 
-                            <tbody>
-                              {modelData.data.map((item, idx) => {
-                                // candidateId handle (object or string)
-                                const candidateId =
-                                  typeof item.candidateId === 'object'
-                                    ? item.candidateId?.candidateId
-                                    : item.candidateId;
+                              return (
+                                <tr key={idx}>
+                                  <td style={styles.td}>
+                                    {modelData.model === 'ResignHistory'
+                                      ? item.operatorId || 'N/A'
+                                      : candidateId || 'N/A'}
+                                  </td>
 
-                                return (
-                                  <tr key={idx}>
-                                    {/* ID */}
-                                    <td style={{ padding: '10px', border: '1px solid #ddd' }}>
-                                      {modelData.model === 'ResignHistory'
-                                        ? item.operatorId || 'N/A'
-                                        : candidateId || 'N/A'}
-                                    </td>
+                                  <td style={{
+                                    ...styles.td,
+                                    color:
+                                      modelData.model === 'ResignHistory'
+                                        ? '#374151'
+                                        : item.result === 'FAILED'
+                                        ? '#dc2626'
+                                        : '#16a34a',
+                                    fontWeight: '600'
+                                  }}>
+                                    {modelData.model === 'ResignHistory'
+                                      ? item.reason || 'N/A'
+                                      : item.result || 'N/A'}
+                                  </td>
 
-                                    {/* Result / Reason */}
-                                    <td
-                                      style={{
-                                        padding: '10px',
-                                        border: '1px solid #ddd',
-                                        color:
-                                          modelData.model === 'ResignHistory'
-                                            ? '#333'
-                                            : item.result === 'FAILED'
-                                            ? 'red'
-                                            : 'green',
-                                        fontWeight: modelData.model === 'ResignHistory' ? 'normal' : 'bold'
-                                      }}
-                                    >
-                                      {modelData.model === 'ResignHistory'
-                                        ? item.reason || 'N/A'
-                                        : item.result || 'N/A'}
-                                    </td>
+                                  <td style={styles.td}>
+                                    {modelData.model === 'ResignHistory'
+                                      ? item.floor 
+                                      : item.floor}
+                                  </td>
 
-                                    {/* Date */}
-                                    <td style={{ padding: '10px', border: '1px solid #ddd' }}>
-                                      {modelData.model === 'ResignHistory'
-                                        ? formatDate(item.resignationDate || item.createdAt)
-                                        : formatDate(item.createdAt || item.interviewDate)}
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
+                                  <td style={styles.td}>
+                                    {modelData.model === 'ResignHistory'
+                                      ? formatDate(item.resignationDate || item.createdAt)
+                                      : formatDate(item.createdAt || item.interviewDate)}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
                       </div>
-                    )
-                  ))}
-                </>
-              ) : (
-                <div style={{ color: 'red', textAlign: 'center', padding: '20px' }}>
-                  {String(results.message || 'No data found')}
-                </div>
-              )
-            ) : null}
+                    </div>
+                  )
+                ))}
+              </>
+
+            ) : (
+              <p style={{ ...styles.center, color: 'red' }}>
+                {results?.message || 'No data found'}
+              </p>
+            )}
           </div>
         </div>
       )}
     </>
   );
 }
+
+/* 🎨 CLEAN MODERN STYLES */
+const styles = {
+  overlay: {
+    position: 'fixed',
+    inset: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999
+  },
+  modal: {
+    backgroundColor: '#ffffff',
+    color: '#1f2937',   // 🔥 fixed visibility
+    padding: '20px',
+    borderRadius: '10px',
+    width: '95%',
+    maxWidth: '1100px',
+    maxHeight: '90vh',
+    overflow: 'auto',
+    position: 'relative'
+  },
+  closeBtn: {
+    position: 'absolute',
+    top: '10px',
+    right: '15px',
+    border: 'none',
+    background: '#eee',
+    borderRadius: '50%',
+    width: '32px',
+    height: '32px',
+    cursor: 'pointer',
+    fontSize: '18px'
+  },
+  title: {
+    marginBottom: '15px',
+    borderBottom: '1px solid #e5e7eb',
+    paddingBottom: '10px',
+    fontSize: '20px',
+    fontWeight: '600'
+  },
+  center: {
+    textAlign: 'center',
+    padding: '20px'
+  },
+  card: {
+    marginBottom: '20px',
+    border: '1px solid #e5e7eb',
+    borderRadius: '6px',
+    overflow: 'hidden'
+  },
+  cardTitle: {
+    backgroundColor: '#f9fafb',
+    padding: '10px',
+    fontWeight: '600',
+    borderBottom: '1px solid #e5e7eb'
+  },
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse'
+  },
+  thead: {
+    backgroundColor: '#f3f4f6'
+  },
+  th: {
+    padding: '10px',
+    border: '1px solid #e5e7eb',
+    textAlign: 'left',
+    fontSize: '14px'
+  },
+  td: {
+    padding: '10px',
+    border: '1px solid #e5e7eb',
+    fontSize: '14px'
+  }
+};

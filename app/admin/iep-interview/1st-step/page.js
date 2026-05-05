@@ -100,7 +100,7 @@ useEffect(() => {
                 
               } else {
                 setNidExists(false);
-                setNidExistsMessage('');
+                setNidExistsMessage('No data found in Database');
               }
             }
           }, 500);
@@ -859,32 +859,7 @@ content:"";
 
         {/* CAMERA SCANNER SECTION */}
         <div className="mb-6">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="text-lg font-semibold text-gray-700">
-              📷 Camera Scanner
-            </h3>
-            {!showScanner && (
-              <button
-                type="button"
-                onClick={startScanner}
-                className="top-btn-sweep btn-primary px-6 py-3 text-md font-bold" 
-              >
-                <span>🔍 Open Scanner</span>
-              </button>
-            )}
-            {showScanner && (
-              <button
-                type="button"
-                onClick={() => {
-                  stopScanner();
-                  setShowScanner(false);
-                }}
-                className="top-btn-sweep btn-danger px-6 py-3 text-md font-bold"
-              >
-                ❌ Close Scanner
-              </button>
-            )}
-          </div>
+          
           
           {/* Camera Selection Dropdown */}
           {availableCameras.length > 0 && showScanner && (
@@ -932,36 +907,49 @@ content:"";
 </div>
 
 {showAll && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div className="bg-white w-full max-w-2xl p-6 rounded-lg shadow-lg max-h-[80vh] overflow-y-auto">
+  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+    
+    <div className="bg-white w-full max-w-2xl p-6 rounded-xl shadow-2xl max-h-[80vh] overflow-y-auto border border-gray-200">
 
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold">All Candidates (Today)</h2>
+      {/* Header */}
+      <div className="flex justify-between items-center mb-5 border-b pb-3">
+        <h2 className="text-xl font-bold text-gray-800">
+          All Candidates (Today)
+        </h2>
+
         <button
           onClick={() => setShowAll(false)}
-          className="text-red-600 font-bold"
+          className="text-red-500 hover:text-red-700 text-xl font-bold"
         >
           ✕
         </button>
       </div>
 
-      <table className="w-full border">
+      {/* Table */}
+      <table className="w-full border border-gray-200 rounded-lg overflow-hidden">
         <thead>
-          <tr className="bg-gray-100">
-            <th className="p-2 border">Name</th>
-            <th className="p-2 border">ID</th>
-            <th className="p-2 border">Candidate ID</th>
+          <tr className="bg-blue-50 text-gray-700">
+            <th className="p-3 border border-gray-200 text-left">Name</th>
+            <th className="p-3 border border-gray-200 text-left">ID</th>
+            <th className="p-3 border border-gray-200 text-left">Candidate ID</th>
           </tr>
         </thead>
 
         <tbody>
           {candidates.map((c, i) => (
-            <tr key={i} className="text-center">
-              <td className="p-2 border">{c.name}</td>
-              <td className="p-2 border">
+            <tr
+              key={i}
+              className="hover:bg-gray-50 transition"
+            >
+              <td className="p-3 border border-gray-200 text-gray-800">
+                {c.name}
+              </td>
+              <td className="p-3 border border-gray-200 text-gray-700">
                 {c.nid || c.birthCertificate}
               </td>
-              <td className="p-2 border">{c.candidateId}</td>
+              <td className="p-3 border border-gray-200 text-blue-600 font-medium">
+                {c.candidateId}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -997,25 +985,7 @@ content:"";
             </div>
           )}
           
-          {!showScanner && (
-            <div className="text-center p-4 border border-gray-300 rounded-lg bg-gray-50">
-              <p className="text-gray-700 mb-2">Use camera scanner to automatically fill Name and NID</p>
-              <button
-                type="button"
-                onClick={startScanner}
-                className="top-btn-sweep btn-primary-copy px-6 py-3 text-md font-bold"
-              >
-                <span className="text-xl">📷</span>
-                <span>Open Camera Scanner</span>
-              </button>
-              {availableCameras.length > 0 && (
-                <div className="mt-3 text-sm text-gray-600">
-                  <p>Available cameras: {availableCameras.length}</p>
-                  <p className="text-xs">Using: {selectedCamera ? 'Selected camera' : 'Rear camera (default)'}</p>
-                </div>
-              )}
-            </div>
-          )}
+          
         </div>
 
         {/* TEXT AREA FOR MANUAL PASTE */}
@@ -1041,8 +1011,7 @@ content:"";
               }
             }}
           />
-          <div className="mt-2 text-sm text-gray-500 flex justify-between">
-            <span>Supports: NID barcode data, XML format, QR codes</span>
+          <div className="mt-2 text-sm text-gray-500 flex justify-end">
             <button
               type="button"
               onClick={() => {
@@ -1057,21 +1026,7 @@ content:"";
           </div>
         </div>
 
-        {/* Search Section */}
-        <div className="mb-6 p-4 bg-[#FFDFEF] rounded-lg border border-purple-500">
-          <h3 className="text-lg font-semibold text-gray-800 mb-2">🔍 Operator Search</h3>
-          <p className="text-sm text-gray-800 mb-3">
-            NID বা Birth Certificate number দিয়ে operator এর details দেখুন
-          </p>
-          <button 
-            onClick={handleSearch}
-            disabled={!formData.nid.trim() && !formData.birthCertificate.trim()}
-           className="w-full btn-royal disabled:bg-gray-400 disabled:cursor-not-allowed px-4 py-3 rounded-md font-medium flex items-center justify-center gap-2"
-          >
-            <span>View Operator Details</span>
-            <span className="text-sm">({formData.nid ? 'NID' : formData.birthCertificate ? 'Birth Certificate' : 'None'})</span>
-          </button>
-        </div>
+        
 
         {/* Search Component */}
         {showSearch && (
@@ -1093,21 +1048,24 @@ content:"";
         )}
 
         {/* NID Exists Warning */}
-        {nidExistsMessage && (
-          <div className="mb-4 p-3 bg-yellow-100 text-yellow-700 rounded-md text-center border border-yellow-300">
-            {nidExistsMessage}
-            <div className="mt-2 text-sm">
-              
-              <button
-                type="button"
-                onClick={handleSearch}
-                className="text-blue-600 hover:text-blue-800 underline text-sm"
-              >
-                View Details
-              </button>
-            </div>
-          </div>
-        )}
+        
+{nidExistsMessage && (
+  <div className="mb-4 p-3 bg-yellow-100 text-yellow-700 rounded-md text-center border border-yellow-300">
+    {nidExistsMessage}
+  </div>
+)}
+<div
+className='text-center'
+>
+{nidExists && (
+  <button
+    type="button"
+    onClick={handleSearch}
+    className="flex-1  text-center btn-sweep btn-primary px-6 py-3 text-md font-bold"
+  >
+    View Details
+  </button>
+)} </div>
 
         {/* Success/Error Messages */}
         {successMessage && !nidExistsMessage && (
@@ -1203,7 +1161,7 @@ content:"";
           </div>
 
           {/* Photo Upload Section */}
-          <div>
+          {/* <div>
             <label className="block mb-2 text-lg font-medium text-gray-700">
               Candidate Photo:
               <span className="text-red-500 ml-1">*</span>
@@ -1211,12 +1169,12 @@ content:"";
             
             <div className="flex space-x-4 mb-4">
              <button
-  type="button"
-  onClick={startCamera}
-  className="flex-1 btn-sweep btn-primary px-6 py-3 text-md font-bold"
->
-  <span>📷 Take Photo</span>
-</button>
+                type="button"
+                onClick={startCamera}
+                className="flex-1 btn-sweep btn-primary px-6 py-3 text-md font-bold"
+              >
+                <span>📷 Take Photo</span>
+              </button>
               <button
                 type="button"
                 onClick={() => document.getElementById('fileInput').click()}
@@ -1297,7 +1255,7 @@ content:"";
             {formErrors.picture && (
               <div className="mt-1 text-red-600 text-sm">{formErrors.picture}</div>
             )}
-          </div>
+          </div> */}
 
           {/* Failure Reason Section - শুধুমাত্র FAILED হলে দেখাবে */}
           {showFailureReason && (
@@ -1370,16 +1328,7 @@ content:"";
           )}
         </form>
 
-        <div className="mt-8 pt-4 border-t border-purple-600 text-center text-sm text-gray-500">
-          <p>📋 Instructions:</p>
-          <ol className="list-decimal list-inside mt-2 text-left max-w-md mx-auto">
-            <li>Use camera scanner to scan NID/barcode for automatic data entry</li>
-            <li>Or manually paste scanned data in the text area</li>
-            <li>Take/upload candidate photo</li>
-            <li>Click PASSED or FAILED to submit</li>
-            <li className="text-red-600 font-medium">System will alert if NID already exists</li>
-          </ol>
-        </div>
+        
       </div>
     </div>
   );
