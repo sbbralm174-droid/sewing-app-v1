@@ -1,4 +1,4 @@
-
+// api/iep-interview/step-one/report
 import { connectDB } from '@/lib/db';
 import VivaInterviewStep1 from '@/models/IepInterviewStepOne';
 
@@ -28,6 +28,53 @@ export async function GET() {
       success: true,
       totalCandidates,
       data: candidates,
+    });
+
+  } catch (error) {
+    console.error(error);
+    return Response.json(
+      { success: false, message: 'Server Error' },
+      { status: 500 }
+    );
+  }
+}
+
+// UPDATE (PUT)
+export async function PUT(req) {
+  try {
+    await connectDB();
+
+    const body = await req.json();
+    const { candidateId, name, nid } = body;
+
+    if (!candidateId) {
+      return Response.json(
+        { success: false, message: 'candidateId required' },
+        { status: 400 }
+      );
+    }
+
+    const updated = await VivaInterviewStep1.findOneAndUpdate(
+      { candidateId },
+      {
+        $set: {
+          name,
+          nid,
+        },
+      },
+      { new: true }
+    );
+
+    if (!updated) {
+      return Response.json(
+        { success: false, message: 'Candidate not found' },
+        { status: 404 }
+      );
+    }
+
+    return Response.json({
+      success: true,
+      data: updated,
     });
 
   } catch (error) {

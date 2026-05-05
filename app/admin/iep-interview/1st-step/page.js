@@ -32,7 +32,11 @@ export default function VivaInterviewStep1() {
   const [selectedCamera, setSelectedCamera] = useState('');
   const [nidExists, setNidExists] = useState(false);
   const [nidExistsMessage, setNidExistsMessage] = useState('');
-
+  const [editingId, setEditingId] = useState(null);
+const [editForm, setEditForm] = useState({
+  name: '',
+  nid: '',
+});
   const [todayCount, setTodayCount] = useState(0);
 const [candidates, setCandidates] = useState([]);
 const [showAll, setShowAll] = useState(false);
@@ -56,6 +60,48 @@ const [showAll, setShowAll] = useState(false);
       setFormErrors(prev => ({ ...prev, [name]: '' }));
     }
   };
+
+  const handleEdit = (c) => {
+  setEditingId(c.candidateId);
+  setEditForm({
+    name: c.name || '',
+    nid: c.nid || c.birthCertificate || '',
+  });
+};
+
+const handleUpdate = async (candidateId) => {
+  try {
+    const res = await fetch('/api/iep-interview/step-one/report', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        candidateId,
+        name: editForm.name,
+        nid: editForm.nid,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      // UI update instantly
+      setCandidates((prev) =>
+        prev.map((c) =>
+          c.candidateId === candidateId
+            ? { ...c, name: editForm.name, nid: editForm.nid }
+            : c
+        )
+      );
+
+      setEditingId(null);
+    }
+
+  } catch (err) {
+    console.error(err);
+  }
+};
 
 
 
@@ -932,24 +978,70 @@ content:"";
             <th className="p-3 border border-gray-200 text-left">Name</th>
             <th className="p-3 border border-gray-200 text-left">ID</th>
             <th className="p-3 border border-gray-200 text-left">Candidate ID</th>
+            <th className="p-3 border border-gray-200 text-left">Action</th>
           </tr>
         </thead>
 
         <tbody>
           {candidates.map((c, i) => (
-            <tr
-              key={i}
-              className="hover:bg-gray-50 transition"
-            >
+            <tr key={i} className="hover:bg-gray-50 transition">
+
+              {/* NAME */}
               <td className="p-3 border border-gray-200 text-gray-800">
-                {c.name}
+                {editingId === c.candidateId ? (
+                  <input
+                    type="text"
+                    value={editForm.name}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, name: e.target.value })
+                    }
+                    className="border px-2 py-1 rounded w-full"
+                  />
+                ) : (
+                  c.name
+                )}
               </td>
+
+              {/* NID */}
               <td className="p-3 border border-gray-200 text-gray-700">
-                {c.nid || c.birthCertificate}
+                {editingId === c.candidateId ? (
+                  <input
+                    type="text"
+                    value={editForm.nid}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, nid: e.target.value })
+                    }
+                    className="border px-2 py-1 rounded w-full"
+                  />
+                ) : (
+                  c.nid || c.birthCertificate
+                )}
               </td>
+
+              {/* Candidate ID */}
               <td className="p-3 border border-gray-200 text-blue-600 font-medium">
                 {c.candidateId}
               </td>
+
+              {/* ACTION */}
+              <td className="p-3 border border-gray-200">
+                {editingId === c.candidateId ? (
+                  <button
+                    onClick={() => handleUpdate(c.candidateId)}
+                    className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
+                  >
+                    Save
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleEdit(c)}
+                    className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                  >
+                    Edit
+                  </button>
+                )}
+              </td>
+
             </tr>
           ))}
         </tbody>
@@ -1157,7 +1249,7 @@ className='text-center'
           )}
 
           <div className="p-3 bg-blue-50 text-blue-700 rounded-md text-sm">
-            💡 You must provide either NID or Birth Certificate ID
+             You must provide either NID or Birth Certificate ID
           </div>
 
           {/* Photo Upload Section */}
