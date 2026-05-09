@@ -1,5 +1,5 @@
 import { connectDB } from '@/lib/db';
-import Candidate from '@/models/Candidate'; // সঠিক মডেল ইম্পোর্ট
+import Candidate from '@/models/Candidate'; 
 import { NextResponse } from 'next/server';
 
 export async function POST(request) {
@@ -25,6 +25,16 @@ export async function POST(request) {
     
     if (!requestData.result) {
       console.log('❌ Validation failed: result is required');
+      if (
+        requestData.result === 'PASSED' &&
+        !requestData.floor?.trim()
+      ) {
+        return NextResponse.json({
+          success: false,
+          error: 'Floor is required for PASSED candidates'
+        }, { status: 400 });
+      }
+
       return NextResponse.json({
         success: false,
         error: 'result is required'

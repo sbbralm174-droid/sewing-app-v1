@@ -633,3 +633,1383 @@ niche 6 ta model dissi. ei 6 ta model er datao deoa hoise bujhar jonno. ek ekta 
     "__v": 0
   }
 ]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// MAIN STATION - MODIFIED VERSION
+
+#include <Arduino.h>
+#include <HardwareSerial.h>
+
+// ===== UART সংযোগ পিন (ESP32 থেকে ESP32) =====
+#define TX_PIN 17  // এই ESP32 এর TX অন্যটির RX এ যাবে
+#define RX_PIN 16  // এই ESP32 এর RX অন্যটির TX এ যাবে
+
+// ===== SENSOR পিন =====
+#define IR_L2  39 //34  
+#define IR_L1 35  //33
+#define IR_C  32  //32
+#define IR_R1 33  // 35
+#define IR_R2 34   //39
+
+// ===== MOTOR পিন =====
+#define L_PWM_A 25 
+#define R_PWM_A 26 
+#define EN_A    22 
+#define L_PWM_B 27 
+#define R_PWM_B 14 
+#define EN_B    23
+
+// ===== ENUMS =====
+enum RobotState { MAIN_LINE, IN_GROUP, RETURNING_TO_MAIN };
+enum MarkerState { NO_MARKER, MARKER_DETECTED };
+enum Mode { REMOTE_MODE, STATION_MODE };
+enum MoveDirection { DIR_NONE, DIR_FORWARD, DIR_BACKWARD };
+
+// ===== GLOBAL VARIABLES =====
+RobotState state = MAIN_LINE;
+MarkerState markerState = NO_MARKER;
+Mode currentMode = REMOTE_MODE;
+MoveDirection currentMoveDirection = DIR_NONE;
+bool skipOneStation = false; 
+String backIRPattern = "11111";
+int rawObstacle = 0;
+int lastRawObstacle = 0;
+int stableObstacle = 0;
+unsigned long obstacleChangeTime = 0;
+const int obstacleStableDelay = 200; // 100ms
+
+
+
+// ===== OBSTACLE =====
+bool obstacleDetected = false;
+unsigned long obstacleClearTime = 0;
+const int obstacleDelay = 2000; // 2 sec
+
+// Ultrasonic distance (updated from other ESP)
+int frontObstacle = 0;
+int backObstacle  = 0;
+
+
+
+
+
+
+
+// ===== স্টেশন ডাটা =====
+const int totalGroups = 5;
+int groupStationCount[totalGroups] = {5, 5, 5, 5, 5};
+
+int targetStation = 0;
+int targetGroup = 0;
+int targetSubStation = 0;
+int groupCounter = 0;
+int stationCounter = 0;
+
+// ===== Store current position for future reference =====
+int currentGroup = 0;
+int currentStation = 0;
+int currentMarkerCount = 0;
+
+bool robotRunning = false;
+bool emergencyStop = false;
+
+// ===== RETURN TO MAIN STATION VARIABLES =====
+bool returningToMain = false;
+int returnGroupCounter = 0;
+int returnStationCounter = 0;
+bool initialBackwardMoveComplete = false;
+unsigned long backwardMoveStartTime = 0;
+const int initialBackwardDuration = 0; // 1 second
+
+// ===== DEBOUNCE =====
+int stablePattern = -1;
+int lastRawPattern = -1;
+unsigned long lastChangeTime = 0;
+const int debounceDelay = 70;
+int lastPrinted = -1;
+
+// ===== MARKER =====
+unsigned long lastMarkerTime = 0;
+const unsigned long markerCooldown = 500;
+int markerCount = 0;
+
+// ===== TURN =====
+bool isTurning = false;
+unsigned long turnStartTime = 0;
+const int turnDuration = 5000;
+
+// ===== LINE FOLLOW =====
+int baseSpeed = 180; //225
+int turnSpeed = 180;  //225
+int backbaseSpeed = 180; //180
+int backturnspeed = 180;  //180
+int lastDirection = 0;
+
+// ===== PID BACKWARD =====
+float Kp = 10;
+float Kd = 50;
+float Ki = 0;
+
+float error = 0, previousError = 0;
+float integral = 0;
+
+int backBaseSpeedPID = 180;
+
+unsigned long lastPIDTime = 0;
+const int PID_INTERVAL = 20;
+
+
+// ===== ALL WHITE CONDITION =====
+unsigned long whiteStartTime = 0;
+bool isSearching = false;
+const int searchDuration = 100;
+
+// ===== রিমোট মুভমেন্ট =====
+unsigned long remoteMoveStartTime = 0;
+bool isRemoteMoving = false;
+const int remoteMoveDuration = 1000; // 1 second movement
+MoveDirection remoteMoveDirection = DIR_NONE;
+
+// ===== UART সেটআপ =====
+HardwareSerial RobotSerial(1); // UART1 ব্যবহার করছি
+HardwareSerial BackIRSerial(2); // UART2 ব্যবহার করছি
+
+// ===== DECLARATIONS =====
+int readStablePattern();
+void printIR(int pattern);
+bool isMarker(int pattern);
+void calculateRoute(int target);
+void calculateReturnRoute();
+void stopMotor();
+void moveForward();
+void moveBackward();
+void turnLeft();
+void turnRight();
+void remoteTurnLeft();
+void processLine();
+void motorControl(int left, int right);
+void handleCommand(String cmd);
+void sendStatus(String msg);
+void updateCurrentPosition();
+void moveToStationInGroup(int direction);
+void startReturnToMain();
+
+// ===== SETUP =====
+void setup() {
+  pinMode(IR_L2, INPUT);
+  pinMode(IR_L1, INPUT);
+  pinMode(IR_C, INPUT);
+  pinMode(IR_R1, INPUT);
+  pinMode(IR_R2, INPUT);
+
+  pinMode(L_PWM_A, OUTPUT);
+  pinMode(R_PWM_A, OUTPUT);
+  pinMode(L_PWM_B, OUTPUT);
+  pinMode(R_PWM_B, OUTPUT);
+
+  pinMode(EN_A, OUTPUT);
+  pinMode(EN_B, OUTPUT);
+
+  ledcAttach(EN_A, 5000, 8);
+  ledcAttach(EN_B, 5000, 8);
+  
+  Serial.begin(115200);
+  Serial.println("ROBOT ESP32 READY");
+  
+  // UART 
+  RobotSerial.begin(9600, SERIAL_8N1, RX_PIN, TX_PIN);
+  BackIRSerial.begin(9600, SERIAL_8N1, 5, 4);
+  
+  stopMotor();
+  sendStatus("Robot Ready");
+}
+
+
+
+bool handleObstacle() {
+  bool isBackward = (returningToMain || 
+                     remoteMoveDirection == DIR_BACKWARD || 
+                     (state == IN_GROUP && targetSubStation < stationCounter));
+
+  // ===== ১. অবস্টাকল ডিটেকশন (সামনে বা পিছনে) =====
+  if (stableObstacle == 1) {
+
+    obstacleClearTime = 0;
+    if (!obstacleDetected) {
+      Serial.println("OBSTACLE DETECTED - BRAKING NOW");
+      RobotSerial.println("OBS"); 
+      safeHardBrake(); // ঝটকা দিয়ে থামাবে
+      obstacleDetected = true;
+    }
+    return true; // লুপের বাকি অংশ এক্সিকিউট হবে না, গাড়ি থেমে থাকবে
+  }
+  else {
+  if (obstacleDetected) {
+    Serial.println("OBSTACLE CLEARED");
+    obstacleDetected = false;
+  }
+}
+
+  // ===== ২. অবস্টাকল ক্লিয়ার হওয়ার পর ২ সেকেন্ড থামা =====
+  
+  return false; // কোনো বাধা নেই
+}
+
+
+
+
+
+// ===== LOOP =====
+void loop() {
+
+ if (BackIRSerial.available()) {
+  backIRPattern = BackIRSerial.readStringUntil('\n');
+  backIRPattern.trim();
+
+  if (backIRPattern.length() >= 7) {
+    frontObstacle = backIRPattern[5] - '0';
+    backObstacle  = backIRPattern[6] - '0';
+    // direction অনুযায়ী raw obstacle select
+bool isBackward = (returningToMain || 
+                   remoteMoveDirection == DIR_BACKWARD || 
+                   (state == IN_GROUP && targetSubStation < stationCounter));
+
+if (!isBackward)
+  rawObstacle = frontObstacle;
+else
+  rawObstacle = backObstacle;
+
+// ===== OBSTACLE DEBOUNCE LOGIC =====
+if (rawObstacle != lastRawObstacle) {
+  obstacleChangeTime = millis();
+  lastRawObstacle = rawObstacle;
+}
+
+// 100ms stable হলে accept
+if (millis() - obstacleChangeTime > obstacleStableDelay) {
+  stableObstacle = rawObstacle;
+}
+
+    // Only IR part
+    backIRPattern = backIRPattern.substring(0,5);
+  }
+}
+
+
+  // রিমোট থেকে কমান্ড চেক
+  if (RobotSerial.available()) {
+    String cmd = RobotSerial.readStringUntil('\n');
+    cmd.trim();
+    if (cmd.length() > 0) {
+      Serial.println("[Received] " + cmd);
+      handleCommand(cmd);
+    }
+  }
+
+  // রোবট চালু না থাকলে বা ইমার্জেন্সি স্টপে মোটর বন্ধ রাখো
+  if (!robotRunning || emergencyStop) {
+    if (!isRemoteMoving && !returningToMain) { // রিমোট মুভমেন্ট বা রিটার্ন চললে বন্ধ করো না
+      stopMotor();
+    }
+    return;
+  }
+
+
+// ===== OBSTACLE CHECK =====
+if (handleObstacle()) {
+  return;
+}
+
+// int checkPattern = readStablePattern();
+// if (checkPattern == 0b11111) {
+//   Serial.println("No line after obstacle - STOP");
+//   stopMotor();
+//   return;
+// }
+
+  // স্টেশন মোডে বা রিটার্ন টু মেইন মোডে লাইন ফলোয়িং
+  if (currentMode == STATION_MODE || returningToMain) {
+    processStationMode();
+  }
+  
+  // রিমোট মুভমেন্ট টাইমার চেক
+  if (isRemoteMoving && millis() - remoteMoveStartTime >= remoteMoveDuration) {
+    isRemoteMoving = false;
+    remoteMoveDirection = DIR_NONE;
+    stopMotor();
+    Serial.println("Remote move complete");
+    sendStatus("Move complete");
+  }
+}
+
+// ===== PID FORWARD (With Counter Pulse) =====
+// ===== HYBRID PULSE =====
+unsigned long pulseTimer = 0;
+bool pulseState = false;
+const int onTime  = 15;
+const int offTime = 40;
+
+// ===== BRAKE SYSTEM =====
+bool brakeActive = false;
+unsigned long brakeTimer = 0;
+const int brakeTime = 50; // 30 ms
+
+// ===== MEMORY =====
+int lastExtreme = 0;
+
+// ===== PID tuning =====
+float f_Kp = 10;
+float f_Kd = 60;
+
+float f_previousError = 0;
+int fBaseSpeedPID = 180;
+
+void processForwardPID() {
+
+  int L2, L1, M, R1, R2;
+
+  // Sensor read
+  L2 = !digitalRead(IR_L2);
+  L1 = !digitalRead(IR_L1);
+  M  = !digitalRead(IR_C);
+  R1 = !digitalRead(IR_R1);
+  R2 = !digitalRead(IR_R2);
+
+  float f_error = 0;
+
+  // ===== ERROR CALCULATION =====
+  if (M == 0)       f_error = 0;
+  else if (L1 == 0) f_error = -1;
+  else if (L2 == 0) f_error = -2;
+  else if (R1 == 0) f_error = 1;
+  else if (R2 == 0) f_error = 2;
+
+  // ===== STORE EXTREME MEMORY =====
+  if (f_error == -2 || f_error == 2) {
+    lastExtreme = f_error;
+  }
+
+  // ===== BRAKE WHEN EXTREME → CENTER =====
+  if (!brakeActive && (lastExtreme == 2 || lastExtreme == -2) && f_error == 0) {
+    brakeActive = true;
+    brakeTimer = millis();
+    lastExtreme = 0; // reset
+  }
+
+  // ===== BRAKE HANDLING =====
+  if (brakeActive) {
+    if (millis() - brakeTimer <= brakeTime) {
+      motorControl(0, 0); // hydraulic brake
+      return;
+    } else {
+      brakeActive = false;
+    }
+  }
+
+  
+  // ===== MEDIUM ERROR → ONE TIME BIG JHATKA =====
+if ((f_error == 1 || f_error == -1) && f_previousError == 0) {
+
+  if (f_error < 0) {
+    motorControl(80, 255);   // LEFT strong jhatka
+  } else {
+    motorControl(255, 80);   // RIGHT strong jhatka
+  }
+
+  delay(15);  // jhatka duration (tune: 10–25 ms)
+
+  f_previousError = f_error;
+  return;
+}
+  // ===== EXTREME CASE → SOFT PULSE =====
+  if (f_error == -2 || f_error == 2) {
+
+    unsigned long now = millis();
+
+    if (pulseState) {
+      if (now - pulseTimer >= onTime) {
+        pulseTimer = now;
+        pulseState = false;
+      }
+    } else {
+      if (now - pulseTimer >= offTime) {
+        pulseTimer = now;
+        pulseState = true;
+      }
+    }
+
+    if (pulseState) {
+      if (f_error < 0) {
+        motorControl(110, 255);  // LEFT correction
+      } else {
+        motorControl(255, 110);  // RIGHT correction
+      }
+    } else {
+      motorControl(140, 140); // pause straight
+    }
+
+    f_previousError = f_error;
+    return;
+  }
+
+  // ===== NORMAL PID =====
+  float derivative = f_error - f_previousError;
+  float output = (f_Kp * f_error) + (f_Kd * derivative);
+
+  output = constrain(output, -100, 100);
+
+  int leftSpeed  = fBaseSpeedPID + output;
+  int rightSpeed = fBaseSpeedPID - output;
+
+  leftSpeed  = constrain(leftSpeed,  0, 255);
+  rightSpeed = constrain(rightSpeed, 0, 255);
+
+  motorControl(leftSpeed, rightSpeed);
+
+  f_previousError = f_error;
+}
+
+
+void processBackwardPID() {
+
+  int L2, L1, M, R1, R2;
+
+  if (backIRPattern.length() != 5) return;
+
+  L2 = backIRPattern[0] - '0';
+  L1 = backIRPattern[1] - '0';
+  M  = backIRPattern[2] - '0';
+  R1 = backIRPattern[3] - '0';
+  R2 = backIRPattern[4] - '0';
+
+  // All White → STOP
+  if (L2 && L1 && M && R1 && R2) {
+    stopMotor();
+    return;
+  }
+
+  // ERROR
+  if (M == 0)      error = 0;
+  else if (L1 == 0) error = -1;
+  else if (L2 == 0) error = -2;
+  else if (R1 == 0) error = 1;
+  else if (R2 == 0) error = 2;
+
+  // ===== BRAKE PULSE =====
+  // if (error == 0 && abs(previousError) >= 1) {
+  //   motorControl(180, 180); 
+  //   delay(30);
+  // }
+
+  if ((previousError == 1 && error == 0))  {
+
+    motorControl(10, 170);  // quick pulse brake
+    delay(50);
+  }
+
+  if ((previousError == -1 && error == 0))  {
+
+    motorControl(170, 10);  // quick pulse brake
+    delay(50);
+  }
+
+  // ===== NEW: L1 → L2 or R1 → R2 গেলে Pulse Brake =====
+  if ((previousError <= -1 && error == -2)) {
+  motorControl(10, 170);
+  delay(50);
+}
+
+if ((previousError >= 1 && error == 2)) {
+  motorControl(170, 10);
+  delay(50);
+}
+
+
+
+  if ((previousError == 0 && error == -1) || 
+      (previousError == 0 && error ==  1 )) {
+
+    motorControl(170, 170);  // quick pulse brake
+    delay(50);
+  }
+
+  // PID
+  integral += error;
+  float derivative = error - previousError;
+  float output = (Kp * error) + (Kd * derivative);
+
+  previousError = error;
+
+  int leftSpeed  = backBaseSpeedPID - output;
+  int rightSpeed = backBaseSpeedPID + output;
+
+  leftSpeed  = constrain(leftSpeed,  0, 255);
+  rightSpeed = constrain(rightSpeed, 0, 255);
+
+  // BACKWARD
+  motorControl(-leftSpeed, -rightSpeed);
+}
+
+void safeHardBrake() {
+  // 1. Hard Brake Activate (Motor terminals short kora)
+  digitalWrite(L_PWM_A, HIGH); 
+  digitalWrite(R_PWM_A, HIGH); 
+  digitalWrite(L_PWM_B, HIGH);
+  digitalWrite(R_PWM_B, HIGH);
+
+  // 2. Full PWM deya jate chaka-ta jhatka diye theme jay
+  ledcWrite(EN_A, 255); 
+  ledcWrite(EN_B, 255);
+  
+  Serial.println("HYDRAULIC BRAKE - ON");
+  
+  // 3. Khub olpo shomoy er jonno brake dhore rakha (Etei gari theme jabe)
+  delay(300); 
+
+  // 4. Ekhon Brake RELEASE (Motor-er khoti bondho korte power zero kora)
+  ledcWrite(EN_A, 0); 
+  ledcWrite(EN_B, 0);
+  digitalWrite(L_PWM_A, LOW); 
+  digitalWrite(R_PWM_A, LOW);
+  digitalWrite(L_PWM_B, LOW);
+  digitalWrite(R_PWM_B, LOW);
+  
+  Serial.println("BRAKE RELEASED - MOTOR SAFE");
+}
+
+// ===== স্টেশন মোড প্রসেস =====
+void processStationMode() {
+
+
+
+  int pattern;
+
+  // পিছানোর সময় পিছনের সেন্সরের প্যাটার্ন ব্যবহার করুন
+  bool isBackward = (returningToMain || remoteMoveDirection == DIR_BACKWARD || (state == IN_GROUP && targetSubStation < stationCounter));
+
+  if (isBackward && backIRPattern.length() == 5) {
+    // String "11111" কে ইন্টিজার 0b11111 এ রূপান্তর
+    pattern = 0;
+    for (int i = 0; i < 5; i++) {
+      if (backIRPattern[i] == '1') pattern |= (1 << (4 - i));
+    }
+  } else {
+    pattern = readStablePattern();
+  }
+
+  if (pattern != lastPrinted && pattern != -1) {
+    printIR(pattern);
+    lastPrinted = pattern;
+  }
+
+  
+
+  // Check if remote moving (1-second movement)
+  if (isRemoteMoving) {
+    if (millis() - remoteMoveStartTime >= remoteMoveDuration) {
+      isRemoteMoving = false;
+      remoteMoveDirection = DIR_NONE;
+      stopMotor();
+      Serial.println("1-second movement complete");
+      sendStatus("Movement complete - ready for station detection");
+    }
+    return; // Don't process line following during remote move
+  }
+
+  // Handle initial 1-second backward movement for return to main
+  if (returningToMain && !initialBackwardMoveComplete) {
+    if (millis() - backwardMoveStartTime < initialBackwardDuration) {
+      // Just keep moving backward, don't count markers
+      moveBackward();
+      return;
+    } else {
+      // Initial 1-second backward move complete
+      initialBackwardMoveComplete = true;
+      Serial.println("Initial 1-second backward complete - now counting markers");
+      markerCount = 0; // Reset marker count for return journey
+      returnStationCounter = stationCounter; // Store current station
+      returnGroupCounter = groupCounter; // Store current group
+      moveBackward(); // Continue backward movement
+    }
+  }
+
+  // মোড় নেওয়ার কাজ
+  if (isTurning) {
+    if (millis() - turnStartTime >= turnDuration) {
+      isTurning = false;
+      Serial.println("Turn complete");
+      moveForward();
+    }
+    return;
+  }
+
+  // মার্কার ডিটেকশন
+  if (isMarker(pattern)) {
+    if (markerState == NO_MARKER && millis() - lastMarkerTime > markerCooldown) {
+      markerState = MARKER_DETECTED;
+      lastMarkerTime = millis();
+      
+      // ১. জেনেরিক স্কিপ লজিক (সবার উপরে থাকবে)
+      // if (skipOneStation) {
+      //   Serial.println("SKIP: First Marker Ignored (Station or Group)");
+      //   skipOneStation = false; 
+      //   return; // এই মার্কারের জন্য নিচে আর নামবে না, ফলে কাউন্ট হবে না
+      // }
+
+      if (returningToMain) {
+        if (initialBackwardMoveComplete) {
+          markerCount--; // টোটাল মার্কার কমবে
+          
+          if (state == IN_GROUP  ) {
+            stationCounter--; // স্টেশনে থাকা অবস্থায় স্টেশন কাউন্টার কমবে
+            Serial.print("RETURN MODE - Station -- : ");
+            Serial.println(stationCounter);
+            
+            if (stationCounter == 0) {
+              Serial.println("Reached group exit - preparing to turn right");
+            }
+          } 
+          else if (state == MAIN_LINE) {
+            groupCounter--; // মেইন লাইনে থাকা অবস্থায় গ্রুপ কাউন্টার কমবে
+            Serial.print("MAIN LINE RETURN - Group Counter: ");
+            Serial.println(groupCounter);
+            
+            if (groupCounter == 0) {
+              Serial.println(">>> MAIN STATION REACHED <<<");
+              safeHardBrake();
+              stopMotor();
+              robotRunning = false;
+              returningToMain = false;
+              state = MAIN_LINE;
+              updateCurrentPosition();
+              sendStatus("Main Station Reached");
+              return;
+            }
+          }
+        }
+      }
+      else {
+        // নরমাল ফরওয়ার্ড মুভমেন্ট (existing code)
+        MoveDirection activeDir = DIR_FORWARD;
+
+        if (remoteMoveDirection == DIR_BACKWARD) {
+          activeDir = DIR_BACKWARD;
+        } else if (remoteMoveDirection == DIR_FORWARD) {
+          activeDir = DIR_FORWARD;
+        } else {
+          if (state == IN_GROUP && targetSubStation < stationCounter) {
+            activeDir = DIR_BACKWARD;
+          }
+        }
+
+        if (activeDir == DIR_BACKWARD) {
+          markerCount--;
+          if (state == IN_GROUP  ) {
+            stationCounter--;
+            Serial.print("BACKWARD Mode - Station -- : ");
+            Serial.println(stationCounter);
+          }
+        } else {
+          markerCount++;
+          if (state == IN_GROUP  ) {
+            stationCounter++;
+            Serial.print("FORWARD Mode - Station ++ : ");
+            Serial.println(stationCounter);
+          }
+        }
+      }
+      
+      Serial.print("Marker Detected! Total Markers: #");
+      Serial.println(markerCount);
+
+      // Handle state transitions for normal operation or return journey
+      if (!returningToMain) {
+        // Normal forward operation (existing code)
+        if (state == MAIN_LINE) {
+          groupCounter++;
+          Serial.print("Group Counter: ");
+          Serial.println(groupCounter);
+
+          if (groupCounter == targetGroup) {
+            Serial.println("TARGET GROUP - TURNING LEFT");
+            turnLeft();
+            state = IN_GROUP;
+            stationCounter = 0;
+            markerCount = 0;
+            return;
+          }
+        }
+        else if (state == IN_GROUP) {
+          
+            Serial.print("CURRENT SUBSTATION: ");
+            Serial.println(stationCounter);
+
+            if (stationCounter == targetSubStation) {
+              Serial.println(">>> TARGET REACHED <<<");
+
+              safeHardBrake();
+              
+              //stopMotor();
+              robotRunning = false;
+              isRemoteMoving = false;
+              remoteMoveDirection = DIR_NONE;
+              
+              updateCurrentPosition();
+              sendStatus("Target reached: Station " + String(targetStation));
+              return;
+            }
+          
+        }
+      } 
+      else {
+        // Return journey logic
+        if (state == IN_GROUP) {
+          
+            if (stationCounter == 0) {
+              // Reached the beginning of the group - need to turn right to main line
+              Serial.println("Exiting group - TURNING RIGHT to main line");
+              turnRightToMainStation();  // Turn right to get back to main line
+              state = MAIN_LINE;
+            }
+          
+        }
+        else if (state == MAIN_LINE) {
+          if (groupCounter == 0) {
+            // Already checked above
+          }
+        }
+      }
+    }
+  } else {
+    markerState = NO_MARKER;
+  }
+
+  processLine();
+}
+
+// ===== Update current position =====
+void updateCurrentPosition() {
+  currentGroup = groupCounter;
+  currentStation = stationCounter;
+  currentMarkerCount = markerCount;
+}
+
+// ===== Start return to main station =====
+void startReturnToMain() {
+  Serial.println("STARTING RETURN TO MAIN STATION");
+  
+  // Store current position
+  updateCurrentPosition();
+  
+  // Initialize return variables
+  returningToMain = true;
+ // skipOneStation = true; // এখানে যোগ করুন
+  initialBackwardMoveComplete = false;
+  backwardMoveStartTime = millis();
+  
+  // Start moving backward for 1 second without counting markers
+  moveBackward();
+  
+  Serial.print("Current position - Group: ");
+  Serial.print(currentGroup);
+  Serial.print(", Station: ");
+  Serial.println(currentStation);
+  
+  sendStatus("Returning to Main Station");
+}
+
+// ===== Move to station in same group =====
+void moveToStationInGroup(int direction) {
+  if (!robotRunning || emergencyStop) return;
+  
+  // Stop all line following temporarily
+  isRemoteMoving = true;
+  remoteMoveStartTime = millis();
+  
+  if (direction > 0) {
+    remoteMoveDirection = DIR_FORWARD;
+    moveForward();
+    Serial.println("Moving FORWARD to next station for 1 second");
+  } else {
+    remoteMoveDirection = DIR_BACKWARD;
+    moveBackward();
+    Serial.println("Moving BACKWARD to previous station for 1 second");
+  }
+}
+
+// ===== রিমোট থেকে কমান্ড হ্যান্ডলার =====
+void handleCommand(String cmd) {
+  if (cmd.startsWith("MODE:")) {
+    String mode = cmd.substring(5);
+    if (mode == "REMOTE") {
+      currentMode = REMOTE_MODE;
+      robotRunning = false;
+      returningToMain = false; // Cancel any return journey
+      stopMotor();
+      Serial.println("Switched to REMOTE MODE");
+      sendStatus("Remote mode active");
+    }
+    else if (mode == "STATION") {
+      currentMode = STATION_MODE;
+      isRemoteMoving = false; // ETA KHUB ZARURI
+      robotRunning = false;
+      returningToMain = false; // Cancel any return journey
+      stopMotor();
+      Serial.println("Switched to STATION MODE");
+      sendStatus("Station mode active - Enter station number");
+    }
+  }
+  
+  else if (cmd == "EMERGENCY_STOP") {
+    emergencyStop = true;
+    robotRunning = false;
+    isRemoteMoving = false;
+    returningToMain = false;
+    remoteMoveDirection = DIR_NONE;
+    stopMotor();
+    Serial.println("EMERGENCY STOP ACTIVATED");
+    sendStatus("EMERGENCY STOP");
+  }
+  
+  else if (cmd == "RESTART") {
+    emergencyStop = false;
+    if (currentMode == STATION_MODE && targetStation > 0) {
+      robotRunning = true;
+      Serial.println("RESTARTED - Continuing route");
+      sendStatus("Restarted");
+    } else {
+      Serial.println("Emergency Stop Released");
+      sendStatus("Ready");
+    }
+  }
+  
+  else if (cmd == "MAIN_STATION") {
+    // Handle MAIN_STATION command (PLAY/PAUSE button)
+    Serial.println("MAIN STATION COMMAND RECEIVED");
+    
+    if (emergencyStop) {
+      sendStatus("Emergency stop active - cannot return");
+      return;
+    }
+    
+    if (currentMode == STATION_MODE) {
+      // Start return journey to main station
+      startReturnToMain();
+      robotRunning = true;
+    } else {
+      Serial.println("Not in station mode - switch to station mode first");
+      sendStatus("Switch to station mode first");
+    }
+  }
+  
+  else if (cmd.startsWith("MAIN_STATION:")) {
+    // Handle MAIN_STATION with specific station number
+    int station = cmd.substring(13).toInt();
+    Serial.print("MAIN STATION CALLED from Station: ");
+    Serial.println(station);
+    
+    if (emergencyStop) {
+      sendStatus("Emergency stop active - cannot return");
+      return;
+    }
+    
+    if (currentMode == STATION_MODE) {
+      // Calculate current position based on the station number
+      targetStation = station;
+      calculateRoute(targetStation);
+      
+      // Set current position based on the station that called
+      currentGroup = targetGroup;
+      currentStation = targetSubStation;
+      groupCounter = currentGroup;
+      stationCounter = currentStation;
+      state = IN_GROUP;
+      
+      Serial.print("Current position set - Group: ");
+      Serial.print(currentGroup);
+      Serial.print(", Station: ");
+      Serial.println(currentStation);
+      
+      // Start return journey
+      startReturnToMain();
+      robotRunning = true;
+    } else {
+      Serial.println("Not in station mode - switch to station mode first");
+      sendStatus("Switch to station mode first");
+    }
+  }
+  
+  else if (cmd.startsWith("TARGET:")) {
+    int station = cmd.substring(7).toInt();
+    if (station >= 1 && station <= 25) {
+      
+      int requestedGroup = 0;
+      int sum = 0;
+      for (int i = 0; i < totalGroups; i++) {
+        sum += groupStationCount[i];
+        if (station <= sum) {
+          requestedGroup = i + 1;
+          break;
+        }
+      }
+      
+      if (state == IN_GROUP && groupCounter > 0) {
+        int currentGrp = groupCounter;
+        
+        if (requestedGroup != currentGrp) {
+          Serial.println("REJECTED: Station belongs to different group");
+          sendStatus("REJECTED: Station " + String(station) + " is in Group " + 
+                    String(requestedGroup) + ", currently in Group " + String(currentGrp));
+          return;
+        }
+      }
+      
+      targetStation = station;
+      calculateRoute(targetStation);
+      
+      if (state == IN_GROUP && groupCounter == targetGroup) {
+        int currentStn = stationCounter;
+        int requestedStn = targetSubStation;
+        
+        if (requestedStn > currentStn) {
+          Serial.println("Target is AHEAD (front)");
+          sendStatus("Target ahead - moving forward");
+          moveToStationInGroup(1);
+        } 
+        else if (requestedStn < currentStn) {
+          Serial.println("Target is BEHIND (back)");
+        //  skipOneStation = true; // এখানে যোগ করুন
+          sendStatus("Target behind - moving backward");
+          moveToStationInGroup(-1);
+        }
+        else {
+          Serial.println("Already at target station!");
+          sendStatus("Already at station " + String(targetStation));
+          return;
+        }
+      }
+      
+      if (!isRemoteMoving) {
+        robotRunning = true;
+      }
+      emergencyStop = false;
+      Serial.print("Target station set: ");
+      Serial.println(targetStation);
+      sendStatus("Target set: Station " + String(targetStation));
+    }
+  }
+  
+  else if (cmd.startsWith("MOVE:")) {
+    if (emergencyStop) {
+      sendStatus("Emergency stop active");
+      return;
+    }
+    
+    String direction = cmd.substring(5);
+    currentMode = REMOTE_MODE;
+    returningToMain = false; // Cancel return if moving manually
+    
+    isRemoteMoving = true;
+    remoteMoveStartTime = millis();
+    
+    if (direction == "FORWARD") {
+      remoteMoveDirection = DIR_FORWARD;
+      moveForward();
+      Serial.println("Remote: Forward");
+    }
+    else if (direction == "BACKWARD") {
+      remoteMoveDirection = DIR_BACKWARD;
+      moveBackward();
+      Serial.println("Remote: Backward");
+    }
+    else if (direction == "LEFT") {
+      remoteMoveDirection = DIR_NONE;
+      remoteTurnLeft();
+      Serial.println("Remote: Left");
+    }
+    else if (direction == "RIGHT") {
+      remoteMoveDirection = DIR_NONE;
+      turnRight();
+      Serial.println("Remote: Right");
+    }
+  }
+}
+
+// ===== রুট ক্যালকুলেশন =====
+void calculateRoute(int target) {
+  int sum = 0;
+  for (int i = 0; i < totalGroups; i++) {
+    sum += groupStationCount[i];
+    if (target <= sum) {
+      targetGroup = i + 1;
+      targetSubStation = target - (sum - groupStationCount[i]);
+      break;
+    }
+  }
+}
+
+// ===== সেন্সর ফাংশন =====
+int readStablePattern() {
+  int l2 = !digitalRead(IR_L2);
+  int l1 = !digitalRead(IR_L1);
+  int c  = !digitalRead(IR_C);
+  int r1 = !digitalRead(IR_R1);
+  int r2 = !digitalRead(IR_R2);
+
+  int raw = (l2 << 4) | (l1 << 3) | (c << 2) | (r1 << 1) | r2;
+
+  if (raw != lastRawPattern) {
+    lastChangeTime = millis();
+    lastRawPattern = raw;
+  }
+
+  if (millis() - lastChangeTime > debounceDelay)
+    stablePattern = raw;
+
+  return stablePattern;
+}
+
+void printIR(int pattern) {
+  Serial.print((pattern >> 4) & 1); Serial.print(" ");
+  Serial.print((pattern >> 3) & 1); Serial.print(" ");
+  Serial.print((pattern >> 2) & 1); Serial.print(" ");
+  Serial.print((pattern >> 1) & 1); Serial.print(" ");
+  Serial.println(pattern & 1);
+}
+
+bool isMarker(int pattern) {
+  return pattern == 0b11111;
+}
+
+// ===== মোটর কন্ট্রোল =====
+void stopMotor() {
+  digitalWrite(L_PWM_A, LOW);
+  digitalWrite(R_PWM_A, LOW);
+  digitalWrite(L_PWM_B, LOW);
+  digitalWrite(R_PWM_B, LOW);
+  ledcWrite(EN_A, 0);
+  ledcWrite(EN_B, 0);
+}
+
+void moveForward() {
+  motorControl(baseSpeed, baseSpeed);
+}
+
+// void moveBackward() {
+//   motorControl(-baseSpeed, -baseSpeed);
+// }
+
+
+void moveBackward() {
+  // যেহেতু মাইনাস ভ্যালু দিলে উল্টা কাজ করছে, 
+  // তাই এখানে সরাসরি পিন কন্ট্রোল করে দেখুন।
+  
+  digitalWrite(L_PWM_A, LOW);
+  digitalWrite(R_PWM_A, HIGH); // এই পিনটা কি আসলে পিছনে ঘুরায়? চেক করুন।
+  
+  digitalWrite(L_PWM_B, LOW);
+  digitalWrite(R_PWM_B, HIGH);
+
+  ledcWrite(EN_A, baseSpeed);
+  ledcWrite(EN_B, baseSpeed);
+}
+
+
+
+void remoteTurnLeft() {
+  motorControl(0, turnSpeed);
+}
+
+
+
+void turnLeft() {
+  Serial.println("TURN LEFT");
+
+  motorControl(0, 0);
+  delay(500);
+
+  safeHardBrake();
+  delay(800);
+
+  // 🔹 Step 1: Left motor lock
+  digitalWrite(L_PWM_A, HIGH); 
+  digitalWrite(R_PWM_A, HIGH); 
+  ledcWrite(EN_A, 255);
+
+  // 🔹 Step 2: Right motor turn
+  digitalWrite(L_PWM_B, HIGH);
+  digitalWrite(R_PWM_B, LOW);
+  ledcWrite(EN_B, 200);
+  delay(30);
+
+  digitalWrite(L_PWM_B, HIGH);
+  digitalWrite(R_PWM_B, LOW);
+  ledcWrite(EN_B, 130);
+
+
+
+  unsigned long startTime = millis();
+  bool lineFound = false;
+
+  // 🔹 Step 3: Max 3 sec turn + sensor check
+  while (millis() - startTime < 10000) {
+
+    // 🔴 FIRST 500ms IGNORE
+    if (millis() - startTime < 500) {
+      continue;
+    }
+
+    int frontIrMiddle = digitalRead(IR_C);
+
+    if (frontIrMiddle == 1) {
+      delay(100);
+      if (digitalRead(IR_C) == 1) {
+        Serial.println("Line detected - STOP TURN");
+        lineFound = true;
+        break;
+      }
+    }
+  }
+
+  // 🔹 Step 4: Always stop
+  safeHardBrake();
+  motorControl(0, 0);
+
+  // 🔹 Step 5: Fail-safe
+  if (!lineFound) {
+    Serial.println("⚠️ Line NOT found in 3 sec - Waiting for manual line...");
+
+    while (true) {
+      int frontIrMiddle = digitalRead(IR_C);
+
+      if (frontIrMiddle == 1) {
+        delay(100);
+        if (digitalRead(IR_C) == 1) {
+          Serial.println("Line detected manually - RESUME");
+          break;
+        }
+      }
+    }
+  }
+
+  delay(300);
+}
+
+void turnRightToMainStation() {
+  Serial.println("EXITING GROUP: TURNING RIGHT TO MAIN LINE");
+
+  // 🔹 Step 1: Small backward push (পজিশন ঠিক করার জন্য)
+  moveBackward();
+  delay(600);
+  safeHardBrake();
+  delay(500);
+
+  // 🔹 Step 2: ডানে ঘুরতে শুরু করা
+  // এখানে Right Motor উল্টা ঘুরবে এবং Left Motor স্থির থাকবে বা সামনে ঘুরবে
+  motorControl(0, -140); 
+
+  unsigned long startTime = millis();
+  bool lineFound = false;
+
+  while (millis() - startTime < 10000) { // ১০ সেকেন্ড পর্যন্ত ট্রাই করবে
+
+    // সিরিয়াল থেকে লেটেস্ট প্যাটার্ন আপডেট করা (খুবই গুরুত্বপূর্ণ)
+    if (BackIRSerial.available()) {
+      backIRPattern = BackIRSerial.readStringUntil('\n');
+      backIRPattern.trim();
+    }
+
+    // 🔴 প্রথম ৫০০ মিলি-সেকেন্ড ইগনোর করুন যাতে বর্তমান লাইন থেকে সরে যেতে পারে
+    if (millis() - startTime < 500) {
+      continue;
+    }
+
+    // 🔹 মাঝখানের সেন্সর চেক (ইনডেক্স ২)
+    // আপনার সেন্সর যদি কালো লাইনে '0' দেয় তবে নিচের কন্ডিশন ঠিক আছে
+    if (backIRPattern.length() == 5 && backIRPattern[2] == '0') {
+      
+      // ডাবল কনফার্মেশন (ভুল রিডিং এড়াতে)
+      delay(20); 
+      if (backIRPattern[2] == '0') {
+        Serial.println("Black Line Detected by Middle Sensor!");
+        lineFound = true;
+        break; 
+      }
+    }
+  }
+
+  // 🔹 Step 3: ব্রেক এবং স্টপ
+  safeHardBrake();
+  delay(200);
+  stopMotor();
+
+  // 🔹 Step 4: ফেল-সেফ (যদি ১০ সেকেন্ডে লাইন না পায়)
+  if (!lineFound) {
+    Serial.println("⚠️ Error: Line NOT found. Manual intervention needed.");
+  } else {
+    Serial.println("Line aligned. Resuming journey...");
+  }
+
+  returningToMain = true;
+  delay(300);
+}
+
+void turnRight() {
+  
+  Serial.println("TURN RIGHT");
+  //safeHardBrake();
+  motorControl(turnSpeed, 0);
+  if (currentMode == STATION_MODE || returningToMain) {
+    isTurning = true;
+    turnStartTime = millis();
+  }
+}
+
+
+void motorControl(int left, int right) {
+  // Left motor
+  if (left >= 0) {
+    digitalWrite(L_PWM_A, HIGH);
+    digitalWrite(R_PWM_A, LOW);
+  } else {
+    digitalWrite(L_PWM_A, LOW);
+    digitalWrite(R_PWM_A, HIGH);
+    left = -left;
+  }
+  
+  // Right motor
+  if (right >= 0) {
+    digitalWrite(L_PWM_B, HIGH);
+    digitalWrite(R_PWM_B, LOW);
+  } else {
+    digitalWrite(L_PWM_B, LOW);
+    digitalWrite(R_PWM_B, HIGH);
+    right = -right;
+  }
+  
+  ledcWrite(EN_A, constrain(left, 0, 255));
+  ledcWrite(EN_B, constrain(right, 0, 255));
+}
+
+// ===== লাইন ফলোয়িং =====
+void processLine() {
+
+  int L2, L1, M, R1, R2;
+
+  static int lastSensorPos = 0;
+
+  // বর্তমানে রোবট কোন দিকে যাচ্ছে তা নির্ধারণ করা
+  bool isBackward = false;
+
+  if (returningToMain || remoteMoveDirection == DIR_BACKWARD) {
+    isBackward = true;
+  }
+
+  // স্টেশন মোডে যদি টার্গেট পেছনে থাকে
+  if (state == IN_GROUP && targetSubStation < stationCounter && !returningToMain) {
+    isBackward = true;
+  }
+
+  // ===== SENSOR SELECT =====
+  if (isBackward) {
+    // Secondary ESP থেকে আসা Back IR
+    if (backIRPattern.length() == 5) {
+      L2 = backIRPattern[0] - '0';
+      L1 = backIRPattern[1] - '0';
+      M  = backIRPattern[2] - '0';
+      R1 = backIRPattern[3] - '0';
+      R2 = backIRPattern[4] - '0';
+    } 
+    else {
+      return; // data invalid হলে কিছু করবে না
+    }
+  } 
+  else {
+    // Main ESP এর Front IR
+    L2 = !digitalRead(IR_L2);
+    L1 = !digitalRead(IR_L1);
+    M  = !digitalRead(IR_C);
+    R1 = !digitalRead(IR_R1);
+    R2 = !digitalRead(IR_R2);
+  }
+
+  // ===== ALL WHITE CONDITION =====
+  if (L2 == HIGH && L1 == HIGH && M == HIGH && R1 == HIGH && R2 == HIGH) {
+    if (!isSearching) {
+      whiteStartTime = millis();
+      isSearching = true;
+    }
+
+    if (millis() - whiteStartTime <= searchDuration) {
+      if (isBackward) moveBackward();
+      else moveForward();
+    } 
+    else {
+      stopMotor();
+    }
+    return;
+  }
+
+  isSearching = false;
+
+  // ===== STRAIGHT MOVE =====
+  if (M == LOW && L1 == HIGH && R1 == HIGH && L2 == HIGH && R2 == HIGH) {
+
+  if (isBackward) {
+    unsigned long currentMillis = millis();
+    if (currentMillis - lastPIDTime >= PID_INTERVAL) {
+      lastPIDTime = currentMillis;
+      processBackwardPID();
+    }
+  } 
+  else {
+    motorControl(baseSpeed, baseSpeed);
+  }
+
+  lastDirection = 0;
+  return;
+}
+
+  // ===== CORRECTION LOGIC =====
+
+  if (isBackward) {
+
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - lastPIDTime >= PID_INTERVAL) {
+    lastPIDTime = currentMillis;
+    processBackwardPID();
+  }
+
+  return;
+}
+
+  else {
+    // ===== FORWARD PID CALL =====
+    unsigned long currentMillis = millis();
+    if (currentMillis - lastPIDTime >= PID_INTERVAL) {
+      lastPIDTime = currentMillis;
+      processForwardPID(); // এখানে নতুন ফাংশনটি কল হবে
+    }
+  }
+}
+
+// ===== স্ট্যাটাস পাঠান =====
+void sendStatus(String msg) {
+  RobotSerial.println("[Status] " + msg);
+}

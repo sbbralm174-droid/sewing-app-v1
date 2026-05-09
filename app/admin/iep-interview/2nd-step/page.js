@@ -200,9 +200,14 @@ export default function InterviewStepTwo() {
 
   const handleResultUpdate = async (resultValue) => {
     if (!selectedCandidate) return;
+
+    if (resultValue === 'PASSED' && !floor.trim()) {
+      alert('Please select floor');
+      return;
+    }
     
     // District validation - must be submitted
-    if (!homeDistrict.trim()) {
+    if (resultValue === 'PASSED' && !homeDistrict.trim()) {
       alert("Please select Home District before submitting.");
       return;
     }

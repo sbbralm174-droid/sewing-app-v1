@@ -29,6 +29,15 @@ const candidateSchema = new mongoose.Schema({
   enum: ['SHAPLA', 'PODDO', 'KODOM', 'BELLY'],
   required: function () {
     return this.result === 'PASSED';
+  },
+  validate: {
+    validator: function(value) {
+      if (this.result === 'PASSED') {
+        return value && value.trim() !== '';
+      }
+      return true;
+    },
+    message: 'Floor is required when result is PASSED'
   }
 },
 
