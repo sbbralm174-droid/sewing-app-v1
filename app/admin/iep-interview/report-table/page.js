@@ -337,6 +337,82 @@ const duplicateCount = useMemo(() => {
                               </>
                             ) : <p className="text-xs text-gray-400 italic">No Data</p>}
                           </div>
+                          {/* RESIGN HISTORY */}
+                          <div className="p-3 bg-white rounded border md:col-span-4">
+                            <h4 className="text-xs font-bold text-gray-400 uppercase mb-3">
+                              5. Resignation History
+                            </h4>
+
+                            {profileData?.resignHistory?.data?.length > 0 ? (
+                              <div className="space-y-3">
+                                {profileData.resignHistory.data.map((history) => (
+                                  <div
+                                    key={history._id}
+                                    className="border rounded p-3 bg-red-50"
+                                  >
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                                      <div>
+                                        <span className="font-semibold text-gray-600">Operator ID:</span>
+                                        <p>{history.operatorId}</p>
+                                      </div>
+
+                                      <div>
+                                        <span className="font-semibold text-gray-600">Department:</span>
+                                        <p>{history.department}</p>
+                                      </div>
+
+                                      <div>
+                                        <span className="font-semibold text-gray-600">Floor:</span>
+                                        <p>{history.floor}</p>
+                                      </div>
+
+                                      <div>
+                                        <span className="font-semibold text-gray-600">Designation:</span>
+                                        <p>{history.designation}</p>
+                                      </div>
+
+                                      <div>
+                                        <span className="font-semibold text-gray-600">Joining Date:</span>
+                                        <p>
+                                          {history.joiningDate
+                                            ? new Date(history.joiningDate).toLocaleDateString()
+                                            : "N/A"}
+                                        </p>
+                                      </div>
+
+                                      <div>
+                                        <span className="font-semibold text-gray-600">Resignation Date:</span>
+                                        <p>
+                                          {history.resignationDate
+                                            ? new Date(history.resignationDate).toLocaleDateString()
+                                            : "N/A"}
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    <div className="mt-3">
+                                      <span className="font-semibold text-red-700">Reason:</span>
+                                      <p className="text-red-600 font-medium">
+                                        {history.reason || "N/A"}
+                                      </p>
+                                    </div>
+
+                                    {history.remarks && (
+                                      <div className="mt-2">
+                                        <span className="font-semibold text-gray-600">Remarks:</span>
+                                        <p>{history.remarks}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-gray-400 italic">
+                                No resignation history found
+                              </p>
+                            )}
+                          </div>
+
                         </div>
                       </div>
                     );

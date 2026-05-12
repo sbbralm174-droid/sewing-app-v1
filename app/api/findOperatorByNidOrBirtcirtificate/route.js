@@ -22,7 +22,6 @@ export async function GET(request) {
       );
     }
 
-    // $or কুয়েরি ব্যবহার করা হয়েছে যাতে nid অথবা birthCertificate যেকোনো একটার সাথে মিললেই ডেটা আসে
     const searchQuery = {
       $or: [
         { nid: nidOrBirthCertificate },
