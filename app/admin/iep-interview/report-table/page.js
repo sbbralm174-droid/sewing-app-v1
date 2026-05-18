@@ -17,10 +17,30 @@ export default function CandidateReport() {
   const [showDuplicates, setShowDuplicates] = useState(false);
   const [showFailedOnly, setShowFailedOnly] = useState(false);
   const [selectedIdType, setSelectedIdType] = useState("ALL");
+  const [duplicateIds, setDuplicateIds] = useState([]);
+  const [resignIds, setResignIds] = useState([]);
 
   useEffect(() => {
-    fetchReport();
-  }, []);
+  fetchReport();
+  fetchDuplicateAndResignData();
+}, []);
+
+  const fetchDuplicateAndResignData = async () => {
+  try {
+    const res = await fetch(
+      "/api/iep-interview/duplicate-history-check"
+    );
+
+    const data = await res.json();
+
+    if (data.success) {
+      setDuplicateIds(data.duplicateIds || []);
+      setResignIds(data.resignIds || []);
+    }
+  } catch (err) {
+    console.error(err);
+  }
+};
 
   const fetchReport = async (start = '', end = '') => {
     try {
@@ -191,6 +211,33 @@ const duplicateCount = useMemo(() => {
           <div className="bg-white rounded-lg shadow p-6 border-l-4 border-orange-500">
             <h2 className="text-sm font-medium text-gray-500">Duplicate IDs (Unique)</h2>
             <p className="text-2xl font-bold text-gray-900">{duplicateCount}</p>
+          </div>
+          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-red-500">
+            <h2 className="text-sm font-medium text-gray-500">
+              Multiple Interview
+            </h2>
+
+            <p className="text-2xl font-bold text-gray-900">
+              {
+                filteredCandidates.filter((c) =>
+                  duplicateIds.includes(c.nid || c.birthCertificate)
+                ).length
+              }
+            </p>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-pink-500">
+            <h2 className="text-sm font-medium text-gray-500">
+              Resign History
+            </h2>
+
+            <p className="text-2xl font-bold text-gray-900">
+              {
+                filteredCandidates.filter((c) =>
+                  resignIds.includes(c.nid || c.birthCertificate)
+                ).length
+              }
+            </p>
           </div>
         </div>
 
@@ -446,7 +493,28 @@ const duplicateCount = useMemo(() => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredCandidates.slice().reverse().map((candidate, index) => (
-                  <tr key={candidate.candidateId} className="hover:bg-gray-50">
+                  <tr
+                      key={candidate.candidateId}
+                      className={`
+                        
+
+                        ${
+                          duplicateIds.includes(
+                            candidate.nid || candidate.birthCertificate
+                          )
+                            ? "bg-red-100"
+                            : ""
+                        }
+
+                        ${
+                          resignIds.includes(
+                            candidate.nid || candidate.birthCertificate
+                          )
+                            ? "bg-yellow-100"
+                            : ""
+                        }
+                      `}
+                    >
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{filteredCandidates.length - index}</td>
                     <td className="px-4 py-2 whitespace-nowrap">
                       <div className="flex items-center space-x-2">

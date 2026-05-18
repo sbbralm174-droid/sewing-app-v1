@@ -195,7 +195,7 @@ export default function QRBulkGeneratorPage() {
       <div className="no-print max-w-4xl mx-auto bg-white p-6 rounded shadow">
         <h1 className="text-xl font-bold mb-4 text-center">Bulk QR Generator (4x4 Grid)</h1>
 
-        <div className="grid grid-cols-2 gap-6 mb-6">
+        <div className="grid text-black grid-cols-2 gap-6 mb-6">
           {/* OPERATORS SELECT */}
           <div>
             <label className="block text-sm font-bold mb-2">Select Operators</label>
@@ -259,7 +259,7 @@ export default function QRBulkGeneratorPage() {
       <div className="flex justify-center mt-10">
         <div 
           ref={printRef} 
-          className="grid grid-cols-4 gap-1 bg-white p-2" 
+          className="grid grid-cols-4 text-black gap-1 bg-white p-2" 
           style={{ 
             width: "210mm", 
             minHeight: "297mm",

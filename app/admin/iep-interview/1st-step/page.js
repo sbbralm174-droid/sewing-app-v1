@@ -439,9 +439,7 @@ useEffect(() => {
     }
     
     // Check if NID already exists (only for new submissions)
-    if (formData.nid && nidExists) {
-      errors.nid = 'This NID already exists in the database';
-    }
+    
     
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -1252,102 +1250,7 @@ className='text-center'
              You must provide either NID or Birth Certificate ID
           </div>
 
-          {/* Photo Upload Section */}
-          {/* <div>
-            <label className="block mb-2 text-lg font-medium text-gray-700">
-              Candidate Photo:
-              <span className="text-red-500 ml-1">*</span>
-            </label>
-            
-            <div className="flex space-x-4 mb-4">
-             <button
-                type="button"
-                onClick={startCamera}
-                className="flex-1 btn-sweep btn-primary px-6 py-3 text-md font-bold"
-              >
-                <span>📷 Take Photo</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => document.getElementById('fileInput').click()}
-                className="flex-1 btn-sweep btn-blue px-6 py-3 text-md font-bold"
-              >
-                📁 Upload File
-              </button>
-            </div>
-
-            <input
-              id="fileInput"
-              type="file"
-              accept="image/*"
-              onChange={handlePhotoSelect}
-              className="hidden"
-              disabled={loading}
-            />
-
-            {showWebcam && (
-              <div className="mb-4 p-4 border border-blue-300 rounded-md bg-blue-50">
-                <div className="text-center mb-2">
-                  <p className="text-blue-700 font-medium">📸 Camera Active - Smile!</p>
-                </div>
-                <Webcam
-                  audio={false}
-                  ref={webcamRef}
-                  screenshotFormat="image/jpeg"
-                  videoConstraints={videoConstraints}
-                  className="w-full h-auto rounded-md"
-                />
-                <div className="flex space-x-2 mt-2">
-                  <button
-                    type="button"
-                    onClick={capturePhoto}
-                    className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md font-medium"
-                  >
-                    📷 Capture Photo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={stopCamera}
-                    className="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md font-medium"
-                  >
-                    ❌ Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {(formData.picture || capturedImage) && (
-              <div className="flex items-center space-x-4 p-4 border border-green-300 rounded-md bg-green-50">
-                <div className="flex-shrink-0">
-                  <img 
-                    src={formData.picture || capturedImage} 
-                    alt="Candidate" 
-                    className="w-20 h-20 object-cover rounded-md border border-gray-300"
-                  />
-                </div>
-                <div className="flex-1">
-                  <p className="text-green-600 font-medium">
-                    {capturedImage ? '✅ Photo captured from camera!' : '✅ Photo selected successfully!'}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={removePhoto}
-                    className="mt-1 text-red-600 hover:text-red-500 text-sm"
-                    disabled={loading}
-                  >
-                    Remove Photo
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div className="mt-2 text-sm text-gray-500">
-              Supported formats: JPEG, PNG, JPG, WebP (Max 5MB) or use camera
-            </div>
-            {formErrors.picture && (
-              <div className="mt-1 text-red-600 text-sm">{formErrors.picture}</div>
-            )}
-          </div> */}
+          
 
           {/* Failure Reason Section - শুধুমাত্র FAILED হলে দেখাবে */}
           {showFailureReason && (
@@ -1402,8 +1305,8 @@ className='text-center'
               <button
                 type="button"
                 onClick={() => handleSubmit('PASSED')}
-                disabled={loading || (formData.nid && nidExists)}
-                className="w-full btn-sweep btn-success px-6 py-3 text-md font-bold disabled:bg-gray-400 disabled:cursor-not-allowed"
+                disabled={loading}
+                className="w-full btn-sweep btn-success px-6 py-3 text-md font-bold "
               >
                 {loading ? 'Processing...' : 'PASSED'}
               </button>
@@ -1411,7 +1314,7 @@ className='text-center'
               <button
                 type="button"
                 onClick={() => handleSubmit('FAILED')}
-                disabled={loading || (formData.nid && nidExists)}
+                disabled={loading}
                 className="w-full btn-sweep btn-danger px-6 py-3 text-md font-bold disabled:cursor-not-allowed " 
               >
                 {loading ? 'Processing...' : 'FAILED'}
