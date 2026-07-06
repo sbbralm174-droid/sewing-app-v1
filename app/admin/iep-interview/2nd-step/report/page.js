@@ -80,7 +80,7 @@ const ReportPage = () => {
   };
 
   return (
-    <div className="p-4 bg-gray-50 mt-20 min-h-screen font-sans">
+    <div className="p-4 bg-gray-50 mt-20 text-black min-h-screen font-sans">
       <div className="max-w-7xl mx-auto bg-white shadow-sm border rounded-lg">
         
         {/* Header/Filter Bar */}

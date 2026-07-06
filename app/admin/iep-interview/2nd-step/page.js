@@ -248,6 +248,7 @@ export default function InterviewStepTwo() {
         setShowReasonInput(false); 
         setFailureReason('');
         fetchCandidates(); 
+        fetchFloorSummary();
       } else {
         const errorData = await response.json();
         setMessage(errorData.message || 'Failed to update candidate status');
@@ -270,10 +271,7 @@ export default function InterviewStepTwo() {
   
   const handleFailedButtonClick = () => {
     // District validation before showing reason input
-    if (!homeDistrict.trim()) {
-      alert("Please select Home District before submitting.");
-      return;
-    }
+    
     setShowReasonInput(true);
     setTimeout(() => document.getElementById('failureReason')?.focus(), 100);
   };

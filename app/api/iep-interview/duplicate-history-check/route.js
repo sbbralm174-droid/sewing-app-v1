@@ -42,16 +42,25 @@ export async function GET() {
     });
 
     // resign history check
+    const allCandidateIds = [...idMap.keys()];
+
     const resignHistoryData = await ResignHistory.find(
       {
-        nid: { $in: [...idMap.keys()] },
+        $or: [
+          { nid: { $in: allCandidateIds } },
+          { birthCertificate: { $in: allCandidateIds } }
+        ]
       },
       {
         nid: 1,
+        birthCertificate: 1,
       }
     ).lean();
 
-    const resignIds = resignHistoryData.map((r) => r.nid);
+    // nid অথবা birthCertificate—যেটিই থাকুক না কেন, সেটিকে অ্যারেতে পুশ করো
+    const resignIds = resignHistoryData
+      .map((r) => r.nid || r.birthCertificate)
+      .filter(Boolean);
 
     return NextResponse.json({
       success: true,

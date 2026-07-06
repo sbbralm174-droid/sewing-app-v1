@@ -20,27 +20,30 @@ export default function CandidateReport() {
   const [duplicateIds, setDuplicateIds] = useState([]);
   const [resignIds, setResignIds] = useState([]);
 
+  // নতুন স্টেট: কোন summary card টি বর্তমানে সিলেক্টেড আছে তা ট্র্যাক করার জন্য
+  const [activeSummaryFilter, setActiveSummaryFilter] = useState(null); 
+
   useEffect(() => {
-  fetchReport();
-  fetchDuplicateAndResignData();
-}, []);
+    fetchReport();
+    fetchDuplicateAndResignData();
+  }, []);
 
   const fetchDuplicateAndResignData = async () => {
-  try {
-    const res = await fetch(
-      "/api/iep-interview/duplicate-history-check"
-    );
+    try {
+      const res = await fetch(
+        "/api/iep-interview/duplicate-history-check"
+      );
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (data.success) {
-      setDuplicateIds(data.duplicateIds || []);
-      setResignIds(data.resignIds || []);
+      if (data.success) {
+        setDuplicateIds(data.duplicateIds || []);
+        setResignIds(data.resignIds || []);
+      }
+    } catch (err) {
+      console.error(err);
     }
-  } catch (err) {
-    console.error(err);
-  }
-};
+  };
 
   const fetchReport = async (start = '', end = '') => {
     try {
@@ -62,7 +65,6 @@ export default function CandidateReport() {
     }
   };
 
-  // NID/Birth Certificate দিয়ে প্রোফাইল খোঁজার ফাংশন
   const fetchCandidateProfile = async (idValue) => {
     try {
       setProfileLoading(true);
@@ -75,6 +77,7 @@ export default function CandidateReport() {
 
       if (data.success) {
         setProfileData(data.results);
+        console.log(data.results);
       }
     } catch (err) {
       console.error("Error fetching history:", err);
@@ -94,21 +97,34 @@ export default function CandidateReport() {
     setShowDuplicates(false);
     setShowFailedOnly(false);
     setSelectedIdType("ALL");
+    setActiveSummaryFilter(null); // Summary filter reset
     fetchReport();
   };
 
-  // Logic to filter candidates
+  // কার্ডে ক্লিক করলে স্টেট টগল করার ফাংশন
+  const handleSummaryCardClick = (filterType) => {
+    if (activeSummaryFilter === filterType) {
+      setActiveSummaryFilter(null); // দ্বিতীয়বার ক্লিক করলে ফিল্টার ক্লিয়ার হবে
+    } else {
+      setActiveSummaryFilter(filterType); // প্রথমবার ক্লিক করলে ফিল্টার অ্যাপ্লাই হবে
+    }
+  };
+
+  // মূল ক্যান্ডিডেট ডেটা ফিল্টারিং লজিক
   let filteredCandidates = useMemo(() => {
     let data = reportData?.candidates || [];
 
+    // ১. ফ্লোর ফিল্টার
     if (selectedFloor !== "All") {
       data = data.filter(c => c.floor === selectedFloor);
     }
 
+    // ২. বাটন ফিল্টার (Failed Only)
     if (showFailedOnly) {
       data = data.filter(c => c.overallStatus === "FAILED");
     }
 
+    // ৩. বাটন ফিল্টার (Duplicates)
     if (showDuplicates) {
       const seen = new Map();
       const dup = new Set();
@@ -121,42 +137,54 @@ export default function CandidateReport() {
       data = data.filter(c => dup.has(c.nid || c.birthCertificate));
     }
 
+    // ৪. আইডি টাইপ ফিল্টার
     if (selectedIdType !== "ALL") {
         data = data.filter(c => (c.nid || c.birthCertificate) === selectedIdType);
     }
 
-    return data;
-  }, [reportData, selectedFloor, showFailedOnly, showDuplicates, selectedIdType]);
-
-
-const duplicateCount = useMemo(() => {
-  const seen = new Map();
-  const uniqueDuplicateIds = new Set();
-
-  filteredCandidates.forEach((c) => {
-    const id = c.nid || c.birthCertificate;
-    if (!id) return;
-
-    if (seen.has(id)) {
-      uniqueDuplicateIds.add(id);
-    } else {
-      seen.set(id, true);
+    // ৫. Summary Card ভিত্তিক ডাইনামিক ফিল্টারিং (যা আপনি চেয়েছেন)
+    if (activeSummaryFilter) {
+      switch (activeSummaryFilter) {
+        case 'PENDING':
+          data = data.filter(c => c.overallStatus === 'PENDING');
+          break;
+        case 'PASSED':
+          data = data.filter(c => c.overallStatus === 'PASSED');
+          break;
+        case 'FAILED':
+          data = data.filter(c => c.overallStatus === 'FAILED');
+          break;
+        case 'MULTIPLE_INTERVIEW':
+          data = data.filter(c => duplicateIds.includes(c.nid || c.birthCertificate));
+          break;
+        case 'RESIGN_HISTORY':
+          data = data.filter(c => resignIds.includes(c.nid || c.birthCertificate));
+          break;
+        default:
+          break;
+      }
     }
-  });
 
-  return uniqueDuplicateIds.size;
-}, [filteredCandidates]);
-
+    return data;
+  }, [reportData, selectedFloor, showFailedOnly, showDuplicates, selectedIdType, activeSummaryFilter, duplicateIds, resignIds]);
 
 
-  const filteredSummary = {
-    total: filteredCandidates.length,
-    pending: filteredCandidates.filter(c => c.overallStatus === 'PENDING').length,
-    passed: filteredCandidates.filter(c => c.overallStatus === 'PASSED').length,
-    failed: filteredCandidates.filter(c => c.overallStatus === 'FAILED').length,
-  };
+  // Summary কার্ডের জন্য আনফিল্টারড/স্ট্যাটিক কাউন্ট (যাতে টেবিল ফিল্টার হলেও কার্ডের সংখ্যাগুলো অপরিবর্তিত থাকে)
+  const baseSummary = useMemo(() => {
+    let data = reportData?.candidates || [];
+    if (selectedFloor !== "All") {
+      data = data.filter(c => c.floor === selectedFloor);
+    }
+    return {
+      total: data.length,
+      pending: data.filter(c => c.overallStatus === 'PENDING').length,
+      passed: data.filter(c => c.overallStatus === 'PASSED').length,
+      failed: data.filter(c => c.overallStatus === 'FAILED').length,
+      multiple: data.filter(c => duplicateIds.includes(c.nid || c.birthCertificate)).length,
+      resign: data.filter(c => resignIds.includes(c.nid || c.birthCertificate)).length,
+    };
+  }, [reportData, selectedFloor, duplicateIds, resignIds]);
 
-  const uniqueFloors = ['All', ...new Set(reportData?.candidates?.map(c => c.floor).filter(Boolean))];
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -185,60 +213,70 @@ const duplicateCount = useMemo(() => {
     );
   }
 
+  const uniqueFloors = ['All', ...new Set(reportData?.candidates?.map(c => c.floor).filter(Boolean))];
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen text-black bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold mt-10 text-gray-900 mb-8">Candidate Tracker</h1>
 
-        {/* Summary Section */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
+        {/* Summary Section - কার্ডগুলোতে onClick এবং একটি একটিভ বর্ডার ইফেক্ট যোগ করা হয়েছে */}
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-8">
+          
+          {/* Total Card */}
+          <div 
+            onClick={() => handleSummaryCardClick(null)}
+            className={`bg-white rounded-lg shadow p-4 border-l-4 border-blue-500 cursor-pointer transition-all ${activeSummaryFilter === null ? 'ring-2 ring-blue-400 scale-105' : 'hover:bg-gray-50'}`}
+          >
             <h2 className="text-sm font-medium text-gray-500">Total Candidates</h2>
-            <p className="text-2xl font-bold text-gray-900">{filteredSummary.total}</p>
+            <p className="text-2xl font-bold text-gray-900">{baseSummary.total}</p>
           </div>
-          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-500">
+
+          {/* Pending Card */}
+          <div 
+            onClick={() => handleSummaryCardClick('PENDING')}
+            className={`bg-white rounded-lg shadow p-4 border-l-4 border-yellow-500 cursor-pointer transition-all ${activeSummaryFilter === 'PENDING' ? 'ring-2 ring-yellow-400 scale-105' : 'hover:bg-gray-50'}`}
+          >
             <h2 className="text-sm font-medium text-gray-500">Pending</h2>
-            <p className="text-2xl font-bold text-gray-900">{filteredSummary.pending}</p>
+            <p className="text-2xl font-bold text-gray-900">{baseSummary.pending}</p>
           </div>
-          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
+
+          {/* Passed Card */}
+          <div 
+            onClick={() => handleSummaryCardClick('PASSED')}
+            className={`bg-white rounded-lg shadow p-4 border-l-4 border-green-500 cursor-pointer transition-all ${activeSummaryFilter === 'PASSED' ? 'ring-2 ring-green-400 scale-105' : 'hover:bg-gray-50'}`}
+          >
             <h2 className="text-sm font-medium text-gray-500">Passed</h2>
-            <p className="text-2xl font-bold text-gray-900">{filteredSummary.passed}</p>
+            <p className="text-2xl font-bold text-gray-900">{baseSummary.passed}</p>
           </div>
-          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-red-500">
+
+          {/* Failed Card */}
+          <div 
+            onClick={() => handleSummaryCardClick('FAILED')}
+            className={`bg-white rounded-lg shadow p-4 border-l-4 border-red-500 cursor-pointer transition-all ${activeSummaryFilter === 'FAILED' ? 'ring-2 ring-red-400 scale-105' : 'hover:bg-gray-50'}`}
+          >
             <h2 className="text-sm font-medium text-gray-500">Failed</h2>
-            <p className="text-2xl font-bold text-gray-900">{filteredSummary.failed}</p>
+            <p className="text-2xl font-bold text-gray-900">{baseSummary.failed}</p>
           </div>
-          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-orange-500">
-            <h2 className="text-sm font-medium text-gray-500">Duplicate IDs (Unique)</h2>
-            <p className="text-2xl font-bold text-gray-900">{duplicateCount}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-red-500">
-            <h2 className="text-sm font-medium text-gray-500">
-              Multiple Interview
-            </h2>
-
-            <p className="text-2xl font-bold text-gray-900">
-              {
-                filteredCandidates.filter((c) =>
-                  duplicateIds.includes(c.nid || c.birthCertificate)
-                ).length
-              }
-            </p>
+          
+          {/* Multiple Interview Card */}
+          <div 
+            onClick={() => handleSummaryCardClick('MULTIPLE_INTERVIEW')}
+            className={`bg-white rounded-lg shadow p-4 border-l-4 border-orange-500 cursor-pointer transition-all ${activeSummaryFilter === 'MULTIPLE_INTERVIEW' ? 'ring-2 ring-orange-400 scale-105' : 'hover:bg-gray-50'}`}
+          >
+            <h2 className="text-sm font-medium text-gray-500">Multiple Interview</h2>
+            <p className="text-2xl font-bold text-gray-900">{baseSummary.multiple}</p>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-pink-500">
-            <h2 className="text-sm font-medium text-gray-500">
-              Resign History
-            </h2>
-
-            <p className="text-2xl font-bold text-gray-900">
-              {
-                filteredCandidates.filter((c) =>
-                  resignIds.includes(c.nid || c.birthCertificate)
-                ).length
-              }
-            </p>
+          {/* Resign History Card */}
+          <div 
+            onClick={() => handleSummaryCardClick('RESIGN_HISTORY')}
+            className={`bg-white rounded-lg shadow p-4 border-l-4 border-pink-500 cursor-pointer transition-all ${activeSummaryFilter === 'RESIGN_HISTORY' ? 'ring-2 ring-pink-400 scale-105' : 'hover:bg-gray-50'}`}
+          >
+            <h2 className="text-sm font-medium text-gray-500">Resign History</h2>
+            <p className="text-2xl font-bold text-gray-900">{baseSummary.resign}</p>
           </div>
+
         </div>
 
         {/* Filter Section */}
@@ -279,12 +317,9 @@ const duplicateCount = useMemo(() => {
               </select>
             </div>
 
-            
-
             <div className="flex gap-2">
-                {/* Duplicate Button */}
                 <button
-                  onClick={() => setShowDuplicates(!showDuplicates)} // শুধু নিজের স্টেট টগল করবে
+                  onClick={() => setShowDuplicates(!showDuplicates)}
                   className={`px-4 py-2 rounded-md text-sm font-semibold border ${
                     showDuplicates ? "bg-orange-500 text-white" : "bg-white text-gray-700"
                   }`}
@@ -292,9 +327,8 @@ const duplicateCount = useMemo(() => {
                   Duplicate
                 </button>
 
-                {/* Failed Button */}
                 <button
-                  onClick={() => setShowFailedOnly(!showFailedOnly)} // শুধু নিজের স্টেট টগল করবে
+                  onClick={() => setShowFailedOnly(!showFailedOnly)}
                   className={`px-4 py-2 rounded-md text-sm font-semibold border ${
                     showFailedOnly ? "bg-red-500 text-white" : "bg-white text-gray-700"
                   }`}
@@ -309,7 +343,7 @@ const duplicateCount = useMemo(() => {
           </div>
         </div>
 
-        {/* Modal: Candidate History by NID/Birth Certificate */}
+        {/* Modal: Candidate History */}
         {selectedIdValue && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-lg shadow-xl p-6 relative">
@@ -326,7 +360,6 @@ const duplicateCount = useMemo(() => {
                 <div className="space-y-6">
                   {profileData?.iepInterviewStepOne?.data?.map((stepOne, idx) => {
                     const cid = stepOne.candidateId;
-                    // Find matching data from other steps for this specific candidateId
                     const downAdmin = profileData?.iepInterviewDownAdmin?.data?.find(d => d.candidateId === cid);
                     const iepMain = profileData?.iepInterview?.data?.find(i => i.candidateId === cid);
                     const adminMain = profileData?.adminInterview?.data?.find(a => a.candidateId === cid);
@@ -344,13 +377,11 @@ const duplicateCount = useMemo(() => {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                          {/* SECURITY */}
                           <div className="p-3 bg-white rounded border">
                             <h4 className="text-xs font-bold text-gray-400 uppercase mb-1">1. Security</h4>
                             <p className={`font-bold ${getStepColor(stepOne.result)}`}>{stepOne.result}</p>
                           </div>
 
-                          {/* DOWN ADMIN */}
                           <div className="p-3 bg-white rounded border">
                             <h4 className="text-xs font-bold text-gray-400 uppercase mb-1">2. Down Admin</h4>
                             {downAdmin ? (
@@ -362,7 +393,6 @@ const duplicateCount = useMemo(() => {
                             ) : <p className="text-xs text-gray-400 italic">No Data</p>}
                           </div>
 
-                          {/* IEP */}
                           <div className="p-3 bg-white rounded border">
                             <h4 className="text-xs font-bold text-gray-400 uppercase mb-1">3. IEP Interview</h4>
                             {iepMain ? (
@@ -374,7 +404,6 @@ const duplicateCount = useMemo(() => {
                             ) : <p className="text-xs text-gray-400 italic">No Data</p>}
                           </div>
 
-                          {/* ADMIN */}
                           <div className="p-3 bg-white rounded border">
                             <h4 className="text-xs font-bold text-gray-400 uppercase mb-1">4. Admin Interview</h4>
                             {adminMain ? (
@@ -384,66 +413,25 @@ const duplicateCount = useMemo(() => {
                               </>
                             ) : <p className="text-xs text-gray-400 italic">No Data</p>}
                           </div>
-                          {/* RESIGN HISTORY */}
+
                           <div className="p-3 bg-white rounded border md:col-span-4">
-                            <h4 className="text-xs font-bold text-gray-400 uppercase mb-3">
-                              5. Resignation History
-                            </h4>
-
+                            <h4 className="text-xs font-bold text-gray-400 uppercase mb-3">5. Resignation History</h4>
                             {profileData?.resignHistory?.data?.length > 0 ? (
-                              <div className="space-y-3">
+                              <div className="space-y-3 text-black">
                                 {profileData.resignHistory.data.map((history) => (
-                                  <div
-                                    key={history._id}
-                                    className="border rounded p-3 bg-red-50"
-                                  >
+                                  <div key={history._id} className="border rounded p-3 bg-red-50">
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-                                      <div>
-                                        <span className="font-semibold text-gray-600">Operator ID:</span>
-                                        <p>{history.operatorId}</p>
-                                      </div>
-
-                                      <div>
-                                        <span className="font-semibold text-gray-600">Department:</span>
-                                        <p>{history.department}</p>
-                                      </div>
-
-                                      <div>
-                                        <span className="font-semibold text-gray-600">Floor:</span>
-                                        <p>{history.floor}</p>
-                                      </div>
-
-                                      <div>
-                                        <span className="font-semibold text-gray-600">Designation:</span>
-                                        <p>{history.designation}</p>
-                                      </div>
-
-                                      <div>
-                                        <span className="font-semibold text-gray-600">Joining Date:</span>
-                                        <p>
-                                          {history.joiningDate
-                                            ? new Date(history.joiningDate).toLocaleDateString()
-                                            : "N/A"}
-                                        </p>
-                                      </div>
-
-                                      <div>
-                                        <span className="font-semibold text-gray-600">Resignation Date:</span>
-                                        <p>
-                                          {history.resignationDate
-                                            ? new Date(history.resignationDate).toLocaleDateString()
-                                            : "N/A"}
-                                        </p>
-                                      </div>
+                                      <div><span className="font-semibold text-gray-600">Operator ID:</span><p>{history.operatorId}</p></div>
+                                      <div><span className="font-semibold text-gray-600">Department:</span><p>{history.department}</p></div>
+                                      <div><span className="font-semibold text-gray-600">Floor:</span><p>{history.floor}</p></div>
+                                      <div><span className="font-semibold text-gray-600">Designation:</span><p>{history.designation}</p></div>
+                                      <div><span className="font-semibold text-gray-600">Joining Date:</span><p>{history.joiningDate ? new Date(history.joiningDate).toLocaleDateString() : "N/A"}</p></div>
+                                      <div><span className="font-semibold text-gray-600">Resignation Date:</span><p>{history.resignationDate ? new Date(history.resignationDate).toLocaleDateString() : "N/A"}</p></div>
                                     </div>
-
                                     <div className="mt-3">
                                       <span className="font-semibold text-red-700">Reason:</span>
-                                      <p className="text-red-600 font-medium">
-                                        {history.reason || "N/A"}
-                                      </p>
+                                      <p className="text-red-600 font-medium">{history.reason || "N/A"}</p>
                                     </div>
-
                                     {history.remarks && (
                                       <div className="mt-2">
                                         <span className="font-semibold text-gray-600">Remarks:</span>
@@ -454,17 +442,13 @@ const duplicateCount = useMemo(() => {
                                 ))}
                               </div>
                             ) : (
-                              <p className="text-xs text-gray-400 italic">
-                                No resignation history found
-                              </p>
+                              <p className="text-xs text-gray-400 italic">No resignation history found</p>
                             )}
                           </div>
-
                         </div>
                       </div>
                     );
                   })}
-                  
                   {(!profileData?.iepInterviewStepOne?.data || profileData?.iepInterviewStepOne?.count === 0) && (
                     <div className="text-center py-10 text-gray-500">No records found for this candidate.</div>
                   )}
@@ -494,27 +478,12 @@ const duplicateCount = useMemo(() => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredCandidates.slice().reverse().map((candidate, index) => (
                   <tr
-                      key={candidate.candidateId}
-                      className={`
-                        
-
-                        ${
-                          duplicateIds.includes(
-                            candidate.nid || candidate.birthCertificate
-                          )
-                            ? "bg-red-100"
-                            : ""
-                        }
-
-                        ${
-                          resignIds.includes(
-                            candidate.nid || candidate.birthCertificate
-                          )
-                            ? "bg-yellow-100"
-                            : ""
-                        }
-                      `}
-                    >
+                    key={candidate.candidateId}
+                    className={`
+                      ${duplicateIds.includes(candidate.nid || candidate.birthCertificate) ? "bg-red-100" : ""}
+                      ${resignIds.includes(candidate.nid || candidate.birthCertificate) ? "bg-yellow-100" : ""}
+                    `}
+                  >
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{filteredCandidates.length - index}</td>
                     <td className="px-4 py-2 whitespace-nowrap">
                       <div className="flex items-center space-x-2">

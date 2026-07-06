@@ -1,8 +1,4 @@
 // utils/uiApiMapping.js
-
-
-
-
 export const UI_API_MAPPING = {
   // Admin Dashboard
   '/admin': [

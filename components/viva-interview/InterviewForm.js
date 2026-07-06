@@ -307,18 +307,7 @@ export default function InterviewForm({ candidateInfo, apiData, onBackToSearch, 
         />
       ) : (
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Success and Error Messages */}
-          {successMessage && (
-            <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-md text-center">
-              {successMessage}
-            </div>
-          )}
-
-          {errorMessage && (
-            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-center">
-              {errorMessage}
-            </div>
-          )}
+          
 
           {uploading && (
             <div className="mb-4 p-3 bg-blue-100 text-blue-700 rounded-md">
@@ -390,8 +379,20 @@ export default function InterviewForm({ candidateInfo, apiData, onBackToSearch, 
             formData={formData}
             onChange={handleChange}
           />
+{/* Success and Error Messages */}
+          {successMessage && (
+            <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-md text-center">
+              {successMessage}
+            </div>
+          )}
 
+          {errorMessage && (
+            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-center">
+              {errorMessage}
+            </div>
+          )}
           <div className="flex space-x-4">
+            
             <button
               type="button"
               onClick={onBackToSearch}

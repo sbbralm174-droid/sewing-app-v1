@@ -213,7 +213,7 @@ export default function AdminInterviewPage() {
         </div>
 
         {/* ফিল্টার সেকশন */}
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 mb-6">
+        <div className="bg-white text-black p-5 rounded-xl shadow-sm border border-slate-200 mb-6">
           <div className="flex items-center gap-2 mb-4">
             <Filter className="h-5 w-5 text-indigo-500" />
             <h2 className="font-semibold text-slate-700">Filters</h2>

@@ -101,7 +101,7 @@ export default function InventoryReport() {
             </div>
 
             {/* ৪. সার্চ ও ফিল্টার বক্স (আপডেট করা হয়েছে) */}
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mb-6">
+            <div className="bg-white p-4 rounded-2xl shadow-sm border text-black border-slate-200 mb-6">
                 <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
                     {/* সার্চ */}
                     <div className="relative">

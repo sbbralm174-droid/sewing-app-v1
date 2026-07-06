@@ -24,22 +24,13 @@ const candidateSchema = new mongoose.Schema({
     default: ''
   },
 
+  // 💡 FLOOR FIELD - ক্লিন এবং সুরক্ষিত স্ট্রাকচার
   floor: {
-  type: String,
-  enum: ['SHAPLA', 'PODDO', 'KODOM', 'BELLY'],
-  required: function () {
-    return this.result === 'PASSED';
+    type: String,
+    enum: ['SHAPLA', 'PODDO', 'KODOM', 'BELLY', ''], // খালি স্ট্রিং এলাউড রাখা হলো সেফটির জন্য
+    trim: true,
+    default: ''
   },
-  validate: {
-    validator: function(value) {
-      if (this.result === 'PASSED') {
-        return value && value.trim() !== '';
-      }
-      return true;
-    },
-    message: 'Floor is required when result is PASSED'
-  }
-},
 
   stepCompleted: {
     type: Number,
@@ -77,34 +68,16 @@ const candidateSchema = new mongoose.Schema({
   
   // Experience with machines
   experienceMachines: {
-    SNLS_DNLS: {
-      type: Boolean,
-      default: false
-    },
-    OverLock: {
-      type: Boolean,
-      default: false
-    },
-    FlatLock: {
-      type: Boolean,
-      default: false
-    }
+    SNLS_DNLS: { type: Boolean, default: false },
+    OverLock: { type: Boolean, default: false },
+    FlatLock: { type: Boolean, default: false }
   },
   
   // Designation preferences
   designation: {
-    ASST_OPERATOR: {
-      type: Boolean,
-      default: false
-    },
-    OPERATOR: {
-      type: Boolean,
-      default: false
-    }
+    ASST_OPERATOR: { type: Boolean, default: false },
+    OPERATOR: { type: Boolean, default: false }
   },
-  
-  // Floor information - ADD THIS FIELD
-  
   
   // Additional information
   otherInfo: {
@@ -129,14 +102,14 @@ const candidateSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Index for better query performance
+// Indexes
 candidateSchema.index({ candidateId: 1 });
 candidateSchema.index({ result: 1 });
 candidateSchema.index({ createdAt: -1 });
 
-// Virtual for formatted created date
+// Virtuals
 candidateSchema.virtual('formattedCreatedAt').get(function() {
-  return this.createdAt.toLocaleDateString('en-BD');
+  return this.createdAt ? this.createdAt.toLocaleDateString('en-BD') : '';
 });
 
 // Pre-save middleware to sync status with result
@@ -145,42 +118,11 @@ candidateSchema.pre('save', function(next) {
     this.status = 'passed';
   } else if (this.result === 'FAILED') {
     this.status = 'failed';
+    this.floor = ''; // FAILED হলে ফ্লোর ফাঁকা করে দেবে
   }
   next();
 });
 
-// Static method to find by candidateId
-candidateSchema.statics.findByCandidateId = function(candidateId) {
-  return this.findOne({ candidateId });
-};
-
-// Static method to find passed candidates
-candidateSchema.statics.findPassed = function() {
-  return this.find({ result: 'PASSED' });
-};
-
-// Static method to find failed candidates
-candidateSchema.statics.findFailed = function() {
-  return this.find({ result: 'FAILED' });
-};
-
-// Instance method to mark as passed
-candidateSchema.methods.markAsPassed = function() {
-  this.result = 'PASSED';
-  this.status = 'passed';
-  return this.save();
-};
-
-// Instance method to mark as failed
-candidateSchema.methods.markAsFailed = function(reason) {
-  this.result = 'FAILED';
-  this.status = 'failed';
-  this.failureReason = reason || '';
-  return this.save();
-};
-
-
 const Candidate = mongoose.models.Candidate || mongoose.model('Candidate', candidateSchema);
 
 export default Candidate;
-
