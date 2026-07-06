@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
-import DefectForm from '@/components/DefectForm';
-import DefectList from '@/components/DefectList';
+import DefectForm from '../../../components/DefectForm';
+import DefectList from '../../../components/DefectList';
 
 export default function DefectsPage() {
   const [defects, setDefects] = useState([]);

@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import Head from 'next/head';
-import Layout from '@/components/Layout';
-import SidebarNavLayout from '@/components/SidebarNavLayout';
+import Layout from '../../../components/Layout';
+import SidebarNavLayout from '../../../components/SidebarNavLayout';
 
 export default function FloorEntryPage() {
   const [floorName, setFloorName] = useState('');

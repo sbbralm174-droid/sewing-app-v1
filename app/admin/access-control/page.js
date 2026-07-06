@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import {  getApisForPage, getApisForPages } from '@/utils/uiApiMapping';
+import { getApisForPage, getApisForPages } from '../../../utils/uiApiMapping';
 
 // Define all available pages in the system
 const ALL_PAGES = [
