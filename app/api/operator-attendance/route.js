@@ -40,19 +40,22 @@ export async function GET(req) {
       );
 
       productionMap.set(item.operator.operatorId, {
-        status: "Present",
+  status: "Present",
 
-        process:
-          item.breakdownProcessTitle ||
-          item.breakdownProcess ||
-          item.process ||
-          "-",
+  process:
+    item.breakdownProcessTitle ||
+    item.breakdownProcess ||
+    item.process ||
+    "-",
 
-        production: totalProduction,
+  production: totalProduction,
 
-        floor: item.floor,
-        line: item.line,
-      });
+  floor: item.floor,
+  line: item.line,
+
+  uniqueMachine: item.uniqueMachine || "-",   // <-- এটা যোগ করো
+  machineType: item.machineType || "-",       // চাইলে এটাও
+});
     });
 
     const result = operators.map((op) => {
@@ -64,6 +67,7 @@ export async function GET(req) {
         employeeId: op.employeeId,
         name: op.name,
         designation: op.designation,
+        machine: found?.uniqueMachine || "-",
 
         status: found ? found.status : "Absent",
 
