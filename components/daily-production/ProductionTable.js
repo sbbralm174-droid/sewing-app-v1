@@ -8,7 +8,8 @@ export default function ProductionTable({
   selectedRow,
   onRowSelect,
   onAddRow,
-  onUpdateRow 
+  onUpdateRow,
+  onDeleteRow // 🔥 ১. ডিলিট করার প্রপসটি এখানে রিসিভ করা হলো
 }) {
   const [editingRow, setEditingRow] = useState(null);
   const [editData, setEditData] = useState({});
@@ -25,44 +26,40 @@ export default function ProductionTable({
   };
 
   const newRow = {
-  operator: null,
-  machine: null,
-  process: '',
-  breakdownProcess: '',
-  smv: '',
-  workAs: 'Helper', // ✅ default
-  target: '',
-};
-
-
-const handleMachineAssign = (index, machineData) => {
-  const updatedRow = {
-    ...rows[index],
-    machine: machineData,
-    workAs: 'Operator', // ✅ machine পেলেই auto Operator
-  };
-
-  onUpdateRow(index, updatedRow);
-};
-
-const handleRemoveMachine = (index) => {
-  const updatedRow = {
-    ...rows[index],
+    operator: null,
     machine: null,
-    workAs: 'Helper', // ✅ fallback
+    process: '',
+    breakdownProcess: '',
+    smv: '',
+    workAs: 'Helper', 
+    target: '',
   };
 
-  onUpdateRow(index, updatedRow);
-};
+  const handleMachineAssign = (index, machineData) => {
+    const updatedRow = {
+      ...rows[index],
+      machine: machineData,
+      workAs: 'Operator', 
+    };
+    onUpdateRow(index, updatedRow);
+  };
 
+  const handleRemoveMachine = (index) => {
+    const updatedRow = {
+      ...rows[index],
+      machine: null,
+      workAs: 'Helper', 
+    };
+    onUpdateRow(index, updatedRow);
+  };
 
-useEffect(() => {
-  if (editData.machine) {
-    setEditData(prev => ({ ...prev, workAs: 'Operator' }));
-  } else {
-    setEditData(prev => ({ ...prev, workAs: 'Helper' }));
-  }
-}, [editData.machine]);
+  useEffect(() => {
+    if (editData.machine) {
+      setEditData(prev => ({ ...prev, workAs: 'Operator' }));
+    } else {
+      setEditData(prev => ({ ...prev, workAs: 'Helper' }));
+    }
+  }, [editData.machine]);
 
   const handleCancelClick = () => {
     setEditingRow(null);
@@ -75,16 +72,13 @@ useEffect(() => {
   };
 
   const handleMachineCellClick = (e, index) => {
-  e.stopPropagation();
-  
-  // চেক করুন যে row-এ অপারেটর আছে কিনা
-  if (!rows[index].operator) {
-    alert(`⚠️ Row ${index + 1} has no operator. Please assign an operator first before assigning a machine.`);
-    return;
-  }
-  
-  onRowSelect(index);
-};
+    e.stopPropagation();
+    if (!rows[index].operator) {
+      alert(`⚠️ Row ${index + 1} has no operator. Please assign an operator first before assigning a machine.`);
+      return;
+    }
+    onRowSelect(index);
+  };
 
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -120,41 +114,23 @@ useEffect(() => {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Row
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Operator
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Machine
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Process
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Breakdown Process
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                SMV
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Work As
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Target
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Row</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Operator</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Machine</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Process</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Breakdown Process</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SMV</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Work As</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Target</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {rows.map((row, index) => (
               <tr 
-                key={index} 
-                className={`hover:bg-gray-50 ${selectedRow === index ? 'bg-blue-50' : ''} ${row.isNew ? 'bg-green-50 animate-pulse' : ''}`}
-              >
+  key={index} 
+  className={`hover:bg-gray-50 ${selectedRow === index ? 'bg-blue-50' : ''}`}
+>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                   {rows.length - index}
                 </td>
@@ -176,9 +152,7 @@ useEffect(() => {
                   )}
                 </td>
                 
-                <td 
-                  className="px-6 py-4 whitespace-nowrap text-sm"
-                >
+                <td className="px-6 py-4 whitespace-nowrap text-sm">
                   <div 
                     onClick={(e) => handleMachineCellClick(e, index)}
                     className={`p-2 rounded cursor-pointer transition-all ${selectedRow === index ? 'bg-yellow-100 border-2 border-yellow-400' : 'bg-gray-100 hover:bg-gray-200 border border-transparent'}`}
@@ -205,8 +179,6 @@ useEffect(() => {
                     )}
                   </div>
                 </td>
-                
-                {/* ... rest of the cells remain the same ... */}
                 
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {editingRow === index ? (
@@ -251,19 +223,19 @@ useEffect(() => {
                   )}
                 </td>
                 
-                  <td>
-  <select
-    value={row.machine ? 'operator' : (row.workAs || 'Helper')}
-    onChange={() => {}}
-    disabled={row.machine}
-    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-  >
-    <option value="Helper">Helper</option>
-    <option value="operator">Operator</option>
-    <option value="Supervisor">Supervisor</option>
-    <option value="Quality Checker">Quality Checker</option>
-  </select>
-</td>
+                <td>
+                  <select
+                    value={row.machine ? 'operator' : (row.workAs || 'Helper')}
+                    onChange={() => {}}
+                    disabled={row.machine}
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                  >
+                    <option value="Helper">Helper</option>
+                    <option value="operator">Operator</option>
+                    <option value="Supervisor">Supervisor</option>
+                    <option value="Quality Checker">Quality Checker</option>
+                  </select>
+                </td>
                 
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {editingRow === index ? (
@@ -296,18 +268,30 @@ useEffect(() => {
                       </button>
                     </div>
                   ) : (
-                    <button
-                      onClick={() => handleEditClick(row, index)}
-                      className="text-blue-600 hover:text-blue-900"
-                    >
-                      Edit
-                    </button>
+                    // 🔥 ২. এখানে Edit এর পাশে একটি স্পেস রেখে সুন্দর করে লাল রঙের Delete বাটন অ্যাড করা হয়েছে।
+                    <div className="flex space-x-3">
+                      <button
+                        onClick={() => handleEditClick(row, index)}
+                        className="text-blue-600 hover:text-blue-900"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm(`Are you sure you want to delete row ${rows.length - index}?`)) {
+                            onDeleteRow(index);
+                          }
+                        }}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   )}
                 </td>
               </tr>
             ))}
             
-            {/* Empty state */}
             {rows.length === 0 && (
               <tr>
                 <td colSpan="9" className="px-6 py-8 text-center text-gray-500">
@@ -321,24 +305,10 @@ useEffect(() => {
       
       <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
         <div className="flex justify-between items-center text-sm text-gray-600">
-          <div>
-            Total Rows: <span className="font-medium">{rows.length}</span>
-          </div>
-          <div>
-            Operators Assigned: <span className="font-medium">
-              {rows.filter(row => row.operator).length}
-            </span>
-          </div>
-          <div>
-            Machines Assigned: <span className="font-medium">
-              {rows.filter(row => row.machine).length}
-            </span>
-          </div>
-          <div>
-            Selected Row: <span className="font-medium text-blue-600">
-              {selectedRow !== null ? `${selectedRow + 1}` : 'None'}
-            </span>
-          </div>
+          <div>Total Rows: <span className="font-medium">{rows.length}</span></div>
+          <div>Operators Assigned: <span className="font-medium">{rows.filter(row => row.operator).length}</span></div>
+          <div>Machines Assigned: <span className="font-medium">{rows.filter(row => row.machine).length}</span></div>
+          <div>Selected Row: <span className="font-medium text-blue-600">{selectedRow !== null ? `${selectedRow + 1}` : 'None'}</span></div>
         </div>
       </div>
     </div>
